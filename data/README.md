@@ -142,11 +142,32 @@ cannot support sufficient diversity. Reserve scenario families before authoring 
 
 ## Reproduce and interpret the statistics
 
-Obtain a complete checkout of the pinned upstream `data/` directory, then run from this repo:
+Fetch the pinned source using Python 3.11+ and Git (no Git LFS or Python packages required):
 
 ```sh
-python scripts/inventory_sources.py /path/to/endless-sky --output data/overview/source-statistics.json
+python scripts/fetch_sources.py
+python scripts/inventory_sources.py data/local/endless-sky-7140eb2a29ce --output data/overview/source-statistics.json
 ```
+
+The fetch command reads the revision and all 204 SHA-256 hashes from the committed statistics
+manifest. It fetches only that commit with a sparse checkout of `data/` plus root files,
+including upstream license, copyright, and credits. Game images/audio and full Git history are
+not checked out. Git metadata and root files add some overhead to the 10.46 MB text corpus.
+The default destination is gitignored and independent of your shell's current directory.
+`--destination /another/path` selects a different location; ensure custom locations stay out of Git.
+
+A second run verifies the existing checkout without network access. Missing, changed, extra,
+or wrong-revision data fails verification rather than overwriting local work. Downloads are
+staged in a temporary sibling directory and published only after verification succeeds.
+To recover from a failed verification, move the old checkout aside or select a new destination.
+Network access to GitHub is required only for the initial fetch.
+
+To refresh deliberately: obtain a separate clean upstream checkout at the desired full commit,
+update `REVISION` in `scripts/inventory_sources.py`, and regenerate the committed statistics
+manifest from that checkout. Review the source changes, inventory counts, curation citations,
+file hashes, and this README together in a PR. The fetch command then uses the new manifest
+and a new revision-specific directory. Do not switch to a moving branch on each run: existing
+training and benchmark artifacts must retain the revision they were built against.
 
 The standard-library script checks the commit, a clean data tree, and completeness against the
 tracked file list. It stores SHA-256 hashes and uses indentation and quoted tokens to count
@@ -158,16 +179,12 @@ The statistics are descriptive estimates, not an extraction pipeline or quality 
 ## Storage, licensing, and release status
 
 Keep this README, inventory statistics, curation metadata, and small test fixtures in ordinary
-Git so they remain reviewable. Published JSONL, Parquet, and gzip payloads under `data/releases/`
-are configured for **Git LFS** in `.gitattributes`. No release payload or upstream corpus is
-committed in this PR, and no existing history is migrated. `data/local/` remains ignored.
-When a reviewed dataset is released, commit its actual payload through LFS with its source
-manifest, split checksums, attribution, and updated counts; verify LFS upload and a fresh checkout.
-LFS users must have Git LFS installed and initialized (`git lfs install`). LFS is storage, not
-access control: it does not prevent benchmark leakage or provide data permissions.
+Git so they remain reviewable. Raw upstream files are fetched into `data/local/` and ignored;
+no raw payload is committed and Git LFS is not configured or required. Storage and packaging
+of the post-processed dataset will be handled in later dataset issues, together with source
+manifests, split checksums, attribution, and updated counts.
 
 The selected text files carry GPL-3.0-or-later notices. Preserve their provenance and assess
 redistribution terms when publishing source-derived examples; do not assume “open source” means
 public domain. See the [source policy](../docs/curation/source-policy.md) for header credits,
-source boundaries, and the unresolved model/adapter-release question. Raw source volume and LFS
-configuration do not constitute a licensed or reviewed dataset release.
+source boundaries, and the unresolved model/adapter-release question. Fetching raw sources does not constitute a reviewed dataset release.

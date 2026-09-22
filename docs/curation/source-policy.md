@@ -15,8 +15,9 @@ and [conversation documentation](https://github.com/endless-sky/endless-sky/wiki
 for syntax, while the pinned source determines this pilot's content. Wiki pages can change;
 they are not an additional unversioned canon source.
 
-To inspect the exact evidence locally, obtain the upstream repository and check out that commit,
-then open the listed files and ranges. Hash the raw file bytes (before newline conversion) with
+To inspect the exact evidence locally, run `python scripts/fetch_sources.py` from this repository
+and open the listed files and ranges in `data/local/endless-sky-7140eb2a29ce/`.
+See the [dataset README](../../data/README.md) for verification and explicit refresh instructions. Hash the raw file bytes (before newline conversion) with
 SHA-256 and compare with the inventory. No upstream checkout, copied game dialogue, artwork,
 or downloaded model is required to use the existing Endless Voices pipeline.
 
