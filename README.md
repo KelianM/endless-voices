@@ -25,6 +25,7 @@ docs/curation/             Reviewed pilot sources, identity briefs, and scope
 src/endless_voices/
   common.py                Config and tokenizer loading
   data.py                  Validation, tokenization and padding
+  contracts.py             Offline curated dataset and benchmark contracts
   train.py                 LoRA supervised fine-tuning
   chat.py                  Base-model or adapter chat
 tests/                     Offline data and tiny-model smoke tests
@@ -88,6 +89,11 @@ The optional system message must come first, followed by one or more complete us
 pairs. Text must be nonempty. `metadata` is optional and ignored by training; use it to keep track
 of sources and identity labels. Put private or larger local datasets in `data/local/` (gitignored)
 and change `data.path`. Paths in configuration are relative to the working directory.
+
+For curated train/development data and separate benchmark cases, use the stricter
+[versioned data contracts](data/contracts.md). Validate a complete split manifest offline with
+`python -m endless_voices.contracts tests/fixtures/contracts/manifest.json`. This reports
+structural coverage and checks metadata, hashes, IDs, and scenario-family split boundaries.
 
 The single example is an **invented archivist**, not a claim about an Endless Sky species, and is
 only suitable for checking the pipeline. Meaningful identity learning needs a larger, carefully

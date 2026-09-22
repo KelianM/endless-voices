@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "dataset_version": "fixture-v1",
+  "files": {
+    "train": [
+      {
+        "path": "train.jsonl",
+        "sha256": "5698ce57a96ff274e5f232ddf35b7cad2e9eb4a9b6be11acfc8d0e483b8e8013"
+      }
+    ],
+    "development": [
+      {
+        "path": "development.jsonl",
+        "sha256": "c04436f76b3e1ed83bb9acb5dfda58552d62b2d64f3b29442fca8146fc086a8f"
+      }
+    ],
+    "benchmark": [
+      {
+        "path": "benchmark.jsonl",
+        "sha256": "795be71f934d1773f319ee78763e1cb6fddd8dd8dd70abbe5a5e177780deb766"
+      }
+    ]
+  }
+}

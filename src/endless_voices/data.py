@@ -7,6 +7,8 @@ from typing import Any
 import torch
 from transformers import PreTrainedTokenizerBase
 
+from endless_voices.messages import validate_messages
+
 
 def load_conversations(path: str) -> list[list[dict[str, str]]]:
     conversations = []
@@ -17,24 +19,7 @@ def load_conversations(path: str) -> list[list[dict[str, str]]]:
             try:
                 record = json.loads(line)
                 messages = record["messages"]
-                if not isinstance(messages, list) or not messages:
-                    raise ValueError("messages must be a nonempty list")
-                for index, message in enumerate(messages):
-                    if not isinstance(message, dict):
-                        raise ValueError("each message must be an object")
-                    role, content = message.get("role"), message.get("content")
-                    if role not in {"system", "user", "assistant"}:
-                        raise ValueError("roles must be system, user or assistant")
-                    if not isinstance(content, str) or not content.strip():
-                        raise ValueError("message content must be nonempty text")
-                    if role == "system" and index != 0:
-                        raise ValueError("system messages may only appear first")
-                turns = messages[1:] if messages[0]["role"] == "system" else messages
-                if len(turns) < 2 or len(turns) % 2:
-                    raise ValueError("provide complete user/assistant turn pairs")
-                for index, message in enumerate(turns):
-                    if message["role"] != ("user" if index % 2 == 0 else "assistant"):
-                        raise ValueError("turns must alternate user and assistant")
+                validate_messages(messages)
                 conversations.append(messages)
             except (ValueError, KeyError, TypeError) as error:
                 raise ValueError(f"{path}:{line_number}: {error}") from error
@@ -50,15 +35,22 @@ def tokenize_conversations(
         raise ValueError("data.max_length must be at least 2")
     examples = []
     for index, messages in enumerate(load_conversations(path), 1):
-        ids = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=False)
-        # Reject rather than silently cutting off the response we want to learn.
-        if len(ids) > max_length or len(ids) < 2:
-            raise ValueError(
-                f"Conversation {index} has {len(ids)} tokens; expected 2..{max_length}. "
-                "Shorten the conversation or increase data.max_length."
-            )
+        ids = tokenize_messages(messages, tokenizer, max_length, label=f"Conversation {index}")
         examples.append({"input_ids": ids, "attention_mask": [1] * len(ids)})
     return examples
+
+
+def tokenize_messages(messages, tokenizer, max_length: int, *, label: str = "Conversation"):
+    """Shared length check for the loader and optional offline curated-data validation."""
+    if max_length < 2:
+        raise ValueError("data.max_length must be at least 2")
+    ids = tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=False)
+    if len(ids) > max_length or len(ids) < 2:
+        raise ValueError(
+            f"{label} has {len(ids)} tokens; expected 2..{max_length}. "
+            "Shorten the conversation or increase data.max_length."
+        )
+    return ids
 
 
 class ConversationCollator:

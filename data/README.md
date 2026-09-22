@@ -6,6 +6,12 @@ pilot describes what we have actually read for authoring. Neither measures final
 training examples. No canonical training or held-out benchmark records have been produced yet;
 `example.jsonl` remains one invented pipeline fixture.
 
+## Curated record and benchmark contracts
+
+[Version 1 contracts](contracts.md) define strict curated conversations, separate benchmark
+cases, versioned split manifests, and offline validation commands. Only invented test fixtures
+exist so far; source inventories below are evidence metadata, not records in those contracts.
+
 ## Scope and faction counts
 
 Source: official Endless Sky development commit
