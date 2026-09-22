@@ -1,0 +1,380 @@
+{
+  "schema_version": 1,
+  "purpose": "Source curation inventory; not training messages or benchmark cases.",
+  "upstream": {
+    "repository": "https://github.com/endless-sky/endless-sky",
+    "revision": "7140eb2a29ce4d2797933075c751791a892c7d4f",
+    "snapshot_kind": "development commit, not a release",
+    "review_date": "2026-09-22"
+  },
+  "files": [
+    {
+      "path": "data/quarg/quarg missions.txt",
+      "sha256": "0cc398975988471e564166e12519fb6aa14e6e02eafe6391a0e0a0c9472d3ab3",
+      "header_author": "Michael Zahniser (2014)",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "path": "data/hai/hai missions.txt",
+      "sha256": "a565e32c5d461ce04ca5acdade4ed9d74d65bfca1360c4c0c2ccc0e355014fa1",
+      "header_author": "Michael Zahniser (2015)",
+      "license": "GPL-3.0-or-later"
+    },
+    {
+      "path": "data/hai/hai culture conversations.txt",
+      "sha256": "1bcb5b1e622a13fbd918335cc7a59473bdbc5803d38ac80f51a7fec451a64ed0",
+      "header_author": "MasterOfGrey (2021)",
+      "license": "GPL-3.0-or-later"
+    }
+  ],
+  "passages": [
+    {
+      "id": "q-greeting",
+      "identity": "quarg",
+      "source_file": "data/quarg/quarg missions.txt",
+      "lines": [
+        22,
+        41
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L22-L41",
+      "mission": "First Contact: Quarg",
+      "source_group": "First Contact: Quarg",
+      "speaker": "Unnamed Quarg greeting a human visitor",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "everyday",
+        "humans"
+      ],
+      "summary": "Patient welcome; long lifespan makes answering a visitor feel unburdensome.",
+      "context": "Landing at a world with hai quarg or human quarg attributes; on-offer conversation.",
+      "caveat": "Separate player choices and physical descriptions from Quarg speech. Do not universalize this individual’s manner.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "q-origin",
+      "identity": "quarg",
+      "source_file": "data/quarg/quarg missions.txt",
+      "lines": [
+        45,
+        52
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L45-L52",
+      "mission": "First Contact: Quarg",
+      "source_group": "First Contact: Quarg",
+      "speaker": "Same unnamed Quarg",
+      "evidence_type": "direct_speech",
+      "disposition": "retain",
+      "topics": [
+        "history",
+        "worldview"
+      ],
+      "summary": "Explains low-atmosphere origins and a self-image of peaceful coexistence backed by strength.",
+      "context": "Reach label quarg, either directly or after asking about other species.",
+      "caveat": "Statements about the Drak gift are this speaker’s account; peaceful does not mean powerless or incapable of defense.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "q-drak",
+      "identity": "quarg",
+      "source_file": "data/quarg/quarg missions.txt",
+      "lines": [
+        56,
+        70
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L56-L70",
+      "mission": "First Contact: Quarg",
+      "source_group": "First Contact: Quarg",
+      "speaker": "Same unnamed Quarg",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "technology",
+        "conflict"
+      ],
+      "summary": "Warns about catastrophic weapons and describes the Drak as intervening against destruction.",
+      "context": "Reach label drak; the nuclear-weapons response is skipped on the alternative closing branch.",
+      "caveat": "Evidence of Quarg beliefs about the Drak, not a Drak voice sample or technical weapon specification.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "q-efreti",
+      "identity": "quarg",
+      "source_file": "data/quarg/quarg missions.txt",
+      "lines": [
+        74,
+        118
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L74-L118",
+      "mission": "First Contact: Kuwaru Efreti",
+      "source_group": "First Contact: Kuwaru Efreti",
+      "speaker": "Unnamed Quarg interlocutor; brief untranslated Korath greeting",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "conflict",
+        "worldview",
+        "technology"
+      ],
+      "summary": "Protects peace-seeking Korath Efreti; refuses details of destructive crimes and describes containment of autonomous warships.",
+      "context": "Landing at Kuwaru Efreti after First Contact: Quarg was offered; branch-specific questions about crimes, robots, trade, containment.",
+      "caveat": "Repeated answers at lines 91/101 and 94/98 are branch duplicates. Archaic register differs from the first-contact speaker; do not blend every mannerism into one compulsory voice.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "q-log",
+      "identity": "quarg",
+      "source_file": "data/quarg/quarg missions.txt",
+      "lines": [
+        19,
+        20
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L19-L20",
+      "mission": "First Contact: Quarg",
+      "source_group": "First Contact: Quarg",
+      "speaker": "Player log / narrator",
+      "evidence_type": "log_summary",
+      "disposition": "context_only",
+      "topics": [
+        "history"
+      ],
+      "summary": "Summarizes Quarg physiology, longevity, ringworlds, and reported Drak contact.",
+      "context": "On-offer log accompanying the first-contact scene.",
+      "caveat": "Not direct speech; overlaps q-origin/q-drak. Keep in the same source family and do not count as independent corroboration.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "q-satellites",
+      "identity": "quarg",
+      "source_file": "data/quarg/quarg missions.txt",
+      "lines": [
+        122,
+        171
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L122-L171",
+      "mission": "Quarg Satellites",
+      "source_group": "Quarg Satellites",
+      "speaker": "Quarg mission giver and player narrator",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "defer",
+      "topics": [
+        "technology",
+        "conflict"
+      ],
+      "summary": "Surveillance deployment framed as reducing slaughter.",
+      "context": "Requires main plot completed, prior Quarg contact, no Coalition first-contact offer, and low pirate attraction.",
+      "caveat": "Outside the pilot’s early-contact scope; future source only. Narrator speculation about motives is not a confirmed Quarg intention.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-contact",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai missions.txt",
+      "lines": [
+        14,
+        83
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20missions.txt#L14-L83",
+      "mission": "First Contact: Hai",
+      "source_group": "First Contact: Hai",
+      "speaker": "Unnamed Hai interlocutor and human merchant",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "humans",
+        "everyday",
+        "worldview"
+      ],
+      "summary": "Hai welcomes humans and enjoys their novelty; warns about danger in the north.",
+      "context": "Government Hai, inhabited world; introduction varies with prior Unfettered contact and wormhole discovery.",
+      "caveat": "Attribute speech line by line: the wormhole explanation and resource-maintenance claim are the human merchant’s, not the Hai’s. Northern-faction judgments are partisan.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-uncertainty",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai missions.txt",
+      "lines": [
+        85,
+        96
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20missions.txt#L85-L96",
+      "mission": "First Contact: Hai",
+      "source_group": "First Contact: Hai",
+      "speaker": "Same young Hai; closing narrator/log",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "history",
+        "humans"
+      ],
+      "summary": "Young Hai defers the origins of the Unfettered to an older person and closes warmly.",
+      "context": "Question about northern hostility; preserve earlier branch prerequisites from h-contact.",
+      "caveat": "Do not transfer the elder’s detailed historical knowledge to this young character. Closing log is not speech.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-elder",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai missions.txt",
+      "lines": [
+        140,
+        186
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20missions.txt#L140-L186",
+      "mission": "Ask the Hai about the Unfettered",
+      "source_group": "Ask the Hai about the Unfettered",
+      "speaker": "Unnamed elderly Hai",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "history",
+        "conflict",
+        "worldview"
+      ],
+      "summary": "Describes defensive fighting, aid to northern Hai, historical raids, and a preference for stability over expansion.",
+      "context": "Both Hai and Unfettered first-contact missions have been offered; distinct war, raids, and drak branches.",
+      "caveat": "An elder’s historical/political testimony. His denial of the alteration story is a viewpoint to attribute, not independently established omniscient canon; preserve acknowledgement of former defenders’ service.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-theater",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai culture conversations.txt",
+      "lines": [
+        14,
+        34
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L14-L34",
+      "mission": "Theater Chat",
+      "source_group": "Theater Chat",
+      "speaker": "Hai woman Gemanari and human woman Alinta",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "everyday",
+        "humans"
+      ],
+      "summary": "A Hai discusses differing interpretations of an old play with a human friend.",
+      "context": "Random encounter on a non-station Hai world; destination is substituted at runtime.",
+      "caveat": "Alinta’s criticism is human speech. Gemanari and her aunt disagree: personal tastes are not species-wide rules; narrator inference about prehistoric animals is not an established history lesson.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-music",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai culture conversations.txt",
+      "lines": [
+        38,
+        73
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L38-L73",
+      "mission": "Musical Entertainment Expo",
+      "source_group": "Musical Entertainment Expo",
+      "speaker": "Hai bartender",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "everyday",
+        "technology"
+      ],
+      "summary": "Explains organized music fandom and the appeal of following performers rather than merely finding a new song.",
+      "context": "Random encounter on a non-station Hai world; player can leave the explanation early.",
+      "caveat": "Music predating human fire is a speaker’s sweeping comparison, not a precise timeline. Technology coverage here is everyday media, not engineering.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-gambling",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai culture conversations.txt",
+      "lines": [
+        179,
+        212
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L179-L212",
+      "mission": "Gambling Judgment",
+      "source_group": "Gambling Judgment",
+      "speaker": "Hai barkeep",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "worldview",
+        "humans",
+        "conflict"
+      ],
+      "summary": "Explains maturity tenets concerning honesty, skill versus chance, and separating play from real consequences; admits Hai can bluff.",
+      "context": "Random non-station Hai diner encounter; follow questions rather than the order-and-exit branch.",
+      "caveat": "A cultural norm is not an inability to lie. Do not invent the unnamed later tenets; personal disagreement with a later tenet shows variation.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-academy",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai culture conversations.txt",
+      "lines": [
+        216,
+        264
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L216-L264",
+      "mission": "Academy Motto",
+      "source_group": "Academy Motto",
+      "speaker": "Hai cafe worker, translator, narrator",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "worldview",
+        "technology",
+        "everyday"
+      ],
+      "summary": "Explains leadership education, service obligations, and accountability of Academy graduates.",
+      "context": "Urban non-station Hai world; language: Hai required; field-trip and question branches.",
+      "caveat": "The worker switches to Hai through a translator. Do not score translator hesitations as a universal Hai speaking style or imply all citizens have attended an Academy.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-meme",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai culture conversations.txt",
+      "lines": [
+        77,
+        106
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L77-L106",
+      "mission": "The Meme Wars 1",
+      "source_group": "The Meme Wars 1",
+      "speaker": "Hai security guard and translator",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "defer",
+      "topics": [
+        "everyday",
+        "worldview"
+      ],
+      "summary": "A guard explains a meme dispute and corrects a mistaken political inference.",
+      "context": "Translator and non-translator branches depend on language: Hai.",
+      "caveat": "Useful future false-premise evidence, but translation alternatives and local political joke need extra context; exclude from initial authoring pool.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "h-sports",
+      "identity": "hai-mainstream",
+      "source_file": "data/hai/hai culture conversations.txt",
+      "lines": [
+        110,
+        175
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L110-L175",
+      "mission": "Wrestling Star / Fencing Star / Mystery Sport Star",
+      "source_group": "Wrestling Star / Fencing Star / Mystery Sport Star",
+      "speaker": "Narrator; no quoted target-character response",
+      "evidence_type": "narration",
+      "disposition": "exclude",
+      "topics": [
+        "everyday"
+      ],
+      "summary": "Celebrity-signing scenes share a repeated narrative template.",
+      "context": "Random non-station Hai encounters; approach/ignore choices.",
+      "caveat": "Not usable as direct-speech evidence; keep related templates grouped if later used for factual context.",
+      "review": "agent_read_source_2026-09-22"
+    }
+  ]
+}
