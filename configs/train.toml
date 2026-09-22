@@ -1,0 +1,28 @@
+[model]
+# Replace with a compatible causal language model ID or local directory.
+name_or_path = "YOUR_HF_MODEL_OR_LOCAL_PATH"
+# Pin a Hub commit for reproducible experiments; "main" can change.
+revision = "main"
+
+[data]
+# Paths are relative to the working directory, not this config file.
+path = "data/example.jsonl"
+max_length = 512
+
+[lora]
+r = 8
+lora_alpha = 16
+lora_dropout = 0.05
+target_modules = "all-linear"
+bias = "none"
+
+[training]
+output_dir = "outputs/example-adapter"
+num_train_epochs = 1
+per_device_train_batch_size = 1
+gradient_accumulation_steps = 4
+learning_rate = 0.0002
+logging_steps = 1
+save_strategy = "no"
+seed = 42
+use_cpu = false

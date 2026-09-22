@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "endless-voices"
+version = "0.1.0"
+description = "Small LoRA experiments in fictional identity, inspired by Endless Sky"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "torch>=2.5,<3",
+    "transformers>=4.57,<5",
+    "peft>=0.17,<0.19",
+    "accelerate>=1.2,<2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+
+[project.scripts]
+endless-train = "endless_voices.train:main"
+endless-chat = "endless_voices.chat:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
