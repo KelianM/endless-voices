@@ -21,6 +21,7 @@ These are experiment directions, not demonstrated results.
 ```text
 configs/train.toml           Model, data, LoRA and training settings
 data/example.jsonl          One original, non-canonical format example
+docs/curation/             Reviewed pilot sources, identity briefs, and scope
 src/endless_voices/
   common.py                Config and tokenizer loading
   data.py                  Validation, tokenization and padding
@@ -33,6 +34,15 @@ There is no frontend, game-data ingestion, synthetic data generator, or evaluati
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
+
+## Pilot data curation
+
+The [initial source review](docs/curation/README.md) selects early Free Worlds militia, Quarg, and non-Unfettered Hai.
+The [dataset overview](data/README.md) inventories all upstream content groups and text categories,
+with qualitative examples and dataset storage guidance. The curation package includes
+a pinned source inventory, role-specific identity briefs, coverage gaps, and attribution
+policy. It is evidence for the next dataset-authoring steps; canonical training examples and
+a held-out benchmark have not yet been added.
 
 ## Setup
 
