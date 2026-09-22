@@ -37,8 +37,10 @@ into the loader or model.
 
 ## Pilot data curation
 
-The [initial source review](docs/curation/README.md) selects Quarg and non-Unfettered Hai,
-with a pinned source inventory, role-specific identity briefs, coverage gaps, and attribution
+The [initial source review](docs/curation/README.md) selects Quarg and non-Unfettered Hai.
+The [dataset overview](data/README.md) inventories all upstream content groups and text categories,
+with qualitative examples and dataset storage guidance. The curation package includes
+a pinned source inventory, role-specific identity briefs, coverage gaps, and attribution
 policy. It is evidence for the next dataset-authoring steps; canonical training examples and
 a held-out benchmark have not yet been added.
 

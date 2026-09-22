@@ -1,0 +1,4 @@
+# Published dataset payloads only; README, statistics, and small fixtures stay in Git.
+data/releases/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
+data/releases/**/*.parquet filter=lfs diff=lfs merge=lfs -text
+data/releases/**/*.gz filter=lfs diff=lfs merge=lfs -text

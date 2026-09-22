@@ -3,6 +3,7 @@
 This is the completed first source review for [issue #2](https://github.com/KelianM/endless-voices/issues/2).
 It selects two pilot identities, records 15 inspected passages, and supplies evidence-backed
 briefs for conversation authors. It contains neither training conversations nor benchmark cases.
+For whole-source counts across every content group, see the [dataset overview](../../data/README.md).
 
 - [Source inventory](source-inventory.json): pinned files, checksums, line links, speakers,
   prerequisites, evidence types, dispositions, and limitations.

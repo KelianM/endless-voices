@@ -1,0 +1,1387 @@
+{
+  "revision": "7140eb2a29ce4d2797933075c751791a892c7d4f",
+  "method": "Structural lexical inventory v1; words are whitespace-separated, not tokens.",
+  "content_directories": [
+    "avgi",
+    "bunrodea",
+    "coalition",
+    "drak",
+    "gegno",
+    "hai",
+    "human",
+    "iije",
+    "incipias",
+    "kahet",
+    "korath",
+    "pug",
+    "quarg",
+    "remnant",
+    "rulei",
+    "sheragi",
+    "successors",
+    "vyrmeid",
+    "wanderer"
+  ],
+  "government_names": [
+    "Aberrant",
+    "Alpha",
+    "Author",
+    "Avgi",
+    "Avgi (Consonance)",
+    "Avgi (Dissonance Angry)",
+    "Avgi (Dissonance)",
+    "Avgi (Twilight Guard)",
+    "Avgi (Wandering Fleet)",
+    "Bad Trip",
+    "Bounty",
+    "Bounty (Disguised)",
+    "Bounty Hunter",
+    "Builder",
+    "Bunrodea",
+    "Bunrodea (Erabu)",
+    "Bunrodea (Guard)",
+    "Bunrodea (Megasa)",
+    "Coalition",
+    "Conlatio",
+    "Deep",
+    "Deep Security",
+    "Derelict",
+    "Derelict (Boardable)",
+    "Drak",
+    "Drak (Hostile)",
+    "Drak (Incipias)",
+    "Ember Waste",
+    "Escort",
+    "Escort (Betraying)",
+    "Free Worlds",
+    "Gegno",
+    "Gegno Scin",
+    "Gegno Scin (Combative)",
+    "Gegno Scin (Neutral)",
+    "Gegno Vi",
+    "Gegno Vi (Combative)",
+    "Gegno Vi (Duelist A)",
+    "Gegno Vi (Duelist B)",
+    "Gegno Vi (Neutral)",
+    "Hai",
+    "Hai (Unfettered Challenger)",
+    "Hai (Unfettered Civilians)",
+    "Hai (Unfettered Wanderer Tribute)",
+    "Hai (Unfettered)",
+    "Hai (Wormhole Access)",
+    "Hai Merchant",
+    "Hai Merchant (Human)",
+    "Hai Merchant (Sympathizers)",
+    "Heliarch",
+    "Heliarch Test Dummy",
+    "Hicemus",
+    "High Houses (Unknown)",
+    "House Aqrabe",
+    "House Chydiyi",
+    "House Kaatrij",
+    "House Myurej",
+    "House Seineq",
+    "House Sioeora",
+    "Incipias Civilian",
+    "Independent",
+    "Independent (Killable)",
+    "Indigenous Lifeform",
+    "Indigenous Lifeform (Acheron)",
+    "Indigenous Lifeform (Astral)",
+    "Indigenous Lifeform (Subsidurial)",
+    "Indigenous Lifeform (Tree Two)",
+    "Indigenous Lifeform (Tree)",
+    "Ka'het",
+    "Ka'het (Infighting)",
+    "Ka'sei",
+    "Ka'sei (12.2)",
+    "Ka'sei (Patir 18)",
+    "Kor Efret",
+    "Kor Mereti",
+    "Kor Mereti (Hostile)",
+    "Kor Sestor",
+    "Korath",
+    "Korath (Civilian)",
+    "Korath Nanobots",
+    "Lunarium",
+    "Lunarium (Hidden)",
+    "Magic Asteroid",
+    "Magic Asteroid (Disabled)",
+    "Magic Asteroid (Patir 12.2)",
+    "Marauder",
+    "Merchant",
+    "Merchant (Hostile)",
+    "Militia",
+    "Navy (Oathkeeper)",
+    "Navy Intelligence",
+    "Neutral",
+    "New Houses",
+    "Old Houses",
+    "Parrot",
+    "People's Houses",
+    "People's Houses (Hostile)",
+    "Pirate",
+    "Pirate (Rival)",
+    "Predecessor",
+    "Pug",
+    "Pug (Wanderer)",
+    "Quarg",
+    "Quarg (Gegno)",
+    "Quarg (Hai)",
+    "Quarg (Incipias)",
+    "Quarg (Kor Efret)",
+    "Remnant",
+    "Remnant (Postverta)",
+    "Remnant (Research)",
+    "Republic",
+    "Republic (Friendly)",
+    "Rulei",
+    "Scar's Legion",
+    "Scar's Legion (Killable)",
+    "Sheragi",
+    "Silent Ones",
+    "Solitude Enforcer",
+    "Successor",
+    "Syndicate",
+    "Syndicate (Extremist)",
+    "Syndicate (Hostile)",
+    "Team Blue",
+    "Team Red",
+    "Test Dummy",
+    "Uninhabited",
+    "Wanderer",
+    "Wormhole Alpha"
+  ],
+  "totals": {
+    "bytes": 10461684,
+    "conversation_blocks": 1745,
+    "conversation_references": 126,
+    "conversation_text_lines": 20260,
+    "conversation_words": 682165,
+    "description_text_lines": 4381,
+    "description_words": 156324,
+    "dialog_text_lines": 1302,
+    "dialog_words": 37921,
+    "files": 204,
+    "lines": 261599,
+    "log_text_lines": 661,
+    "log_words": 22105,
+    "phrase_news_text_lines": 21919,
+    "phrase_news_words": 87194,
+    "root_conversation": 54,
+    "root_government": 128,
+    "root_mission": 2331,
+    "root_news": 219,
+    "root_phrase": 868,
+    "spaceport_text_lines": 624,
+    "spaceport_words": 32772
+  },
+  "groups": {
+    "(shared root)": {
+      "bytes": 1611933,
+      "conversation_blocks": 6,
+      "conversation_references": 5,
+      "conversation_text_lines": 60,
+      "conversation_words": 2370,
+      "description_text_lines": 1036,
+      "description_words": 55814,
+      "files": 19,
+      "lines": 52875,
+      "log_text_lines": 23,
+      "log_words": 965,
+      "phrase_news_text_lines": 620,
+      "phrase_news_words": 4783,
+      "root_conversation": 5,
+      "root_government": 127,
+      "root_mission": 5,
+      "root_phrase": 40,
+      "spaceport_text_lines": 567,
+      "spaceport_words": 29508
+    },
+    "_deprecated": {
+      "bytes": 47304,
+      "conversation_blocks": 1,
+      "conversation_text_lines": 1,
+      "conversation_words": 29,
+      "description_text_lines": 51,
+      "description_words": 1364,
+      "files": 3,
+      "lines": 1726,
+      "root_mission": 3
+    },
+    "_ui": {
+      "bytes": 183665,
+      "conversation_blocks": 5,
+      "conversation_text_lines": 10,
+      "conversation_words": 542,
+      "files": 8,
+      "lines": 5636,
+      "root_conversation": 5
+    },
+    "avgi": {
+      "bytes": 439283,
+      "conversation_blocks": 43,
+      "conversation_text_lines": 765,
+      "conversation_words": 24708,
+      "description_text_lines": 207,
+      "description_words": 7918,
+      "dialog_text_lines": 13,
+      "dialog_words": 314,
+      "files": 14,
+      "lines": 12609,
+      "log_text_lines": 55,
+      "log_words": 1706,
+      "phrase_news_text_lines": 2029,
+      "phrase_news_words": 6019,
+      "root_mission": 89,
+      "root_news": 16,
+      "root_phrase": 64
+    },
+    "bunrodea": {
+      "bytes": 58375,
+      "conversation_blocks": 2,
+      "conversation_text_lines": 75,
+      "conversation_words": 2288,
+      "description_text_lines": 52,
+      "description_words": 2124,
+      "files": 5,
+      "lines": 1693,
+      "phrase_news_text_lines": 31,
+      "phrase_news_words": 31,
+      "root_mission": 1,
+      "root_phrase": 6
+    },
+    "coalition": {
+      "bytes": 934795,
+      "conversation_blocks": 250,
+      "conversation_references": 2,
+      "conversation_text_lines": 2646,
+      "conversation_words": 101539,
+      "description_text_lines": 298,
+      "description_words": 7299,
+      "dialog_text_lines": 133,
+      "dialog_words": 4207,
+      "files": 10,
+      "lines": 16051,
+      "log_text_lines": 33,
+      "log_words": 1230,
+      "phrase_news_text_lines": 1123,
+      "phrase_news_words": 5841,
+      "root_conversation": 1,
+      "root_mission": 248,
+      "root_news": 29,
+      "root_phrase": 59
+    },
+    "drak": {
+      "bytes": 38878,
+      "conversation_blocks": 7,
+      "conversation_text_lines": 57,
+      "conversation_words": 1612,
+      "description_text_lines": 21,
+      "description_words": 657,
+      "files": 5,
+      "lines": 1287,
+      "log_text_lines": 1,
+      "log_words": 43,
+      "phrase_news_text_lines": 14,
+      "phrase_news_words": 13,
+      "root_mission": 13,
+      "root_phrase": 1
+    },
+    "gegno": {
+      "bytes": 259711,
+      "conversation_blocks": 24,
+      "conversation_references": 2,
+      "conversation_text_lines": 474,
+      "conversation_words": 21405,
+      "description_text_lines": 105,
+      "description_words": 4792,
+      "dialog_text_lines": 12,
+      "dialog_words": 429,
+      "files": 9,
+      "lines": 6039,
+      "log_text_lines": 3,
+      "log_words": 111,
+      "phrase_news_text_lines": 186,
+      "phrase_news_words": 278,
+      "root_conversation": 1,
+      "root_mission": 42,
+      "root_phrase": 5,
+      "spaceport_text_lines": 1,
+      "spaceport_words": 56
+    },
+    "hai": {
+      "bytes": 482614,
+      "conversation_blocks": 88,
+      "conversation_references": 2,
+      "conversation_text_lines": 1092,
+      "conversation_words": 33795,
+      "description_text_lines": 211,
+      "description_words": 6131,
+      "dialog_text_lines": 73,
+      "dialog_words": 2207,
+      "files": 11,
+      "lines": 11730,
+      "log_text_lines": 19,
+      "log_words": 709,
+      "phrase_news_text_lines": 831,
+      "phrase_news_words": 6143,
+      "root_mission": 167,
+      "root_news": 25,
+      "root_phrase": 28,
+      "spaceport_text_lines": 1,
+      "spaceport_words": 50
+    },
+    "human": {
+      "bytes": 3440040,
+      "conversation_blocks": 688,
+      "conversation_references": 93,
+      "conversation_text_lines": 8450,
+      "conversation_words": 249660,
+      "description_text_lines": 1325,
+      "description_words": 37065,
+      "dialog_text_lines": 696,
+      "dialog_words": 19897,
+      "files": 41,
+      "lines": 86308,
+      "log_text_lines": 333,
+      "log_words": 10238,
+      "phrase_news_text_lines": 12394,
+      "phrase_news_words": 49072,
+      "root_conversation": 30,
+      "root_government": 1,
+      "root_mission": 1124,
+      "root_news": 96,
+      "root_phrase": 347,
+      "spaceport_text_lines": 37,
+      "spaceport_words": 2151
+    },
+    "iije": {
+      "bytes": 5656,
+      "description_text_lines": 2,
+      "description_words": 80,
+      "files": 1,
+      "lines": 304
+    },
+    "incipias": {
+      "bytes": 63745,
+      "conversation_blocks": 11,
+      "conversation_text_lines": 137,
+      "conversation_words": 4141,
+      "description_text_lines": 34,
+      "description_words": 1237,
+      "dialog_text_lines": 2,
+      "dialog_words": 91,
+      "files": 5,
+      "lines": 1577,
+      "log_text_lines": 9,
+      "log_words": 358,
+      "phrase_news_text_lines": 137,
+      "phrase_news_words": 475,
+      "root_mission": 11,
+      "root_news": 2,
+      "root_phrase": 20
+    },
+    "kahet": {
+      "bytes": 557688,
+      "conversation_blocks": 95,
+      "conversation_references": 6,
+      "conversation_text_lines": 1367,
+      "conversation_words": 57408,
+      "description_text_lines": 132,
+      "description_words": 3313,
+      "dialog_text_lines": 54,
+      "dialog_words": 1943,
+      "files": 9,
+      "lines": 10811,
+      "log_text_lines": 12,
+      "log_words": 337,
+      "phrase_news_text_lines": 401,
+      "phrase_news_words": 599,
+      "root_conversation": 3,
+      "root_mission": 84,
+      "root_phrase": 25,
+      "spaceport_text_lines": 2,
+      "spaceport_words": 94
+    },
+    "korath": {
+      "bytes": 305647,
+      "conversation_blocks": 21,
+      "conversation_text_lines": 140,
+      "conversation_words": 6039,
+      "description_text_lines": 166,
+      "description_words": 5595,
+      "dialog_text_lines": 5,
+      "dialog_words": 168,
+      "files": 11,
+      "lines": 9515,
+      "log_text_lines": 1,
+      "log_words": 111,
+      "phrase_news_text_lines": 968,
+      "phrase_news_words": 3070,
+      "root_mission": 30,
+      "root_news": 6,
+      "root_phrase": 127
+    },
+    "pug": {
+      "bytes": 31801,
+      "conversation_blocks": 2,
+      "conversation_text_lines": 16,
+      "conversation_words": 685,
+      "description_text_lines": 18,
+      "description_words": 655,
+      "files": 5,
+      "lines": 1316,
+      "phrase_news_text_lines": 330,
+      "phrase_news_words": 641,
+      "root_mission": 4,
+      "root_news": 7,
+      "root_phrase": 4
+    },
+    "quarg": {
+      "bytes": 87948,
+      "conversation_blocks": 9,
+      "conversation_text_lines": 164,
+      "conversation_words": 5321,
+      "description_text_lines": 40,
+      "description_words": 1882,
+      "dialog_text_lines": 8,
+      "dialog_words": 164,
+      "files": 5,
+      "lines": 2261,
+      "log_text_lines": 3,
+      "log_words": 147,
+      "phrase_news_text_lines": 303,
+      "phrase_news_words": 1639,
+      "root_conversation": 1,
+      "root_mission": 8,
+      "root_news": 10,
+      "root_phrase": 4
+    },
+    "remnant": {
+      "bytes": 692815,
+      "conversation_blocks": 186,
+      "conversation_references": 7,
+      "conversation_text_lines": 1679,
+      "conversation_words": 68084,
+      "description_text_lines": 219,
+      "description_words": 6208,
+      "dialog_text_lines": 123,
+      "dialog_words": 3652,
+      "files": 10,
+      "lines": 13385,
+      "log_text_lines": 24,
+      "log_words": 807,
+      "phrase_news_text_lines": 681,
+      "phrase_news_words": 1574,
+      "root_conversation": 3,
+      "root_mission": 151,
+      "root_news": 4,
+      "root_phrase": 37,
+      "spaceport_text_lines": 4,
+      "spaceport_words": 216
+    },
+    "rulei": {
+      "bytes": 15257,
+      "conversation_blocks": 5,
+      "conversation_text_lines": 40,
+      "conversation_words": 798,
+      "description_text_lines": 4,
+      "description_words": 144,
+      "files": 3,
+      "lines": 431,
+      "log_text_lines": 3,
+      "log_words": 100,
+      "phrase_news_text_lines": 4,
+      "phrase_news_words": 4,
+      "root_mission": 7,
+      "root_phrase": 1
+    },
+    "sheragi": {
+      "bytes": 147644,
+      "conversation_blocks": 41,
+      "conversation_text_lines": 524,
+      "conversation_words": 17199,
+      "description_text_lines": 47,
+      "description_words": 1325,
+      "dialog_text_lines": 16,
+      "dialog_words": 433,
+      "files": 3,
+      "lines": 2370,
+      "log_text_lines": 12,
+      "log_words": 561,
+      "root_mission": 33
+    },
+    "successors": {
+      "bytes": 554107,
+      "conversation_blocks": 106,
+      "conversation_references": 6,
+      "conversation_text_lines": 1459,
+      "conversation_words": 46569,
+      "description_text_lines": 192,
+      "description_words": 7157,
+      "dialog_text_lines": 23,
+      "dialog_words": 475,
+      "files": 18,
+      "lines": 12399,
+      "log_text_lines": 49,
+      "log_words": 1447,
+      "phrase_news_text_lines": 1329,
+      "phrase_news_words": 4466,
+      "root_conversation": 3,
+      "root_mission": 108,
+      "root_news": 8,
+      "root_phrase": 86,
+      "spaceport_text_lines": 1,
+      "spaceport_words": 62
+    },
+    "vyrmeid": {
+      "bytes": 6700,
+      "description_text_lines": 4,
+      "description_words": 167,
+      "files": 1,
+      "lines": 303
+    },
+    "wanderer": {
+      "bytes": 496078,
+      "conversation_blocks": 155,
+      "conversation_references": 3,
+      "conversation_text_lines": 1104,
+      "conversation_words": 37973,
+      "description_text_lines": 217,
+      "description_words": 5397,
+      "dialog_text_lines": 144,
+      "dialog_words": 3941,
+      "files": 8,
+      "lines": 10973,
+      "log_text_lines": 81,
+      "log_words": 3235,
+      "phrase_news_text_lines": 538,
+      "phrase_news_words": 2546,
+      "root_conversation": 2,
+      "root_mission": 203,
+      "root_news": 16,
+      "root_phrase": 14,
+      "spaceport_text_lines": 11,
+      "spaceport_words": 635
+    }
+  },
+  "files": [
+    {
+      "path": "data/_deprecated/deprecated events.txt",
+      "sha256": "79126506ed3833a3aff762e21c1d6cd2d379c5be230947d64607de3a90cfafc2"
+    },
+    {
+      "path": "data/_deprecated/deprecated outfits.txt",
+      "sha256": "e68818b1ea2259cc2ca4c6981c01d7c11afc646051d214bb2d1d32380ddc1725"
+    },
+    {
+      "path": "data/_deprecated/deprecated ships.txt",
+      "sha256": "96d8bd19f89d935019c0df405c1ce52130d78002ebc90825754793768c61835b"
+    },
+    {
+      "path": "data/_ui/flight checks.txt",
+      "sha256": "9a89e8e43679edd9df105b92389118649df17ec3b5877a96941374c2b6cb7911"
+    },
+    {
+      "path": "data/_ui/help.txt",
+      "sha256": "8a01b7654e112e3bef59ab07baa01f91bf0a0e825baf6244b74d58d9cad10ee8"
+    },
+    {
+      "path": "data/_ui/interfaces.txt",
+      "sha256": "48b40b5a80d70c6551ff5799ab87addf86fdc4beeb7930b0e77fcd8997285962"
+    },
+    {
+      "path": "data/_ui/landing messages.txt",
+      "sha256": "7e21c3b9a06444558a17e4329742927e26cdc8d86e673ef08eea0e3ea556b4df"
+    },
+    {
+      "path": "data/_ui/messages.txt",
+      "sha256": "c16cb6b03b65cce61c39d9ac66b49f67a2d087fe9e33cb0627232e1cd8cbbd21"
+    },
+    {
+      "path": "data/_ui/ratings.txt",
+      "sha256": "eaccb4962becbb7b2b504193b9bfc35826e85b7082f026615edb146810b8f958"
+    },
+    {
+      "path": "data/_ui/swizzles.txt",
+      "sha256": "c7569e2c031d86a3157f905d78a3b242d978d9f1da913ed0e9e5551228f18b2c"
+    },
+    {
+      "path": "data/_ui/tooltips.txt",
+      "sha256": "01c7fb6fd35efafc689ee017c40d044a57cf732887cd6071b53518794e728325"
+    },
+    {
+      "path": "data/avgi/avgi 0 first contact.txt",
+      "sha256": "7eed6f6ecdb4075d5eb8724651a499ddd97227bb647852aab451007e7a228ebb"
+    },
+    {
+      "path": "data/avgi/avgi culture conversations.txt",
+      "sha256": "ea02b87a3c23178c98b6554370f087899f7959586c375162131e95c9a5931a44"
+    },
+    {
+      "path": "data/avgi/avgi events.txt",
+      "sha256": "0dca98daaeddaa1fda22267ee70f81b9a831059be3469373cd313c110d01ccba"
+    },
+    {
+      "path": "data/avgi/avgi fleets.txt",
+      "sha256": "c9cbf29d8fc8cddb8a235d0d037f37d0e4406acc5c24e09030f6b1e19fe3fe9c"
+    },
+    {
+      "path": "data/avgi/avgi hails.txt",
+      "sha256": "f41ab5b0fc144a99e65a159d0660c3dbde4e85b41ab90a887cf48ae68f34d88e"
+    },
+    {
+      "path": "data/avgi/avgi jobs.txt",
+      "sha256": "d9339ea67ebde0f089e14f374c43da4512ed4918d3bb9b4fe6905465909fc07a"
+    },
+    {
+      "path": "data/avgi/avgi news.txt",
+      "sha256": "c513f8996838703de61ace68f448f8538afc41fbdbeee9226c64548afd309b58"
+    },
+    {
+      "path": "data/avgi/avgi outfits.txt",
+      "sha256": "79f95f17093f80f3f56109faf639185342d5131dd0eedaad49935175f91263bf"
+    },
+    {
+      "path": "data/avgi/avgi sales.txt",
+      "sha256": "b8773390ccfd6a89d910ef7bee2a32f6cdf444552f586e40d8cac8fc1518e303"
+    },
+    {
+      "path": "data/avgi/avgi ships.txt",
+      "sha256": "8f08dc06820f26ac0aa254fb32234ea4628de57a7bedf448d759b4fd09431e23"
+    },
+    {
+      "path": "data/avgi/avgi side missions.txt",
+      "sha256": "43ad20e407ce5d03358e10c1d8591ee904d0644870a110c4756b16069cf347a3"
+    },
+    {
+      "path": "data/avgi/avgi weapons.txt",
+      "sha256": "8eb9cb526f790f5d48c12e91e6faaae9368110f24abf2eac5fa7c41e33e3a5d4"
+    },
+    {
+      "path": "data/avgi/avgi.txt",
+      "sha256": "9e80b25bc26c3bddcff6b012f52242f6be47aefff84518ed700662bbc8efd7f5"
+    },
+    {
+      "path": "data/avgi/windjammers.txt",
+      "sha256": "e792c8ebce1146780c328a1ff3455d2ef5efc033812face1c5272a2f2c2a78ce"
+    },
+    {
+      "path": "data/bunrodea/bunrodea missions.txt",
+      "sha256": "c43fe7117206d10dd47f2b8cf9015092f29b30b8eee7c765f9e9a10a709709e7"
+    },
+    {
+      "path": "data/bunrodea/bunrodea outfits.txt",
+      "sha256": "af704ca831264ca4eed617f69ac5b76c53f64bf46fc8a0f4fce313d3ac1d00b7"
+    },
+    {
+      "path": "data/bunrodea/bunrodea ships.txt",
+      "sha256": "835acc2402f2426725a5a178105e77ea199000341939a2f9f24c9edec79cfd36"
+    },
+    {
+      "path": "data/bunrodea/bunrodea weapons.txt",
+      "sha256": "8af7d86dead3a137ae28dd84d9d813303e4f3aea427016810356c92288f6edeb"
+    },
+    {
+      "path": "data/bunrodea/bunrodea.txt",
+      "sha256": "b374dc3207930638ff6f2d05aacf3bbcba0d34251343bd94f066aee2573614fd"
+    },
+    {
+      "path": "data/categories.txt",
+      "sha256": "81052800afb4c6bec29c1f84f983f63665b59060959e850d7b0b26ad92b81b0c"
+    },
+    {
+      "path": "data/coalition/coalition culture conversations.txt",
+      "sha256": "cd981ee3db4b5b50f074ae59af92ab1e5f6f56729ceaba87c329fa895a0b2551"
+    },
+    {
+      "path": "data/coalition/coalition jobs.txt",
+      "sha256": "5d8454f6de0fc56a811d5ffc2ef57924dbdfa8df1f5a277838329e5c9216c74e"
+    },
+    {
+      "path": "data/coalition/coalition missions.txt",
+      "sha256": "9cca654ba9d4d1ca2053adeafdfe7317c7cc1db24650c3e4ba39d02355d1ad65"
+    },
+    {
+      "path": "data/coalition/coalition news.txt",
+      "sha256": "02a7c0589aa7339cc90aa6fbefa7617e9610297f06fbab2a6c4932c487790d41"
+    },
+    {
+      "path": "data/coalition/coalition outfits.txt",
+      "sha256": "7f38388aa15195470ea496a2f7d061ccef1d196725f8af8c3084bb85c07b1872"
+    },
+    {
+      "path": "data/coalition/coalition ships.txt",
+      "sha256": "67e296a66aacedb7a67f4e250863bdfac2e709918214d654d83834ce37308869"
+    },
+    {
+      "path": "data/coalition/coalition weapons.txt",
+      "sha256": "a9b8b8413c1f419c4bc210cdbe40adf9fe7ad24ca5390edbcd10054ae31c65f4"
+    },
+    {
+      "path": "data/coalition/coalition.txt",
+      "sha256": "728afcee3d91dc5256ffa541e3826739e3b1d4013c1acd220c27bbcee4c3d741"
+    },
+    {
+      "path": "data/coalition/heliarch intro.txt",
+      "sha256": "8a5d774b9a15ea452681c277f52101fa3fd2c5facdff867c9bb8a276ca3f1a9a"
+    },
+    {
+      "path": "data/coalition/lunarium intro.txt",
+      "sha256": "fce8d7baa1026309fa62c95b38adf9841e3e52ace1a73706496e16eeed1137b4"
+    },
+    {
+      "path": "data/commodities.txt",
+      "sha256": "0437732ea206f27c613806e0dd10c834f4a6a25acf1b5d345c6cade19e53b2de"
+    },
+    {
+      "path": "data/confusions.txt",
+      "sha256": "367e3fda293d39836e9c48c9a752ba8750cf72c3454f12d3f9ade14887cd07fb"
+    },
+    {
+      "path": "data/dialog phrases.txt",
+      "sha256": "bf095e23e6b8f218e2ba29dc6b0b930ad78dd6292100d1977aae63120a8b7588"
+    },
+    {
+      "path": "data/drak/drak culture conversations.txt",
+      "sha256": "6c2c0757e13e3ac55f933c08d599cab2cb4938cbe13a211e298e04632adf23db"
+    },
+    {
+      "path": "data/drak/drak missions.txt",
+      "sha256": "30c29b3d21ead42fc762e52d37e94bfa5b4b61b078be6eafb7eef9890204b980"
+    },
+    {
+      "path": "data/drak/drak outfits.txt",
+      "sha256": "9fdb0d47aae32bb0af12d6ba72d37698842b31f6e487cbfc1d2930f08ae6741d"
+    },
+    {
+      "path": "data/drak/drak ships.txt",
+      "sha256": "6125b58ad5453d1a8fb41defa9143f7cbff0b85e4bddd0787547950f5f6ad1ce"
+    },
+    {
+      "path": "data/drak/indigenous.txt",
+      "sha256": "31c1826f507933be01ff44f5118d2674b2c5dbfe993068f9534d2e6d4210a2a9"
+    },
+    {
+      "path": "data/effects.txt",
+      "sha256": "b5d15c276d2d2cc496fc89645879f6e60635aba36bdd4da7778216219e810e65"
+    },
+    {
+      "path": "data/formations.txt",
+      "sha256": "e3ea0b36d296c2d61f375ebfa1ad325496b2514e08ea9c0671bc55935633015d"
+    },
+    {
+      "path": "data/gamerules.txt",
+      "sha256": "8e4ce4c56647230e2191d7705b97d5f0e78ded10997c44af8ae8287f2a5d2a45"
+    },
+    {
+      "path": "data/gegno/gegno I corroboration.txt",
+      "sha256": "46e1cb60d72262a5a9cc5120d81577b21887afbb4928e118d661b48f9f3f7edb"
+    },
+    {
+      "path": "data/gegno/gegno events.txt",
+      "sha256": "ac214507930fc94651b2c2242be33422362fbe87d086bf35c82b517fc87f2429"
+    },
+    {
+      "path": "data/gegno/gegno fleets.txt",
+      "sha256": "36108034b9b5486ad74073c0f79fe40b2c49e505a0eca698d8fcae8355e4b4bf"
+    },
+    {
+      "path": "data/gegno/gegno intro missions.txt",
+      "sha256": "0fdca2e0b992590a3400b0ac0a798e7a17d17b5ea9595d68a931248b755f75e3"
+    },
+    {
+      "path": "data/gegno/gegno jobs.txt",
+      "sha256": "32eedac74c9ee7e6ec91291a09bcdc6a7e8936d01738816c00bf109c6c422cc0"
+    },
+    {
+      "path": "data/gegno/gegno outfits.txt",
+      "sha256": "ad9d442d90464529bd2392a47745f3e7828fe9b59e0ef9eb73ba9562419dc96c"
+    },
+    {
+      "path": "data/gegno/gegno sales.txt",
+      "sha256": "a3867b2bb328962e992aabb041b263623c9e7f31775a35ce9d92c4ba40d967f0"
+    },
+    {
+      "path": "data/gegno/gegno ships.txt",
+      "sha256": "09a516052259b084893f9a61e0baaed45f208520bf644e8a5a34f0a9551eef83"
+    },
+    {
+      "path": "data/gegno/gegno.txt",
+      "sha256": "b341f81f3494928d45ad16360239ff919a820011b7bae704959ea6b69f5d8c28"
+    },
+    {
+      "path": "data/globals.txt",
+      "sha256": "e02cb8b5751bfb4d89d480e23f186e1a34edb0792d594d36571a1e3673eb5c41"
+    },
+    {
+      "path": "data/governments.txt",
+      "sha256": "5efd5d79c54ba84128685351c6d3716a36612a5c59085cfd4278733b7a142018"
+    },
+    {
+      "path": "data/hai/hai culture conversations.txt",
+      "sha256": "1bcb5b1e622a13fbd918335cc7a59473bdbc5803d38ac80f51a7fec451a64ed0"
+    },
+    {
+      "path": "data/hai/hai fleets.txt",
+      "sha256": "1c51344f5bbf59ce9538f6dfb6107132270bc2c26e107e80642fb6fdf3425de2"
+    },
+    {
+      "path": "data/hai/hai jobs.txt",
+      "sha256": "24b969a6728d92f6ecf0d21bb94e14af2d43f45bb56bdd360f12ff75946ed9d4"
+    },
+    {
+      "path": "data/hai/hai missions.txt",
+      "sha256": "a565e32c5d461ce04ca5acdade4ed9d74d65bfca1360c4c0c2ccc0e355014fa1"
+    },
+    {
+      "path": "data/hai/hai news.txt",
+      "sha256": "2d327171a134c12878cff5a4c0babb5b7e3b7d16004d1397fe6991ff31305a7c"
+    },
+    {
+      "path": "data/hai/hai outfits.txt",
+      "sha256": "009c039e60198e4742812cccd6e5839283effb1437004a740245bbeadc63c253"
+    },
+    {
+      "path": "data/hai/hai ships.txt",
+      "sha256": "f98504f49df0b818f74999c2df0af84fd6fc1c86310267ac5d027eac0926817d"
+    },
+    {
+      "path": "data/hai/hai.txt",
+      "sha256": "0fadc9cbd316c88729f1392a1b79426d8b7bc8c1095041e10b365ab005e53150"
+    },
+    {
+      "path": "data/hai/unfettered 0 prologue.txt",
+      "sha256": "21f1f219b5b617c82075831026c42c28c3bd2780ed896701d009fd3c8df02a0e"
+    },
+    {
+      "path": "data/hai/unfettered jobs.txt",
+      "sha256": "e2a673cda0f86f2e52a9af0eb5844ac59916e71f9e1b48aa148222e1b0c1f16b"
+    },
+    {
+      "path": "data/hai/unfettered side missions.txt",
+      "sha256": "9d06d880d7fb29d74f6f443296108481fc6fb1559ddf673e9adb31e670c94a4c"
+    },
+    {
+      "path": "data/harvesting.txt",
+      "sha256": "5a873ffe2bf980a0c33e5807164f4db9262d382b361a2f296f780ffe187a7032"
+    },
+    {
+      "path": "data/hazards.txt",
+      "sha256": "97e4ca9fb240f1dfabe1b72d331c799b636e6d88f4e0408a8d46280151e584db"
+    },
+    {
+      "path": "data/human/boarding missions.txt",
+      "sha256": "22531c0803553d84395be2d3370c646a1d11ec8443dac54590dd971e223fb63d"
+    },
+    {
+      "path": "data/human/campaign events.txt",
+      "sha256": "fef6e4a9aa3673bb7a54752efc118a48f060045c6ed6870182b1065073a39b21"
+    },
+    {
+      "path": "data/human/culture conversations.txt",
+      "sha256": "8f9dcd0ec83f78948740bf9d4b1a7d129da1775f83fd9d10253711a17841f599"
+    },
+    {
+      "path": "data/human/deep jobs.txt",
+      "sha256": "7f66fd8b05f9a3313801d215b26a46d42024c62d947a15175c2a49420f50182d"
+    },
+    {
+      "path": "data/human/deep missions.txt",
+      "sha256": "169e5d5516be1e2777c0103223066dc3f2debba4ac3f71ec3aba20082b7ccf45"
+    },
+    {
+      "path": "data/human/derelicts.txt",
+      "sha256": "ee1edd92983e35bd824581ca4c314368f9dfbef0e5af8627f99553a9280552a5"
+    },
+    {
+      "path": "data/human/dirt belt jobs.txt",
+      "sha256": "58c18f388a852cdd74a6ea59abddafa5f7139bd53a693d7afe101c88101fd5fa"
+    },
+    {
+      "path": "data/human/engines.txt",
+      "sha256": "2a78ce13be9e2d8d9bbe2f774d5f6aa4179f11f29e7c6d90c734e9c736fea680"
+    },
+    {
+      "path": "data/human/far north jobs.txt",
+      "sha256": "e527c5a99496c466c34a4a4f11a21e4ce4b17dcf5ec7c02f8b588020b97daa55"
+    },
+    {
+      "path": "data/human/fleets.txt",
+      "sha256": "0cd6c9bb7e7300e6cf86481a603d73f085e517f6de203b609fc080bf6230c263"
+    },
+    {
+      "path": "data/human/free worlds 0 prologue.txt",
+      "sha256": "422038778afdd38db02f1f9690b88b762315ca7bd2ba551f9f406be85ffe3f4b"
+    },
+    {
+      "path": "data/human/free worlds 1 start.txt",
+      "sha256": "dcd4a8b4496de18831f24783bd008f6401aa3beb288778dc6eb5259b5c05ec3e"
+    },
+    {
+      "path": "data/human/free worlds 2 middle.txt",
+      "sha256": "e1e0a073e4429c821c591c1d77ab8d77da594fafd978980027df4f50e9537370"
+    },
+    {
+      "path": "data/human/free worlds 3 checkmate.txt",
+      "sha256": "7271feee880e3076efa94f5b5755026bdc2dd1602c2e94aa4592dac9f9c24a53"
+    },
+    {
+      "path": "data/human/free worlds 3 reconciliation.txt",
+      "sha256": "ce7b6023356ca51198f0c597adbb03dc732815dd592ed63ff5cfe7dc030807ee"
+    },
+    {
+      "path": "data/human/free worlds 4 epilogue.txt",
+      "sha256": "24edf67cc78f232063e61cfdc28d791fd643188c1117e02474f2e2485c62d439"
+    },
+    {
+      "path": "data/human/free worlds side plots.txt",
+      "sha256": "985db74133158528e7fd9d679de9839eb12d3ec299d83efbfb326b0074b2b635"
+    },
+    {
+      "path": "data/human/free worlds war jobs.txt",
+      "sha256": "c24028d4b70e7bff8ea9696c6301b2119055ab8782373600e760dc1be402b407"
+    },
+    {
+      "path": "data/human/frontier jobs.txt",
+      "sha256": "f3cafe899895642d50e1372a2c6430914d3a9275c24044aae5209ff38d39769d"
+    },
+    {
+      "path": "data/human/hails.txt",
+      "sha256": "d721f69035c0b2866dc7900e05cd5f79aeb094da9ecac5d87eb883d1f9b472ee"
+    },
+    {
+      "path": "data/human/human missions.txt",
+      "sha256": "9f119640394e47e1325158ffa8fa697066d7e68353f53e12d6cb7145b83ca1e5"
+    },
+    {
+      "path": "data/human/intro missions.txt",
+      "sha256": "fd1735658f8a0ffdd4752168835d807846e50b5efe2e0fd803e0f8e4ae2e3543"
+    },
+    {
+      "path": "data/human/jobs.txt",
+      "sha256": "dbcaf7500dbab4ad9a9ad0f4ef8d95f437291b10970986aba8c93a6927b1c743"
+    },
+    {
+      "path": "data/human/kestrel.txt",
+      "sha256": "53a49947a520b66b4da8e59f1b5b96917a48b46054d44def828c2d9aaf5604e3"
+    },
+    {
+      "path": "data/human/marauders.txt",
+      "sha256": "cf089aaedfb32098f4d6a1038f0c89fedabd4c1658d84994bb03cb6c2081b495"
+    },
+    {
+      "path": "data/human/message buoys.txt",
+      "sha256": "42e07ee0b7d9c3747edbe0e8130c2cd2466d28a07f2824672e7fce7841753bcb"
+    },
+    {
+      "path": "data/human/names.txt",
+      "sha256": "74da200ce5bf968d31e3317c7509754dbad7eda072ac312fde3fb44afedce2d7"
+    },
+    {
+      "path": "data/human/near earth jobs.txt",
+      "sha256": "2747d00833f946af7e803df61fce64d826ea93cdc13ff84d5c52c0bf5b63ec72"
+    },
+    {
+      "path": "data/human/news.txt",
+      "sha256": "951b531732d7e7649de9fda72f1f978b01f2216ee2ca6187063771f9c5801ea0"
+    },
+    {
+      "path": "data/human/outfits.txt",
+      "sha256": "d0be3a7a3acd065773edc4f3103ad2065fd0239c2128b66e6775fb4ad7c1fd8e"
+    },
+    {
+      "path": "data/human/paradise world jobs.txt",
+      "sha256": "f86728455c7db956254ea88513250bf8f660ed0e8e2217d25bcc671abd78adde"
+    },
+    {
+      "path": "data/human/pirate jobs.txt",
+      "sha256": "75eefc18617be01c8e382c3be74585df3f6ddf9e4f41d93698cce8f3bd9e541a"
+    },
+    {
+      "path": "data/human/post-war reactions.txt",
+      "sha256": "614c2bc63f9363aec37d03237098b79c172d6bc25773c41d30e98f28cd4ca775"
+    },
+    {
+      "path": "data/human/power.txt",
+      "sha256": "c6645ef750bc208d013aaa0714d2b6bd28cce9c535a656735f214cd213df7352"
+    },
+    {
+      "path": "data/human/rim jobs.txt",
+      "sha256": "98bc9f5f77ed424d0da026d1d20ab7918eb40b6488ec7dfb5ef35d0abb07cb14"
+    },
+    {
+      "path": "data/human/sales.txt",
+      "sha256": "d6a7f252d5889bb6eb535a73ce6eefd7d0d9a657060c52f95d9cb8dfdb5e919d"
+    },
+    {
+      "path": "data/human/ships.txt",
+      "sha256": "434fffaf7fb44c1c6687fe8bd20efc59fce9fc875b82a12f98ce12015ebf3e96"
+    },
+    {
+      "path": "data/human/south jobs.txt",
+      "sha256": "0c8466bb410685e196c34f61a684765b75b985b4ddc72b01a0bc1ab1b2416035"
+    },
+    {
+      "path": "data/human/syndicate jobs.txt",
+      "sha256": "fb53e763bd389c4e1206d9b8c1e5199b6b8c50317db83f2a907c6960fbf15c25"
+    },
+    {
+      "path": "data/human/variants.txt",
+      "sha256": "57f793bafd1dd2acff8c4945166ed1b580564803e4655d20f9c50dfc6265e812"
+    },
+    {
+      "path": "data/human/weapons.txt",
+      "sha256": "53a794f727e0650e67259fd5d599555f3fd80a7cf63cb14c9f8fd974150d47a4"
+    },
+    {
+      "path": "data/iije/iije.txt",
+      "sha256": "40ad8518599f5b9cec3334c0138f02a00a1d2eab66dc10c774c4612b7dcfdd8b"
+    },
+    {
+      "path": "data/incipias/incipias first contact.txt",
+      "sha256": "0277d30459c9f5874364408d9466d4282e211d1017d06dc69e633586608e1392"
+    },
+    {
+      "path": "data/incipias/incipias outfits.txt",
+      "sha256": "f57f437048165d47426969904d49757e8b2d3708dfd42066999e55bdd86435e4"
+    },
+    {
+      "path": "data/incipias/incipias ships.txt",
+      "sha256": "1c83bc6c96dccf95d7b63295d315de4cac1086d590298ad101c1592d88f93fb4"
+    },
+    {
+      "path": "data/incipias/incipias.txt",
+      "sha256": "d0588653f7a5088350df566757431e5daa5c98f8f191c967f1c1c21749af6f7b"
+    },
+    {
+      "path": "data/incipias/tace mesa.txt",
+      "sha256": "c382030c619b326f01360a06b570f195dcbf13ad91cb3a438e78d481c06bac59"
+    },
+    {
+      "path": "data/kahet/aberrant missions.txt",
+      "sha256": "af6b18321df8e437c446ec9c25232d66cec1b935bad34fb3d3626bb839fe2ec4"
+    },
+    {
+      "path": "data/kahet/aberrant outfits.txt",
+      "sha256": "c8ac80a58d67e2a7f23f71c5c82e9ac05baab83c79cf521f03ff5bc31d1f952c"
+    },
+    {
+      "path": "data/kahet/aberrant ships.txt",
+      "sha256": "058e649e00956c0622d4a31240dea7692b8a5eb82b88435f445a6fd6e6263e38"
+    },
+    {
+      "path": "data/kahet/aberrant.txt",
+      "sha256": "757568cfc7c4acbde659a6e1617f0780260f3e0c1fab324e7e300ffe8ff3f288"
+    },
+    {
+      "path": "data/kahet/beyond patir assets.txt",
+      "sha256": "8bd2f2e40d6bd8c9ef01cdb4791f6cdaedf2b3ac155250379ed0ceb0916c91a3"
+    },
+    {
+      "path": "data/kahet/kahet missions.txt",
+      "sha256": "c00b01aa8d21f0c02e758d9d4af47dff55b7723a896b416bd4cc69ef6249de4f"
+    },
+    {
+      "path": "data/kahet/kahet outfits.txt",
+      "sha256": "3279c6f68bc02f0ff9e75c8feb50f5e85cc69375faf74a75dc43ade4bd4e56a1"
+    },
+    {
+      "path": "data/kahet/kahet ships.txt",
+      "sha256": "07b05dce7ec04607b0c34877e530fb9436dea465c40666ebe228c5be87fc65b6"
+    },
+    {
+      "path": "data/kahet/kahet.txt",
+      "sha256": "768d5329d8c38bc68de348ec68a85f83e4ef7ef7da44f1d4269d84dd3059c317"
+    },
+    {
+      "path": "data/korath/korath culture conversations.txt",
+      "sha256": "463d9e14cfd395e18acbb9857c3e150a787accd4837b1bce84e10977af63ccea"
+    },
+    {
+      "path": "data/korath/korath hails.txt",
+      "sha256": "285479d14cb3720d2d86db4ec7ee549a1fb3906cbd537386fa8a7d8b6847234a"
+    },
+    {
+      "path": "data/korath/korath jobs.txt",
+      "sha256": "5abbe2cbece109c053545e79089c0ca3271108ff4fb03f42373fbfda6bc25e8c"
+    },
+    {
+      "path": "data/korath/korath missions.txt",
+      "sha256": "e1825bcb16c15d229f2bf510f2d5817dab63ef136e9d9f9f33ed9c3c735f60c3"
+    },
+    {
+      "path": "data/korath/korath news.txt",
+      "sha256": "16fa41854ab4a13505f50fc92d8601a5b5b22daee60213b5bb90ec4cb8749d42"
+    },
+    {
+      "path": "data/korath/korath outfits.txt",
+      "sha256": "4d082eceabdae8f4068e48a741329f68c529e639402b43e2f28fb629718fe253"
+    },
+    {
+      "path": "data/korath/korath ships.txt",
+      "sha256": "f1a4333d32c59788276ad83a234287232435a9c5ce508db53e9be2550278329e"
+    },
+    {
+      "path": "data/korath/korath variants.txt",
+      "sha256": "ed1bb2f24479613cc91b9cfa3b3545329fa89fd277e1c6ac55bc9ddef9a27209"
+    },
+    {
+      "path": "data/korath/korath weapons.txt",
+      "sha256": "19fb1afeefcf9501badf196bef7364df5d26817328ec26abc788b58f6ba0d78f"
+    },
+    {
+      "path": "data/korath/korath.txt",
+      "sha256": "30bcb1fb94483ce2311d8a624b41d95d8e322c3f7f0630789dab149586be977f"
+    },
+    {
+      "path": "data/korath/nanobots.txt",
+      "sha256": "09dd542e6d8e0c8dc70bd141567129f597c6626f7f7bab8f0aa4c0f765ceb083"
+    },
+    {
+      "path": "data/map beyond patir.txt",
+      "sha256": "e4bbf9cf0afb2cb0e05da151ac9d7431104c205a85838ff11f09ae96aaaf0297"
+    },
+    {
+      "path": "data/map planets.txt",
+      "sha256": "cdc305ecfd4d0ebf63c580d5f91121afd3d23d71f68683f8d515db32f03ac4b9"
+    },
+    {
+      "path": "data/map systems.txt",
+      "sha256": "110f7d7c1a139b1c45b1ceba031cb01f94a8ff376900264f7abb67f73471f3e0"
+    },
+    {
+      "path": "data/persons.txt",
+      "sha256": "85652881d986227ab83e9ad62736f4bea794ab103bdabe4947c59736680e4510"
+    },
+    {
+      "path": "data/pug/pug missions.txt",
+      "sha256": "e308d6fe9d9191e1bfb5411cd2dd84554e5b42ee0787eb552a089783c60648b2"
+    },
+    {
+      "path": "data/pug/pug news.txt",
+      "sha256": "6b3a5c6394f3a8831318df17b87442cbf78eb6bee1d95e4ca76ed579940efc15"
+    },
+    {
+      "path": "data/pug/pug outfits.txt",
+      "sha256": "959390f5bae1d1f26420dc4f2bdec13be3e8427f392872d5462a7089ee4f207b"
+    },
+    {
+      "path": "data/pug/pug ships.txt",
+      "sha256": "088c28f8ec4358e734745caa8c7f8ddcfd079229fa6861beb96e8dde0724d54f"
+    },
+    {
+      "path": "data/pug/pug.txt",
+      "sha256": "8e92f51ce723159707b01c452a88fddd6ecbf7d8a266b2510f1aa67bf277284b"
+    },
+    {
+      "path": "data/quarg/quarg missions.txt",
+      "sha256": "0cc398975988471e564166e12519fb6aa14e6e02eafe6391a0e0a0c9472d3ab3"
+    },
+    {
+      "path": "data/quarg/quarg news.txt",
+      "sha256": "d2fd324ee58949ae8da506d59e0f4e7410e95dcf53071b5274101cba34b731fc"
+    },
+    {
+      "path": "data/quarg/quarg outfits.txt",
+      "sha256": "e3cd86bf7a25ed3d4e33358e7c4e343de75386761276b6ddd049c7a46e22e305"
+    },
+    {
+      "path": "data/quarg/quarg ships.txt",
+      "sha256": "91dccd3af77fa6f68ff6884629d8c04a1bff743b6898253a974c9b1cd9524d3e"
+    },
+    {
+      "path": "data/quarg/quarg.txt",
+      "sha256": "a40d1940f13deae3b616bd4fa690c3afedb48877673de5ef2f4ac53e0a3f7d81"
+    },
+    {
+      "path": "data/remnant/remnant 1 introduction.txt",
+      "sha256": "e35f569eb2270a69763c21403e9abb6b440471055bf3e45241dba2d55bc5345b"
+    },
+    {
+      "path": "data/remnant/remnant 2 cognizance.txt",
+      "sha256": "d4ba17390e30b15103761522737e861b99ea3e596307bc935392f3cf2e5b6547"
+    },
+    {
+      "path": "data/remnant/remnant 2 side missions.txt",
+      "sha256": "c6e8091d0038fab4fdfb2c90e35204db1e9c4802d0334c51abf0ef14faf86f26"
+    },
+    {
+      "path": "data/remnant/remnant commodities.txt",
+      "sha256": "007dc30f23a6919b67c2a659ebe4acf7b55c7595b315213ec4bd019392e79773"
+    },
+    {
+      "path": "data/remnant/remnant events.txt",
+      "sha256": "5804f586c66b01a59c63213cfd9dbc9ba608b7a386bdeba3d0b1c3c3d0dac7aa"
+    },
+    {
+      "path": "data/remnant/remnant jobs.txt",
+      "sha256": "5248ccac3d15f52524e9c055147c940e9f51704da0a5e84bfb523c356dca77d5"
+    },
+    {
+      "path": "data/remnant/remnant news.txt",
+      "sha256": "9df512c7ee2ea141d9ac9fb2562392f654003fc5d7b654d561c60d54b2c64a11"
+    },
+    {
+      "path": "data/remnant/remnant outfits.txt",
+      "sha256": "e617f1f0db6b4b45eba76d857a93af8993f1fa41968e6f3dd65b676ce4004cd7"
+    },
+    {
+      "path": "data/remnant/remnant ships.txt",
+      "sha256": "ab880eb925f94171725a0f6af9cbffc6db4cafa7d3640e98cb87e91c4dbcf49f"
+    },
+    {
+      "path": "data/remnant/remnant.txt",
+      "sha256": "d0f6a4fd57d7e11f799668c9316cd5d7e1c900b14713b7e98bf946e7bf04398a"
+    },
+    {
+      "path": "data/rulei/rulei outfits.txt",
+      "sha256": "083c7776c1f9d344aafdefa41c34ff69b28d83b10e8086b0788520576c08300d"
+    },
+    {
+      "path": "data/rulei/rulei ships.txt",
+      "sha256": "84ee0c7d3a17f9f08db3520a479072e2a8783033885f88a2eaf42780777d1f16"
+    },
+    {
+      "path": "data/rulei/rulei.txt",
+      "sha256": "0d8fa3ddea6cbede44e7fc0fb3f17d79d679cc9c4bc24bbfda1d58b7678705e4"
+    },
+    {
+      "path": "data/series.txt",
+      "sha256": "82d7686bd19f7f817f0bd073ab2ede521d38f95f098c7e4fd1420589d7871313"
+    },
+    {
+      "path": "data/sheragi/archaeology missions.txt",
+      "sha256": "6e350fded422f9507fceb4d27b8a41a460dce302d6f9c90c69a1d8a655ba7ed0"
+    },
+    {
+      "path": "data/sheragi/sheragi outfits.txt",
+      "sha256": "ba8eeaf6b936f5a709750ee8d58e54186c9915d410e62d50e172217e62b5c25f"
+    },
+    {
+      "path": "data/sheragi/sheragi ships.txt",
+      "sha256": "537bbbc05731c0716db32e7a5e6db6a2630fd961c9d9ae110df237a17f35d940"
+    },
+    {
+      "path": "data/stars.txt",
+      "sha256": "5cb64788ab9773bc4d44cc0e57a3e417036601e6d54f1f7a2ec036639d906d75"
+    },
+    {
+      "path": "data/starts.txt",
+      "sha256": "7b8d6b3affeecc09944c336bbe50516828657ad4d9674911458e159a2c74480b"
+    },
+    {
+      "path": "data/substitutions.txt",
+      "sha256": "4628d8bca357a26b552451796551a47e7732fb6d6178554e970876a3049780f6"
+    },
+    {
+      "path": "data/successors/predecessors.txt",
+      "sha256": "a5dee2ef529a9d0f060ecffd5217c72875613d0544add91531301fbad4242106"
+    },
+    {
+      "path": "data/successors/successor 1 prologue.txt",
+      "sha256": "7a24d3560860298e6cf1ee5adb2b0e550734b6a90ea4ba077353b39cea54f824"
+    },
+    {
+      "path": "data/successors/successor 2 ghosts aqrabe.txt",
+      "sha256": "c5837337d698860818cc1466e1c55e3c99eb6cb65c0708985eaccd2f93345b6c"
+    },
+    {
+      "path": "data/successors/successor 2 ghosts myurej.txt",
+      "sha256": "bb305f58bdf69575288cc03c829af08c8abd73ce8e18e9bec2fdbb7f0b6a5d26"
+    },
+    {
+      "path": "data/successors/successor 2 ghosts.txt",
+      "sha256": "10c96e46df554c230e5bb7e539b3effcd72a25aa22a35d4163979082f609ffff"
+    },
+    {
+      "path": "data/successors/successor culture conversations.txt",
+      "sha256": "875fbe00e2a481de79be471abfd47baef4337791865a8caff8c8e7aab1bee3bd"
+    },
+    {
+      "path": "data/successors/successor events.txt",
+      "sha256": "8d8eb607ff221507d250d6723b691543806ce1d5f4e71ae2b7b3fe563a15d603"
+    },
+    {
+      "path": "data/successors/successor fleets.txt",
+      "sha256": "f6adb73636792a6bea8b50f20c6a5d085c8c65f9381036339efb1ec57e16c88e"
+    },
+    {
+      "path": "data/successors/successor hails.txt",
+      "sha256": "66dcf0ebcedf67f2c9447a61d0c42b1cae7379b861b3164269f233e2483cbf56"
+    },
+    {
+      "path": "data/successors/successor jobs.txt",
+      "sha256": "a5a61d1321fc76c95fa8bb1486d817670072d30de2b53ff51f1a9f194030fe42"
+    },
+    {
+      "path": "data/successors/successor news.txt",
+      "sha256": "5ca5596bf9d795169bf17725668ca3de46bb4fa6a885fc65d50c921c137b4e5b"
+    },
+    {
+      "path": "data/successors/successor outfits.txt",
+      "sha256": "e21d499b6a22d836c4218634e0b831b554e672c66fe8c477ed4b8014ea5e0474"
+    },
+    {
+      "path": "data/successors/successor sales.txt",
+      "sha256": "ac6cfb578dcc553b220c577b8557eb24d5ce691ab9eb2830bea29886f373b889"
+    },
+    {
+      "path": "data/successors/successor ships.txt",
+      "sha256": "70a53a4dbd786945662af0c0fa158c78f915bfcd3c6754af9bc6e07f1317ffdb"
+    },
+    {
+      "path": "data/successors/successor side missions.txt",
+      "sha256": "b454dabd6dd5807d829cc8fd78b2dfb9fd2d66d068fd1c6be557d8e4c840ac0e"
+    },
+    {
+      "path": "data/successors/successor variants.txt",
+      "sha256": "6c5c9abce727c27409c950be51a73fd69e5f95458a4a7fcf393b87ece96b3d9d"
+    },
+    {
+      "path": "data/successors/successor weapons.txt",
+      "sha256": "c36f248a37cec4253c2b576206b3d0f69db644fe4f739a335f4a05ca8c84184e"
+    },
+    {
+      "path": "data/successors/successors.txt",
+      "sha256": "6a1e2cfcb0cfed67f35e5cfc2b3ba638f03fc5d8099f4e40b8bf61e7507e106b"
+    },
+    {
+      "path": "data/vyrmeid/vyrmeid.txt",
+      "sha256": "a73504663518ecae72102525612a8a308c7c55c181e070e4f12fd3b8ce86995f"
+    },
+    {
+      "path": "data/wanderer/wanderer jobs.txt",
+      "sha256": "47cb811544aded63c3d83b4b1858f654280076047d39f40200fd826c9a3143db"
+    },
+    {
+      "path": "data/wanderer/wanderer missions.txt",
+      "sha256": "0aca23c9ef166800f84df9836fe8acb804f2b98595059e3b9e77caf839a21b27"
+    },
+    {
+      "path": "data/wanderer/wanderer news.txt",
+      "sha256": "bfaeba49203bfb48c8ae85b2b4fa7aa1e108f05e2bf2a58c01f67cf8db54e8e6"
+    },
+    {
+      "path": "data/wanderer/wanderer outfits.txt",
+      "sha256": "a7da9694d08ec45da25fb3c169e3a7bd6f51d0e49d3a72101780b4cc6c861dff"
+    },
+    {
+      "path": "data/wanderer/wanderer ships.txt",
+      "sha256": "7c133543da51c5564ae61901965cf0960f777b323a6d195947ad8873f37704c4"
+    },
+    {
+      "path": "data/wanderer/wanderers middle.txt",
+      "sha256": "81a7d7d61d5d3928f6470a2f17d6f298fc7a7087535d142151e992a139ed6f52"
+    },
+    {
+      "path": "data/wanderer/wanderers start.txt",
+      "sha256": "cb0ed16c39ce74d9aa18f3d4170f8eb41d0b98348ab6d3c35a259c44edde4c6d"
+    },
+    {
+      "path": "data/wanderer/wanderers.txt",
+      "sha256": "bed6c35aeb43736617b0909175af8cb89aa9e39064eacf052f2cfd2c6c39c502"
+    }
+  ]
+}
