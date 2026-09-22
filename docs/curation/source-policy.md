@@ -4,7 +4,7 @@
 
 The authority for this pilot is the official Endless Sky repository at commit
 `7140eb2a29ce4d2797933075c751791a892c7d4f`. The [inventory](source-inventory.json) records
-three inspected files with SHA-256 checksums, author notices, immutable URLs, and inclusive
+four inspected files with SHA-256 checksums, author notices, immutable URLs, and inclusive
 one-based passage ranges. Mission names and branch context make the evidence auditable beyond
 a bare line citation. Review date: 2026-09-22. Review method: agent reading of the selected source
 passages and relevant conditions; no human or independent double-review is claimed.
@@ -32,7 +32,7 @@ must be flagged, deferred, or excluded rather than guessed.
 The pilot excludes third-party plugins, community lore additions, images/audio, UI/deprecated
 content, unreviewed campaign outcomes, and the existing invented archivist from canonical
 training. Referenced but unreviewed factions are not new target identities. The inventory also
-records two deferred passages and one excluded record so later authors do not mistake all
+records three deferred passages and two excluded records so later authors do not mistake all
 inspected material for usable speech.
 
 Source paragraphs are evidence, not ready-made user/assistant pairs. Post-processing must
@@ -43,9 +43,11 @@ summaries and identity briefs are not benchmark questions or exact-match answer 
 ## Licensing and attribution
 
 The pinned [upstream copyright manifest](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/copyright)
-assigns its general `Files: *` entry GPL-3.0-or-later. All three selected text files have matching
+assigns its general `Files: *` entry GPL-3.0-or-later. All four selected text files have matching
 GPL notices. Their file headers credit Michael Zahniser (2014) for the Quarg mission file,
-Michael Zahniser (2015) for the Hai mission file, and MasterOfGrey (2021) for the Hai culture file. These are header credits, not a claim that no other
+Michael Zahniser (2015) for the Hai mission file, and MasterOfGrey (2021) for the Hai culture file.
+The human prologue file also credits Michael Zahniser (2014). These are header credits,
+not a claim that no other
 contributors changed the files; preserve the upstream contributors/credits context as well.
 Artwork has separate terms and is not included in this pilot.
 

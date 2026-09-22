@@ -21,7 +21,7 @@ There is no single authoritative “number of factions” field in these sources
 - **128 distinct government identifiers**, also 128 root government declarations in this
   snapshot. These include political groups, location/hostility variants, and technical entities
   such as `Test Dummy`, `Uninhabited`, and `Escort`. They are not 128 independently trainable voices.
-- **Two selected pilot identities:** Quarg and non-Unfettered Hai. They are curation choices,
+- **Three selected pilot identities:** early Free Worlds militia, Quarg, and non-Unfettered Hai. They are curation choices,
   not the full set available in the game.
 
 Directory groups are the reproducible breakdown below, **not a completed faction taxonomy or
@@ -114,6 +114,7 @@ They illustrate why both volume and reading the source matter.
 
 | Source example | Learning signal | Preparation concern |
 | --- | --- | --- |
+| [Free Worlds reconnaissance](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L329-L425) | Practical cooperation, defensive framing, and concern about provoking the Navy | A Republic captain speaks inside the same mission; preserve faction attribution, early-campaign timing, and shared-chain split boundaries |
 | [Quarg first contact](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L22-L70) | Patient explanation, collective identity, peaceful coexistence backed by strength | Narration and player questions interrupt speech; Quarg claims about the Drak must remain attributed |
 | [Quarg at Kuwaru Efreti](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L74-L118) | More archaic register; protection of Efreti and withholding dangerous knowledge | Branches repeat answers; one speaker's register is not mandatory for every Quarg |
 | [Hai first contact](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20missions.txt#L14-L96) | Hospitality and curiosity about humans; a young Hai defers history to elders | Human merchant exposition is interleaved with Hai speech; characters have different knowledge |
@@ -128,15 +129,18 @@ as omniscient facts, and generating many near-duplicates from a small number of 
 
 ## Curated pilot versus available source
 
-The [curation package](../docs/curation/README.md) contains **15 inspected passage records**:
-11 retained as evidence, one context-only, two deferred, and one excluded. Retained material
-spans **eight mission groups**: two Quarg and six Hai. This is an agent source review, not
+The [curation package](../docs/curation/README.md) contains **21 inspected passage records**:
+14 retained as evidence, two context-only, three deferred, and two excluded. Retained material
+spans **11 mission groups**: three Free Worlds, two Quarg, and six Hai. The three Free Worlds
+missions share one reconnaissance chain and are not independent scenario families. This is an agent source review, not
 independent human adjudication or final example approval.
 
 Quarg has strong first-contact/knowledge-restraint evidence but narrow everyday coverage.
 Hai has more varied civilian contexts, but speakers' ages, tastes, political views, and
-translation conditions must be preserved. Initial authoring targets are **48 training,
-12 development, and 24 held-out benchmark records** across the two identities. These are
+translation conditions must be preserved. Free Worlds adds practical militia dialogue about cooperation, surveillance, and avoiding
+escalation; its initial sample does not represent all human-space factions or civilian life.
+Initial authoring targets are **72 training,
+18 development, and 36 held-out benchmark records** across the three identities. These are
 future targets, not current dataset sizes or a measured usable yield; reduce them if evidence
 cannot support sufficient diversity. Reserve scenario families before authoring variants.
 

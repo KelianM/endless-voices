@@ -1,7 +1,7 @@
 # Initial source curation
 
 This is the completed first source review for [issue #2](https://github.com/KelianM/endless-voices/issues/2).
-It selects two pilot identities, records 15 inspected passages, and supplies evidence-backed
+It selects three pilot identities, records 21 inspected passages, and supplies evidence-backed
 briefs for conversation authors. It contains neither training conversations nor benchmark cases.
 For whole-source counts across every content group, see the [dataset overview](../../data/README.md).
 
@@ -15,27 +15,32 @@ For whole-source counts across every content group, see the [dataset overview](.
 
 | Identity ID | Species ID | Faction / government boundary | Representative roles |
 | --- | --- | --- | --- |
+| `human-free-worlds` | `human` | Free Worlds militia in the early reconnaissance chain | Transport officer; Glaze commander Jean-Jacques (JJ) |
 | `quarg` | `quarg` | Quarg interlocutors at the selected first-contact locations | Local greeter; Kuwaru Efreti interlocutor |
 | `hai-mainstream` | `hai` | Residents of government `Hai` worlds; excludes `Hai (Unfettered)` as a target identity | Young resident; elder; barkeep; culture participant; cafe worker |
 
 `hai-mainstream` is a project label, not an official species name. Roles retain different
-knowledge and tastes; these are not two omniscient spokespersons. The non-Unfettered boundary
+knowledge and tastes; these are not omniscient spokespersons. The non-Unfettered boundary
 must remain visible when discussing the northern Hai. Korath and Drak mentioned by Quarg are
 subjects of testimony, not additional target speakers.
 
-Choose these identities because both offer identifiable dialogue while contrasting restrained
-first-contact discourse with ordinary cultural conversation. Hai supplies broader everyday
-coverage; Quarg is intentionally smaller and has limited independent scenes. Defer Coalition,
-Wanderers, and other identities until this small corpus has been prepared and evaluated. Their
-exclusion is a scope decision, not a finding that their data is unsuitable.
+Include human space from the start: its folder supplies 249,660 conversation words, about 37%
+of the entire source total. Volume is a strong reason to sample it, not proof that every passage
+is high quality or belongs to one faction. The first attributable human target is the early
+Free Worlds militia; Republic, Syndicate, and other human groups remain separate candidates.
+Quarg provides contrasting first-contact discourse and Hai broader civilian cultural dialogue.
+Defer other targets until this bounded pilot is prepared and evaluated.
 
 ## Canon and scene assumptions
 
 Use development commit `7140eb2a29ce4d2797933075c751791a892c7d4f` from the official repository.
 This preserves the inspected snapshot; it is not advertised as the latest stable release.
-The inventory has SHA-256 hashes for the three inspected text files and immutable passage links.
+The inventory has SHA-256 hashes for the four inspected text files and immutable passage links.
 
-The pilot covers local contact/culture encounters, before importing later campaign outcomes.
+The pilot covers local contact/culture encounters and early Free Worlds reconnaissance,
+before importing later campaign outcomes. Free Worlds records are after initial deployment
+and before the player chooses sides; JJ’s local no-shooting-yet account must retain that timing.
+Prewar Pact material is historical context only, not an interchangeable faction voice.
 There is no single fictitious save state combining all scenes. Each passage retains its own
 prerequisites: Kuwaru Efreti follows Quarg contact; the Hai elder conversation follows both Hai
 and Unfettered contact; the Academy scene requires Hai language access. A later conversation
@@ -53,8 +58,12 @@ multiple passages from one mission do not create independent source scenes.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Quarg | 4 | 2 | 1 | 1 | 0 |
 | Non-Unfettered Hai | 7 | 6 | 0 | 1 | 1 |
-| Total | 11 | 8 | 1 | 2 | 1 |
+| Free Worlds | 3 | 3 | 1 | 0 | 0 |
+| Other human speakers (not targets) | 0 | 0 | 0 | 1 | 1 |
+| Total | 14 | 11 | 2 | 3 | 2 |
 
+The three retained Free Worlds missions form one connected chain, not three independent
+scenario families. Keep source-derived variants of that chain in one split.
 The excluded Hai record covers three related sports scenes. Counts are inventory records,
 not utterances, independent facts, future examples, or word counts. No usable-example yield
 has been measured yet. See each record's `context` and `caveat` before using its summary.
@@ -68,12 +77,18 @@ has been measured yet. See each record's `context` and `caveat` before using its
 | Conflict | q-efreti | h-elder, h-gambling | Containment, defense, and disagreement; no general tactical expertise |
 | Everyday interaction | q-greeting | h-theater, h-music, h-academy | Quarg evidence is narrow; do not fabricate rich everyday customs |
 
+Human coverage: `fw-transport` provides everyday interaction, `fw-scan` and `fw-jj`
+provide reconnaissance technology, political relationships, conflict, and bounded recent history.
+Moral decisions can probe the tension between defense and covert surveillance. The sample does
+not support alien attitudes, civilian Free Worlds culture, or an authoritative war history.
+Use political-group relationships for the human pilot rather than inventing interspecies views.
+
 ## Initial authoring budget
 
 Set a deliberately small target of **24 training conversations, 6 development conversations,
-and 12 benchmark cases per identity**: 48 / 12 / 24 overall (84 records). This is a scope cap
+and 12 benchmark cases per identity**: 72 / 18 / 36 overall (126 records). This is a scope cap
 for the first pass, not a claim that the reviewed sources already yield 84 independent examples.
-For each identity, aim for 4 / 1 / 2 primary-topic records across the six topics above. Secondary
+For each identity, aim for 4 / 1 / 2 primary-topic records across the six topics above (human political-group relationships replace unsupported alien attitudes). Secondary
 tags may overlap but do not inflate counts. Include at least two multi-turn cases and four novel
 situations among each identity's 12 benchmark cases; these categories may overlap.
 

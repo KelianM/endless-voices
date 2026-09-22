@@ -25,6 +25,12 @@
       "sha256": "1bcb5b1e622a13fbd918335cc7a59473bdbc5803d38ac80f51a7fec451a64ed0",
       "header_author": "MasterOfGrey (2021)",
       "license": "GPL-3.0-or-later"
+    },
+    {
+      "path": "data/human/free worlds 0 prologue.txt",
+      "sha256": "422038778afdd38db02f1f9690b88b762315ca7bd2ba551f9f406be85ffe3f4b",
+      "header_author": "Michael Zahniser (2014)",
+      "license": "GPL-3.0-or-later"
     }
   ],
   "passages": [
@@ -374,6 +380,147 @@
       "summary": "Celebrity-signing scenes share a repeated narrative template.",
       "context": "Random non-station Hai encounters; approach/ignore choices.",
       "caveat": "Not usable as direct-speech evidence; keep related templates grouped if later used for factual context.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "fw-transport",
+      "identity": "human-free-worlds",
+      "source_file": "data/human/free worlds 0 prologue.txt",
+      "lines": [
+        279,
+        326
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L279-L326",
+      "mission": "FW Recon 0",
+      "source_group": "FW Recon 0",
+      "speaker": "Unnamed Free Worlds militia officer",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "everyday",
+        "worldview"
+      ],
+      "summary": "Politely requests paid passage, identifies militia affiliation, and checks whether that is a problem.",
+      "context": "Requires initial deployment 4 and offer conditions; fails when chosen sides is set. Completion refers the captain to the commander on Glaze.",
+      "caveat": "Player hostility is a selectable reply, not officer speech; preserve refusal/acceptance branches.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "fw-scan",
+      "identity": "human-free-worlds",
+      "source_file": "data/human/free worlds 0 prologue.txt",
+      "lines": [
+        329,
+        361
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L329-L361",
+      "mission": "FW Recon 1",
+      "source_group": "FW Recon 1",
+      "speaker": "Free Worlds militia commander on Glaze",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "technology",
+        "conflict",
+        "worldview"
+      ],
+      "summary": "Offers payment for scanning a Republic Cruiser and seeks a sympathetic merchant to avoid provoking the Navy.",
+      "context": "After FW Recon 0 completion, before chosen sides; on-offer dialogue only.",
+      "caveat": "The commander’s defensive framing is a faction perspective, not proof of the Republic’s intentions. Restrict technical claims to scanner use.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "fw-jj",
+      "identity": "human-free-worlds",
+      "source_file": "data/human/free worlds 0 prologue.txt",
+      "lines": [
+        398,
+        423
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L398-L423",
+      "mission": "FW Recon 2",
+      "source_group": "FW Recon 2",
+      "speaker": "Jean-Jacques (JJ), militia commander on Glaze",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "retain",
+      "topics": [
+        "history",
+        "conflict",
+        "technology"
+      ],
+      "summary": "Introduces himself and explains why weapons refits could indicate changing Navy intentions while neither local side wants to fire first.",
+      "context": "After FW Recon 1 completion, before chosen sides. Same reconnaissance chain as fw-transport and fw-scan.",
+      "caveat": "Current local political situation is not a timeless claim about the whole campaign. These three mission groups share one chain and must stay together for source-derived split assignment.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "fw-pact-background",
+      "identity": "human-free-worlds",
+      "source_file": "data/human/free worlds 0 prologue.txt",
+      "lines": [
+        14,
+        85
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L14-L85",
+      "mission": "Pact Recon 0",
+      "source_group": "Pact Recon 0",
+      "speaker": "Freya Winters, Southern Mutual Defense Pact militia officer",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "context_only",
+      "topics": [
+        "history",
+        "conflict",
+        "everyday"
+      ],
+      "summary": "Explains mutual defense, assistance to merchants, and volunteer scanner-log reconnaissance.",
+      "context": "Explicitly before event: war begins; a predecessor-era role, not the same scene state as FW Recon.",
+      "caveat": "Do not silently put Freya’s words or prewar knowledge into JJ’s mouth. Keep the Pact as a distinct historical identity/state.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "fw-republic-captain",
+      "identity": "human-republic",
+      "source_file": "data/human/free worlds 0 prologue.txt",
+      "lines": [
+        363,
+        387
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L363-L387",
+      "mission": "FW Recon 1",
+      "source_group": "FW Recon 1",
+      "speaker": "Republic Cruiser captain",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "exclude",
+      "topics": [
+        "technology",
+        "everyday"
+      ],
+      "summary": "A Republic captain responds to a scan with engine promotion or a personal invitation.",
+      "context": "NPC conversation embedded in a Free Worlds mission.",
+      "caveat": "Not Free Worlds speech; illustrates why the mission filename is not a speaker label. Republic is not yet a reviewed pilot target.",
+      "review": "agent_read_source_2026-09-22"
+    },
+    {
+      "id": "fw-questioning",
+      "identity": "human-unattributed",
+      "source_file": "data/human/free worlds 0 prologue.txt",
+      "lines": [
+        201,
+        275
+      ],
+      "source_url": "https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L201-L275",
+      "mission": "Pact Questioning",
+      "source_group": "Pact Questioning",
+      "speaker": "Unidentified officer wearing an unmarked Navy uniform",
+      "evidence_type": "mixed_direct_speech_and_narration",
+      "disposition": "defer",
+      "topics": [
+        "conflict",
+        "history"
+      ],
+      "summary": "Questions the player about work for Freya and the Pact.",
+      "context": "Conditional on prior Pact work; prewar/postwar wording branches.",
+      "caveat": "Exact rank and affiliation are uncertain from the scene; do not treat as a generic Republic policy statement or Free Worlds voice.",
       "review": "agent_read_source_2026-09-22"
     }
   ]
