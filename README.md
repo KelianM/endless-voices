@@ -32,7 +32,7 @@ data/evaluation/           Evaluation protocol and calibration evidence
 data/overview/             Upstream source inventory and statistics
 ```
 
-There is no frontend, general game-data ingestion, synthetic data generator, or evaluation runner.
+There is no frontend, general game-data ingestion, synthetic data generator, or scoring runner.
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
@@ -68,7 +68,7 @@ chat template that accepts your message roles, including `system` if used. No mo
 downloaded until you run a command. Model licenses, access requirements, and memory needs differ.
 For gated models, authenticate with Hugging Face first. Remote model code is not enabled.
 
-Both commands load the full base model in float32 for a simple CPU/MPS starting point. This is
+Training and interactive chat load the full base model in float32 for a simple CPU/MPS starting point. This is
 **LoRA, not quantized LoRA**: only adapter parameters train, but the base weights still occupy
 memory. Start with a small model, short sequences, and batch size one. CUDA is also supported.
 
@@ -160,10 +160,29 @@ generates one answer. Entire conversations and known scenario variants stay in o
 The [authenticity protocol](data/evaluation/README.md) compares generated replies against original
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
-result is claimed. Generation and reporting
-commands remain future work. Fixed-history evaluation does not establish persistence through a
+result is claimed. The generation command below saves continuations; judging and comparison
+reports remain future work. Fixed-history evaluation does not establish persistence through a
 model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
+
+## Generate comparable responses
+
+Generate one final reply per selected validation sample, retaining authored history:
+
+```bash
+endless-generate --config configs/generate.toml \
+  --manifest data/pilot-v1/samples/manifest.json \
+  --sample-ids data/evaluation/smoke-sample-ids.json \
+  --device mps --dtype float16 --output outputs/qwen3-validation
+```
+
+The example downloads a pinned Qwen3-4B-Instruct-2507 checkpoint into `data/local/hub/`.
+Use `--adapter` for an existing LoRA adapter, `--offline` to require cached weights, and a new
+output directory for each condition. The runner withholds the target and private assessment
+fields, rejects overlong inputs, and saves responses, failures and reproduction settings.
+Checkpoint, device, precision and generation limits remain configurable.
+See the [generation reference](docs/generation.md) for selection, adapter compatibility,
+JSON/JSONL output fields and reproducibility limits. This command performs no training or scoring.
 
 ## Development
 

@@ -22,6 +22,7 @@ dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
 endless-validate = "endless_voices.contracts:main"
 endless-train = "endless_voices.train:main"
 endless-chat = "endless_voices.chat:main"
+endless-generate = "endless_voices.generate:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
