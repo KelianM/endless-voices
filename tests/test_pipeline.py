@@ -156,3 +156,24 @@ use_cpu = true
             text=True,
         )
         assert "Voice:" in result.stdout
+
+
+def test_contract_cli_local_tokenizer(tmp_path: Path, tokenizer: PreTrainedTokenizerFast):
+    local = tmp_path / "tokenizer"
+    tokenizer.save_pretrained(local)
+    manifest = Path(__file__).parent / "fixtures" / "contracts" / "manifest.json"
+    command = [
+        sys.executable,
+        "-m",
+        "endless_voices.contracts",
+        str(manifest),
+        "--tokenizer",
+        str(local),
+        "--max-length",
+    ]
+    result = subprocess.run([*command, "100"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    result = subprocess.run([*command, "2"], capture_output=True, text=True)
+    assert result.returncode == 1
+    assert "train.jsonl:1:" in result.stderr
+    assert "Shorten the conversation" in result.stderr

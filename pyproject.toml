@@ -19,6 +19,7 @@ dependencies = [
 dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
 
 [project.scripts]
+endless-validate = "endless_voices.contracts:main"
 endless-train = "endless_voices.train:main"
 endless-chat = "endless_voices.chat:main"
 

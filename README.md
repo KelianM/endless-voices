@@ -25,6 +25,7 @@ docs/curation/             Reviewed pilot sources, identity briefs, and scope
 src/endless_voices/
   common.py                Config and tokenizer loading
   data.py                  Validation, tokenization and padding
+  contracts.py             Offline curated dataset and benchmark contracts
   train.py                 LoRA supervised fine-tuning
   chat.py                  Base-model or adapter chat
 tests/                     Offline data and tiny-model smoke tests
@@ -89,6 +90,11 @@ pairs. Text must be nonempty. `metadata` is optional and ignored by training; us
 of sources and identity labels. Put private or larger local datasets in `data/local/` (gitignored)
 and change `data.path`. Paths in configuration are relative to the working directory.
 
+For curated train/validation/test samples, use the shared
+[versioned data contracts](data/contracts.md). Validate a complete split manifest offline with
+`python -m endless_voices.contracts tests/fixtures/contracts/manifest.json`. This reports
+structural coverage and checks metadata, hashes, IDs, and known conversation/scenario split boundaries.
+
 The single example is an **invented archivist**, not a claim about an Endless Sky species, and is
 only suitable for checking the pipeline. Meaningful identity learning needs a larger, carefully
 reviewed dataset spanning different situations. Keep provenance and permissions for future game
@@ -146,11 +152,12 @@ budget are rejected; reset or shorten the conversation. Adjust `--max-context-to
 2048) and `--max-new-tokens` (default 128) for your model. Adapter loading expects a tokenizer
 saved alongside the adapter, as the training command does.
 
-For later comparisons, keep the checkpoint, test questions, context, and generation settings
-fixed. Try both adapter-only and adapter-plus-prompt conditions. Hold out entire conversations
-and scenarios from training, then inspect lore consistency, worldview, speech, and identity
-persistence over multiple turns. Separate factual lore recall from merely sounding distinctive.
-These checks are future work; there is no automated evaluation yet.
+The first comparison uses the same identity instructions, selected lore, and authored history
+for the base model and adapted model. Evaluation withholds the final assistant response and
+generates one answer. Entire conversations and known scenario variants stay in one split.
+The generation runner and scoring protocol remain future work; fixed-history evaluation does
+not establish persistence through a model’s own unfolding conversation. See the
+[data contract](data/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
 ## Development
 
