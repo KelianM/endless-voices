@@ -46,8 +46,9 @@ Keep each actual conversation and its known repeated/branch variants in one spli
 themes, faction labels and shared lore alone do not determine split membership. Preserve source
 provenance independently from those relationships.
 
-Commit the complete curated payload, agent-authored annotations and review evidence in ordinary
-Git, with versioned manifests and reconstruction hashes. Keep the retrievable raw upstream corpus
+Version the complete curated release through Git LFS, retaining its manifest and reconstruction
+hashes. Keep agent-authored annotations and curation review records in ordinary Git. Mark the
+materialized release as generated so dataset output does not dominate code review. Keep the retrievable raw upstream corpus
 outside Git. Agent work must remain available without rerunning generation or reconstruction.
 Content corrections produce new dataset versions. Annotation and source review is explicit agent
 review; human approval is recorded only when actually supplied.
@@ -73,8 +74,9 @@ review; human approval is recorded only when actually supplied.
 - Different encounters in a campaign can cross splits. This preserves usable coverage but does
   not test generalization to entirely unseen story arcs. Conversation prefixes remain dependent
   samples and must not be counted as independent observations.
-- A fresh checkout contains the curated dataset and its review evidence. Committing generated
-  files duplicates reconstructible content and grows repository history, but preserves the exact
-  reviewed artifact without requiring tools or downloads. The pilot is small text data, so LFS
-  adds no useful storage benefit. Reconstruction hashes detect drift; the recipe and a successful
-  schema check alone do not establish quality.
+- A checkout with Git LFS contains the exact curated dataset and its review evidence. Git stores
+  compact pointers while LFS stores the payload; a checkout without LFS contains only pointers
+  until the objects are fetched. This adds an LFS installation and storage dependency. The pilot
+  is small in bytes, but its generated text dominates the PR diff; review visibility motivates
+  LFS here. Reviewers inspect materialized samples locally and review annotations in Git.
+  Reconstruction hashes still detect payload drift; storage format does not establish quality.

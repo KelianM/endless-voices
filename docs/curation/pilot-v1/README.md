@@ -15,10 +15,18 @@ samples. [Coverage and review findings](findings.md) document exclusions, correc
 
 ## Use and reconstruct the release
 
-The [complete release](../../../data/curated/pilot-v1/) is committed in ordinary Git, including
+The [complete release](../../../data/curated/pilot-v1/) is versioned through Git LFS, including
 the three split files, provenance, review copy and license material. Agent-authored annotations,
-profiles and lore are committed alongside this document. A fresh checkout contains the dataset;
-no source download or reconstruction is required to read it.
+profiles and lore are committed alongside this document. Fetch the versioned payload after cloning with Git LFS installed:
+
+```sh
+git lfs install --local
+git lfs pull
+```
+
+A checkout without LFS contains pointer files. After fetching the LFS objects, no raw source
+download or reconstruction is required to read the dataset. Generated release files are collapsed
+in GitHub review; inspect the local `review.md` for full sample context and targets.
 
 Validate the committed split manifest offline:
 
@@ -166,7 +174,8 @@ possible pretraining memorization remains unmeasured. The small calibration used
 alternatives; its successful origin judgments are not model-quality results. Future evaluator
 validation still needs fresh scenes, subtler alternatives and actual generated responses.
 
-Materialized speech, annotations, manifests and review records stay in ordinary Git. Only raw
+The complete materialized release stays in Git LFS. Agent-authored annotations, profiles, lore,
+curation review records and reconstruction hashes stay in ordinary Git. Only raw
 upstream sources, tokenizer caches and temporary reconstruction outputs stay under gitignored
 `data/local/`. This source-derived dataset uses GPL-3.0-or-later. The committed bundle preserves
 the upstream license, copyright manifest, credits and selected file-header notices. Source URLs

@@ -192,10 +192,12 @@ The statistics are descriptive estimates, not an extraction pipeline or quality 
 
 Keep this README, inventory statistics, curation metadata, and small test fixtures in ordinary
 Git so they remain reviewable. Raw upstream files are fetched into `data/local/` and ignored;
-no raw corpus is committed and Git LFS is not configured or required. The complete curated release,
-agent-authored annotations, profiles, lore, review records and frozen hashes remain in ordinary Git.
+no raw corpus is committed. The complete curated release is versioned through Git LFS to keep
+generated output from dominating the code diff. Agent-authored annotations, profiles, lore,
+curation review records and frozen hashes remain in ordinary Git.
 The release includes source notices, licensing material, provenance and a readable review copy.
-Reconstruction checks the committed release; it is not required to obtain the dataset.
+Run `git lfs install --local` and `git lfs pull` after cloning to obtain the release payload.
+Reconstruction checks the versioned release; it is not required to obtain the dataset.
 
 The selected text files carry GPL-3.0-or-later notices. Preserve their provenance and assess
 redistribution terms when publishing source-derived examples; do not assume “open source” means

@@ -44,9 +44,10 @@ into the loader or model.
 The [first conversation dataset](docs/curation/pilot-v1/README.md) covers Free Worlds representatives,
 Republic Navy, mainstream Hai and Quarg. Reviewed annotations record speaker attribution,
 branch routes, profiles and selected lore. Deterministic preparation builds original-speech
-samples into committed train, validation and test files under `data/curated/pilot-v1/`, with frozen hashes,
+samples into Git LFS-versioned train, validation and test files under `data/curated/pilot-v1/`, with frozen hashes,
 source provenance, agent review evidence and attribution. The [dataset overview](data/README.md)
-distinguishes the available source corpus from the selected coverage.
+distinguishes the available source corpus from the selected coverage. Install Git LFS, then run
+`git lfs install --local` and `git lfs pull` to fetch the committed release payload.
 
 ## Setup
 
