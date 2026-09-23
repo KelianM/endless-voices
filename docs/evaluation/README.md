@@ -8,9 +8,9 @@ quality score. [ADR 4](../adr/0004-evaluate-authenticity-against-game-continuati
 this choice.
 
 This issue supplies a protocol and a small development calibration pack. No discriminator is
-trained, no generator is fine-tuned, and no model-quality result is claimed. Human calibration
-is **pending**. The prepared examples have agent review of source attribution and structure,
-not independent human judgments or measured evaluator reliability.
+trained, no generator is fine-tuned, and no model-quality result is claimed. The [initial human review](calibration-findings.md) identified all three originals with high
+confidence, citing vocabulary, mannerisms, and phrasing. Control review remains pending; evaluator
+reliability has not been established. The alternatives are authored examples, not model outputs.
 
 ## What the experiment measures
 
@@ -176,5 +176,5 @@ training or test files merely to satisfy a complete-manifest check; `read_record
 - #12 is the separate fine-tuning experiment. Training against a discriminator would be a new
   training decision, not implied by choosing authenticity evaluation.
 
-Human review of this pack is the next calibration step. Until judgments and any necessary
-revisions are recorded, #6 is not fully calibrated and must not be described as complete.
+Primary human judgments are recorded in [calibration findings](calibration-findings.md). Control
+review is the next step; #6 remains open until the initial calibration review is complete.

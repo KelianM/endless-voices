@@ -157,8 +157,8 @@ The first comparison uses the same identity instructions, selected lore, and aut
 for the base model and adapted model. Evaluation withholds the final assistant response and
 generates one answer. Entire conversations and known scenario variants stay in one split.
 The [authenticity protocol](docs/evaluation/README.md) compares generated replies against original
-game continuations in blinded pairs. Its small development calibration pack is ready for human
-review; no evaluator reliability or model-quality result is claimed. Generation and reporting
+game continuations in blinded pairs. Its small development calibration pack has an
+initial human review, with controls pending; no evaluator reliability or model-quality result is claimed. Generation and reporting
 commands remain future work. Fixed-history evaluation does not establish persistence through a
 model’s own unfolding conversation. See the
 [data contract](data/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
