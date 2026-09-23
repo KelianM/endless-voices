@@ -27,8 +27,7 @@ weighted definition of success. Original-identification accuracy is reported wit
 failures, recognition, and control results; chance performance alone does not establish quality.
 
 The [development calibration pack](../evaluation/calibration.json) uses source continuations,
-authored alternatives, wrong-context speech, and identical pairs. The [initial human review](../evaluation/calibration-findings.md) is recorded; control review is
-pending. No automated discriminator or adversarial training loop is implemented. The fixed-context boundary
+authored alternatives, wrong-context speech, and identical pairs. The [initial human review](../evaluation/calibration-findings.md), including controls, is recorded. No automated discriminator or adversarial training loop is implemented. The fixed-context boundary
 from [ADR 3](0003-use-one-conversation-format-across-splits.md) remains unchanged.
 
 ## Consequences

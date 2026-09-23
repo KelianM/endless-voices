@@ -223,7 +223,7 @@ Use `read_records(path, "validation")` for that file. A full dataset release sti
 three physical splits and a manifest. Reserve calibration conversations and their known variants
 from the eventual test set.
 
-- Evaluation design (#6) supplies the protocol and calibration material; primary human review is recorded and controls remain pending.
+- Evaluation design (#6) supplies the protocol and calibration material; the initial human review, including controls, is recorded.
 - Dataset construction (#5) now includes source preparation and test freezing, replacing #4 and #7.
   Initial coverage and authoring methods still need decisions before implementation.
 - Response generation (#8) uses existing models and adapters; it does not fine-tune.

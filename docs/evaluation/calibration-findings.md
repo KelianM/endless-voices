@@ -34,15 +34,37 @@ into mandatory catchphrases, add them to these examples' visible profiles, or re
 ornate writing everywhere. Those changes would reward imitation of these particular answers
 rather than the appropriate voice of another scene or individual.
 
-## Remaining calibration
+## Control review
 
-The four control judgments have not been submitted. Candidate-order sensitivity, independent
-reviewer agreement, and automated-judge agreement have not been measured. Three deliberately
-small examples and one reviewer do not establish evaluator reliability or an indistinguishability
-threshold. No statistical or model-quality conclusion is drawn from the three correct choices.
+The [control record](reviews/kelian-controls-v1.json) preserves the subsequent judgments.
+All four match the intended control outcomes; they remain separate from primary results.
 
-Complete the control review next, retaining it separately from primary detection results.
-Before relying on an automated judge, use fresh development scenes and actual model outputs,
-including alternatives that preserve surface style but fail contextual fit. That will test
-whether the judge detects more than the obvious style differences exposed here. These reviewed
+| Trial | Control | Submitted choice | Intended outcome |
+| --- | --- | --- | --- |
+| a-02 | Quarg speech in the militia scene | B | B |
+| a-03 | Hai speech in the Quarg scene | A | A |
+| a-04 | Militia speech in the Hai scene | B | B |
+| a-07 | Identical responses | Abstain | Abstain |
+
+The reviewer described the mismatches as obvious and noticed reused answers. Reuse was deliberate:
+the controls substitute already-extracted speech instead of adding more source scenes. However,
+the reviewer had seen the primary sheet and had been told which primary choices were correct.
+The controls can therefore be answered through recognition as well as contextual fit. They check
+that the review procedure and abstention option make sense, not independent contextual reasoning.
+No numerical confidence value was supplied for the controls; none has been invented.
+
+## Outcome and follow-up
+
+The initial human calibration round is complete. The authenticity question produced relevant
+voice-based explanations, and the controls behaved as intended. Keep the primary protocol.
+The control review does not justify additional routine human labeling of equally obvious cases.
+
+For future evaluator validation, use fresh source scenes for human controls and isolate automated
+judge calls from previous trials and keys. Include subtler alternatives that preserve surface
+style while failing scene or speaker context, alongside obvious sanity checks. Actual model
+outputs are needed before assessing an automated judge's usefulness for model comparison.
+
+Candidate-order sensitivity, independent reviewer agreement, and automated-judge agreement remain
+unmeasured. Three authored examples and one reviewer do not establish evaluator reliability or an
+indistinguishability threshold. No statistical or model-quality conclusion is drawn. The reviewed
 scenes and their known variants remain reserved for development, not final testing.

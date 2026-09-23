@@ -9,8 +9,9 @@ this choice.
 
 This issue supplies a protocol and a small development calibration pack. No discriminator is
 trained, no generator is fine-tuned, and no model-quality result is claimed. The [initial human review](calibration-findings.md) identified all three originals with high
-confidence, citing vocabulary, mannerisms, and phrasing. Control review remains pending; evaluator
-reliability has not been established. The alternatives are authored examples, not model outputs.
+confidence, citing vocabulary, mannerisms, and phrasing. All four subsequent control judgments
+matched their intended outcomes. The initial review is complete; evaluator reliability remains
+unestablished. The alternatives are authored examples, not model outputs.
 
 ## What the experiment measures
 
@@ -111,7 +112,9 @@ The controls ask whether the reviewer attends to **this scene**, rather than rec
 prose anywhere. Both alternatives in a wrong-context control are real source text, but only one
 continues the presented scene. These controls are not real/generated trials and never enter
 the primary detection rate. Identical pairs should produce abstention. Controls are intentionally
-obvious; passing them does not demonstrate sensitivity to subtle lore or voice errors.
+obvious and reuse previously seen passages; passing them does not independently demonstrate
+context sensitivity or sensitivity to subtle lore or voice errors. Future evaluator validation
+should use fresh scenes for human controls and isolated calls for automated judges.
 
 For each surprising judgment, retain the choice and reason, inspect the evidence, and record
 whether the disagreement concerns recognition, presentation, context, or the writing itself.
@@ -176,5 +179,6 @@ training or test files merely to satisfy a complete-manifest check; `read_record
 - #12 is the separate fine-tuning experiment. Training against a discriminator would be a new
   training decision, not implied by choosing authenticity evaluation.
 
-Primary human judgments are recorded in [calibration findings](calibration-findings.md). Control
-review is the next step; #6 remains open until the initial calibration review is complete.
+Primary and control judgments are recorded in [calibration findings](calibration-findings.md).
+The initial human calibration is complete. Validation of an automated judge on fresh examples
+and actual model outputs remains a prerequisite for using that judge in headline comparisons.
