@@ -1,6 +1,6 @@
 # 3. All splits contain authored conversations with one final target
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-23
 - **Sources:** [Issue #3](https://github.com/KelianM/endless-voices/issues/3), [PR #11](https://github.com/KelianM/endless-voices/pull/11), [CharacterEval, section 3](https://aclanthology.org/2024.acl-long.638.pdf)
 
