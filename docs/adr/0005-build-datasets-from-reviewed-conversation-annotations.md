@@ -27,7 +27,9 @@ Keep each actual conversation and its known repeated/branch variants in one spli
 themes, faction labels and shared lore alone do not determine split membership. Preserve source
 provenance independently from those relationships.
 
-Store extracted payloads outside Git, with versioned manifests and committed reconstruction hashes.
+Commit the complete curated payload, agent-authored annotations and review evidence in ordinary
+Git, with versioned manifests and reconstruction hashes. Keep the retrievable raw upstream corpus
+outside Git. Agent work must remain available without rerunning generation or reconstruction.
 Content corrections produce new dataset versions. Annotation and source review is explicit agent
 review; human approval is recorded only when actually supplied.
 
@@ -42,5 +44,8 @@ review; human approval is recorded only when actually supplied.
 - Different encounters in a campaign can cross splits. This preserves usable coverage but does
   not test generalization to entirely unseen story arcs. Conversation prefixes remain dependent
   samples and must not be counted as independent observations.
-- A fresh checkout must reconstruct the payload from pinned sources. Release hashes make the
-  reconstruction auditable; the recipe and a successful schema check alone do not establish quality.
+- A fresh checkout contains the curated dataset and its review evidence. Committing generated
+  files duplicates reconstructible content and grows repository history, but preserves the exact
+  reviewed artifact without requiring tools or downloads. The pilot is small text data, so LFS
+  adds no useful storage benefit. Reconstruction hashes detect drift; the recipe and a successful
+  schema check alone do not establish quality.

@@ -1,0 +1,3 @@
+# Attribution
+
+This source-derived conversation dataset is distributed under GPL-3.0-or-later. Dialogue comes from Endless Sky at 7140eb2a29ce4d2797933075c751791a892c7d4f. Preserve license.txt, copyright, credits.txt, SOURCE-NOTICES.md, and provenance.json. Those files retain upstream notices and contributor attribution. Profiles, lore summaries, scene context and connective prompts were written by agents for Endless Voices; the combined dataset uses GPL-3.0-or-later. Extracted dialogue omits narration and enclosing quotation marks; narrator-tag trailing commas are normalized to periods as recorded per span. No human sample approval is implied by the review status.

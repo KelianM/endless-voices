@@ -1,7 +1,7 @@
 # Endless Voices dataset: source overview and pilot status
 
-The [first conversation dataset](../docs/curation/pilot-v1/README.md) is reconstructed from
-reviewed annotations into versioned train, validation and test files. Original game speech is
+The [first conversation dataset](../docs/curation/pilot-v1/README.md) is committed under
+`data/curated/pilot-v1/`, with versioned train, validation and test files and reconstruction annotations. Original game speech is
 paired with source-backed profiles, selected lore and coherent conversation history. The release
 includes Free Worlds representatives, Republic Navy, mainstream Hai and Quarg; its own coverage report
 records actual sample and conversation counts. `example.jsonl` remains an invented pipeline fixture.
@@ -192,9 +192,10 @@ The statistics are descriptive estimates, not an extraction pipeline or quality 
 
 Keep this README, inventory statistics, curation metadata, and small test fixtures in ordinary
 Git so they remain reviewable. Raw upstream files are fetched into `data/local/` and ignored;
-no raw payload is committed and Git LFS is not configured or required. The curated payload is also materialized locally, while its annotations and frozen artifact
-hashes remain in ordinary Git. Reconstruction bundles source notices, licensing material,
-provenance and a readable review copy; see the pilot release instructions.
+no raw corpus is committed and Git LFS is not configured or required. The complete curated release,
+agent-authored annotations, profiles, lore, review records and frozen hashes remain in ordinary Git.
+The release includes source notices, licensing material, provenance and a readable review copy.
+Reconstruction checks the committed release; it is not required to obtain the dataset.
 
 The selected text files carry GPL-3.0-or-later notices. Preserve their provenance and assess
 redistribution terms when publishing source-derived examples; do not assume “open source” means

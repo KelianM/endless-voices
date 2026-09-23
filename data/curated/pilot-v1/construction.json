@@ -1,0 +1,45 @@
+{
+  "annotation_sha256": {
+    "free-worlds.json": "bf5d5bf2b3ed06da7da762a48bc3d870b3e5e1ab84268a2c2b20ebf7971a4dcc",
+    "hai.json": "e9ea873bd1188b023ab1101ed486dfef36a950de42bd6dd2edd76a6e568ffc41",
+    "quarg.json": "56db643cac7c9afff1e5052e7016c553c53c208369f59ea6e2101d3bd8d85719",
+    "republic.json": "44aaeae73651a6cecb1b2ec84720921eddb1788905b871311b32ecd6ba285c98"
+  },
+  "preparation_sha256": {
+    "build_pilot.py": "0dac2f7a6dbd5732ddd7c05e15ba3bc9215cca2d7ba8152a4f383074d52a576e",
+    "prepare_conversations.py": "1d25467a5bf5589e4d8da308b92ab07b62bc15e7530803099b392eca76f72ecc"
+  },
+  "review": {
+    "annotation_sha256": {
+      "free-worlds.json": "bf5d5bf2b3ed06da7da762a48bc3d870b3e5e1ab84268a2c2b20ebf7971a4dcc",
+      "hai.json": "e9ea873bd1188b023ab1101ed486dfef36a950de42bd6dd2edd76a6e568ffc41",
+      "quarg.json": "56db643cac7c9afff1e5052e7016c553c53c208369f59ea6e2101d3bd8d85719",
+      "republic.json": "44aaeae73651a6cecb1b2ec84720921eddb1788905b871311b32ecd6ba285c98"
+    },
+    "construction_review": {
+      "reviewers": "Three delegated construction agents, requested model gpt-6-luna",
+      "scope": "Annotated speakers, source routes, profiles, lore and initial split assignments. Per-conversation notes record source reasoning."
+    },
+    "date": "2026-09-23",
+    "human_review": {
+      "scope": "PR review requested. No claim that the owner approved individual samples.",
+      "status": "not-performed"
+    },
+    "implementing_review": {
+      "reviewer": "Codex implementing agent",
+      "scope": "Read each retained source conversation alongside selectors; checked speaker changes, target completeness, source branches and scene assumptions. Revised faction attribution, future context, narration-tag punctuation and connective prompts. Checked selected profile/lore citations and knowledge boundaries. Rebuilt all records mechanically from pinned source spans."
+    },
+    "independent_peer_review": {
+      "scope": "Construction and implementing review are not blinded evaluator validation.",
+      "status": "not-performed"
+    },
+    "overlap_review": {
+      "limitation": "No exhaustive search for semantic paraphrases across all upstream dialogue.",
+      "manual_checks": "Reviewed selected alternate routes and source encounters. Separate mission events remain separate conversation IDs. The known calibration source conversations remain validation; Kuwaru Efreti is a separate Quarg encounter and is training material.",
+      "mechanical_checks": "Exact normalized assistant replies/paragraphs of at least twelve words across all split histories, plus partial twelve-word phrases and system/target phrase matches.",
+      "rule": "Actual conversations and known repeated/branch variants stay together. Shared themes, mission chains and factual lore do not force a shared split."
+    },
+    "review_version": 1
+  },
+  "source_revision": "7140eb2a29ce4d2797933075c751791a892c7d4f"
+}

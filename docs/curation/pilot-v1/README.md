@@ -13,9 +13,21 @@ an omniscient faction spokesperson. Topic labels organize coverage; topics do no
 The pilot contains **176 samples from 61 conversations**: 101 training, 48 validation and 27 test
 samples. [Coverage and review findings](findings.md) document exclusions, corrections and limits.
 
-## Reconstruct the release
+## Use and reconstruct the release
 
-From the repository root with the development dependencies installed:
+The [complete release](../../../data/curated/pilot-v1/) is committed in ordinary Git, including
+the three split files, provenance, review copy and license material. Agent-authored annotations,
+profiles and lore are committed alongside this document. A fresh checkout contains the dataset;
+no source download or reconstruction is required to read it.
+
+Validate the committed split manifest offline:
+
+```sh
+python -m endless_voices.contracts data/curated/pilot-v1/manifest.json
+```
+
+To verify reconstruction, run these commands from the repository root with the development
+dependencies installed:
 
 ```sh
 python scripts/fetch_sources.py
@@ -36,7 +48,7 @@ hf download Qwen/Qwen3-4B-Instruct-2507 \
   --revision cdbee75f17c01a7cc42f958dc650907174af0554 \
   --local-dir data/local/tokenizers/qwen3-4b-instruct-2507
 python scripts/build_pilot.py \
-  --output data/local/curated/pilot-v1 \
+  --output data/local/pilot-v1-rebuilt \
   --tokenizer data/local/tokenizers/qwen3-4b-instruct-2507 --max-length 8192 \
   --verify-release docs/curation/pilot-v1/release.json
 ```
@@ -49,7 +61,7 @@ and target; it is a dataset preparation limit, not the model's maximum context l
 is truncated. The trainer's existing configuration is unchanged and must use an appropriate
 length limit if this dataset is selected later. No weights, generation or training are needed.
 
-The local release contains separate `train.jsonl`, `validation.jsonl`, `test.jsonl`, and a
+The committed release contains separate `train.jsonl`, `validation.jsonl`, `test.jsonl`, and a
 versioned `manifest.json`. `coverage.json` records counts and measured token lengths.
 `provenance.json` records every extracted source span, original or agent-authored user turn,
 and punctuation normalization. `review.md` is an organizer's reading copy with targets and source
@@ -154,8 +166,9 @@ possible pretraining memorization remains unmeasured. The small calibration used
 alternatives; its successful origin judgments are not model-quality results. Future evaluator
 validation still needs fresh scenes, subtler alternatives and actual generated responses.
 
-Materialized speech stays under gitignored `data/local/`; annotations, manifests and review
-records stay in Git. This source-derived dataset uses GPL-3.0-or-later. The local bundle preserves
+Materialized speech, annotations, manifests and review records stay in ordinary Git. Only raw
+upstream sources, tokenizer caches and temporary reconstruction outputs stay under gitignored
+`data/local/`. This source-derived dataset uses GPL-3.0-or-later. The committed bundle preserves
 the upstream license, copyright manifest, credits and selected file-header notices. Source URLs
 and hashes identify the original text; profiles and connective prompts are identified as agent
 work. Dataset release terms do not settle licensing of any future trained adapter.

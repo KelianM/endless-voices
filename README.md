@@ -44,7 +44,7 @@ into the loader or model.
 The [first conversation dataset](docs/curation/pilot-v1/README.md) covers Free Worlds representatives,
 Republic Navy, mainstream Hai and Quarg. Reviewed annotations record speaker attribution,
 branch routes, profiles and selected lore. Deterministic preparation builds original-speech
-samples into separate train, validation and test files under `data/local/`, with frozen hashes,
+samples into committed train, validation and test files under `data/curated/pilot-v1/`, with frozen hashes,
 source provenance, agent review evidence and attribution. The [dataset overview](data/README.md)
 distinguishes the available source corpus from the selected coverage.
 
@@ -101,7 +101,7 @@ structural coverage and checks metadata, hashes, IDs, and known conversation/sce
 The single example is an **invented archivist**, not a claim about an Endless Sky species, and is
 only suitable for checking the pipeline. Meaningful identity learning needs a larger, carefully
 reviewed dataset spanning different situations. Keep provenance and permissions for future game
-text or generated examples; this repository does not include game assets or dialogue.
+text or generated examples; this repository includes the curated dialogue release, but not the raw upstream corpus or game assets.
 
 The tokenizer's native chat template formats each conversation. This first implementation uses
 causal language-modelling loss on **all non-padding tokens**, including system and user text;

@@ -1,0 +1,24 @@
+{
+  "dataset_version": "pilot-v1",
+  "files": {
+    "test": [
+      {
+        "path": "test.jsonl",
+        "sha256": "d9c884a4689b4cef479ff87908960ecf5817fe81f7436647b359aaed96666892"
+      }
+    ],
+    "train": [
+      {
+        "path": "train.jsonl",
+        "sha256": "41424aed18f915c3c43761166a6cf3d9500ff11f09ca0b855894df0c046c92ba"
+      }
+    ],
+    "validation": [
+      {
+        "path": "validation.jsonl",
+        "sha256": "355a86e0b5588fff9e0b76ac746239ed929d7a2c9a547ec5a631d67c34218c48"
+      }
+    ]
+  },
+  "schema_version": 1
+}

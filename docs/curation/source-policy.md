@@ -53,7 +53,7 @@ contributors changed the files; preserve the upstream contributors/credits conte
 Artwork has separate terms and is not included in this pilot.
 
 The initial source review stores links, attribution metadata and summaries. The
-[pilot release](pilot-v1/README.md) reconstructs extracted speech locally with upstream license,
+[pilot release](pilot-v1/README.md) commits extracted speech with the upstream license,
 copyright, credits, selected file-header notices and per-message provenance. The combined
 source-derived dataset uses GPL-3.0-or-later. Original speech, rendered game variables,
 punctuation normalization and agent-authored context remain identifiable. No conclusion about
