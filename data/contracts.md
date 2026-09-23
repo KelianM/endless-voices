@@ -1,31 +1,31 @@
-# Dataset contracts, version 1
+# Conversation sample contract, version 1
 
-These interfaces define future curated data; they do not release a corpus or frozen benchmark.
-The small [contract fixtures](../tests/fixtures/contracts/) are invented plumbing examples,
-not Endless Sky canon, benchmark authoring, or approved training material. Source statistics
-in `data/overview/` and evidence in `docs/curation/` retain their separate formats.
+Train, validation, and test files use the same sample format. Each sample contains a
+representative's identity and selected lore, authored conversation history, a final user
+message, one target response, and evaluator-only criteria. The first experiment compares
+prompted and fine-tuned models given identical identity instructions, lore, and history.
 
-## Conversations: permissive loader and curated records
+[ADR 3](../docs/adr/0003-use-one-conversation-format-across-splits.md) records the design.
+The [fixtures](../tests/fixtures/contracts/) are invented format examples. No canonical training
+corpus or frozen test set exists yet. Source statistics and curation inventories remain separate
+formats because evidence passages are not conversation samples.
 
-`load_conversations` still accepts the existing `data/example.jsonl`: `messages`, with an
-optional first system message followed by one or more complete alternating user/assistant
-pairs. Content must be nonempty text. Metadata is optional and ignored by the trainer.
+## Record format
 
-The stricter curated contract adds `schema_version: 1`, requires a leading **identity-setting
-system message**, and requires the metadata below. The same message-order validator serves
-both contracts. A system prompt must identify the faction, species, character role, knowledge
-limits, and relevant scene context; structure validation can check its presence and text,
-not whether it actually establishes the right identity. That remains a review responsibility.
-
-Readable example (serialize each entire object on one line in a UTF-8 JSONL file):
+Store one complete JSON object per line in UTF-8 JSONL. The example below is expanded for reading.
 
 ```json
 {
   "schema_version": 1,
   "messages": [
-    {"role": "system", "content": "You are an invented archive clerk, not a canonical game character."},
-    {"role": "user", "content": "Hello."},
-    {"role": "assistant", "content": "Welcome to the archive."}
+    {
+      "role": "system",
+      "content": "You are an invented archive clerk. Speak plainly. Lore (fixture-v1): The archive is closed. The clerk does not know the opening hours."
+    },
+    {"role": "user", "content": "May I enter?"},
+    {"role": "assistant", "content": "The archive is closed."},
+    {"role": "user", "content": "When should I return?"},
+    {"role": "assistant", "content": "I do not know the opening hours."}
   ],
   "metadata": {
     "id": "fixture-train",
@@ -33,7 +33,8 @@ Readable example (serialize each entire object on one line in a UTF-8 JSONL file
     "species": "invented",
     "character_role": "Archive clerk",
     "topics": ["everyday"],
-    "scenario_group": "fixture-train-family",
+    "conversation_id": "conversation-train",
+    "scenario_group": null,
     "split": "train",
     "sources": [{
       "reference": "Invented fixture, not canon",
@@ -42,54 +43,13 @@ Readable example (serialize each entire object on one line in a UTF-8 JSONL file
     }],
     "authorship": "agent",
     "review_status": "draft"
-  }
-}
-```
-
-All displayed keys are required. Version 1 curated objects reject unknown fields, including
-extra message fields, to catch typos and accidental mixing of record types. The permissive
-training loader continues to ignore extra record metadata.
-
-| Field | Structural constraint / meaning |
-| --- | --- |
-| `schema_version` | Integer `1` on every record and manifest |
-| `metadata.id` | Globally unique across all files in the manifest |
-| `identity`, `species` | Open labels; no pilot-faction whitelist. Keep different human factions distinct |
-| `id`, `identity`, `species`, `scenario_group`, topic labels | Lowercase letters/digits separated by single `-` or `_`; e.g. `human-free-worlds` |
-| `character_role` | Nonempty descriptive text; speaker role, not message role |
-| `topics` | Nonempty list of topic labels; counts report each label once per record |
-| `scenario_group` | Globally scoped authored scenario-family ID, assigned before variants are written |
-| `split` | Exactly `train`, `development`, or `benchmark`, matching its manifest file declaration |
-| `sources` | Nonempty list of objects with nonempty `reference`, `revision`, `source_group` |
-| `authorship` | `human`, `agent`, or `mixed`; describes record creation, not source authorship |
-| `review_status` | `draft`, `reviewed`, `approved`, or `rejected`; validity does not imply approval |
-
-A source `reference` names a path/URL and passage or a curation evidence ID. `revision` pins
-its immutable snapshot (full upstream commit for game sources, a version for original work).
-The validator checks presence and type, not remote existence, revision immutability, canonical
-truth, or legal permission. `source_group` identifies common provenance, such as a mission
-chain, independently of the authored scenario group. Several sources may support one record.
-Authorship/review labels do not substitute for later attribution and review evidence.
-
-## Separate benchmark cases
-
-A benchmark case has `schema_version`, the **same metadata** (with `split: "benchmark"`),
-`inputs`, and `evaluation`. It has no training `messages` or gold assistant turns.
-The two payload objects look like this; see the complete
-[benchmark fixture](../tests/fixtures/contracts/benchmark.jsonl) for an executable record:
-
-```json
-{
-  "inputs": {
-    "system": "You are an invented archive clerk at a closed archive.",
-    "user_turns": ["May I enter?", "When should I return?"]
   },
   "evaluation": {
-    "dimensions": ["identity", "uncertainty"],
-    "expected_facts": ["The archive is closed."],
-    "expected_behaviours": ["Be helpful."],
-    "expected_style": ["Use concise language."],
-    "prohibited_contradictions": ["Claiming that the archive is open."],
+    "dimensions": ["knowledge_fidelity", "persona_fidelity", "conversational_quality"],
+    "expected_facts": [],
+    "expected_behaviours": ["Acknowledge the clerk's knowledge limit."],
+    "expected_style": ["Use plain language."],
+    "prohibited_contradictions": ["Claiming the archive is currently open."],
     "uncertainty_expectations": ["Do not invent opening hours."],
     "sources": [{
       "reference": "Invented fixture, not canon",
@@ -100,48 +60,94 @@ The two payload objects look like this; see the complete
 }
 ```
 
-`inputs.system` is nonempty, model-visible identity/scene context. `inputs.user_turns` is a
-nonempty list of nonempty strings, including fixed follow-ups. **Everything in `metadata`
-and `evaluation` is evaluator/curation-only.** Identity labels are not automatically added to
-prompts; the explicit system text defines what the model may see. Do not put answer keys or
-reference excerpts into this input context. Structural separation cannot detect a human
-copying a secret answer into an allowed text field.
+All displayed keys are required in every split. Unknown fields are rejected. `messages` starts
+with one system message followed by one or more complete alternating user/assistant pairs.
+Each message contains only `role` and nonempty `content`. The final assistant message is the
+target; earlier assistant messages are authored history.
 
-`evaluation.dimensions` is a nonempty list of applicable dimension names. It defines no scores,
-weights, or rubric. The five expectation lists are required but may be empty when inapplicable;
-their entries must be nonempty text. `evaluation.sources` cites the evaluator's evidence and
-uses the same source format. It may differ from the record's overall provenance.
+The system message supplies the representative profile, scene assumptions, knowledge limits,
+and selected lore. Species, faction, and role can define a representative without a named
+individual. Keep distinct human factions separate. Validation checks the system message's
+presence and text, not whether the description is accurate or sufficient.
+
+| Metadata field | Constraint and meaning |
+| --- | --- |
+| `id` | Sample ID, unique across the manifest |
+| `identity`, `species` | Open labels; no permitted-faction list |
+| `character_role` | Nonempty description of the representative's role |
+| `topics` | Nonempty list of topic labels |
+| `conversation_id` | Shared ID for samples from the same authored or extracted conversation |
+| `scenario_group` | ID for known scenario variants, or `null` when no relationship is recorded |
+| `split` | `train`, `validation`, or `test`, matching the file declaration |
+| `sources` | Nonempty list of source references, revisions, and provenance groups |
+| `authorship` | `human`, `agent`, or `mixed` |
+| `review_status` | `draft`, `reviewed`, `approved`, or `rejected`; validity does not imply approval |
+
+IDs and topic labels use lowercase letters/digits separated by single hyphens or underscores.
+`schema_version` must be integer `1`. Each source requires nonempty `reference`, `revision`,
+and `source_group` strings. References identify passages or curation evidence IDs. Revisions
+should pin immutable evidence: a full upstream commit for game text or a version for original
+material. Structural validation does not contact sources or verify their truth or immutability.
+
+`evaluation` contains private assessment notes in every split. `dimensions` is a nonempty list
+of names; the example names illustrate the intended concerns, not an implemented rubric.
+The five expectation lists are required and may be empty when inapplicable. List entries must
+be nonempty text. Evaluation sources use the same format as metadata sources and may identify
+different evidence. A target response is one acceptable answer, not an exact-match requirement.
+
+## Training and evaluation use the same sample
+
+The existing loader reads `messages` and ignores the other fields. The loader still accepts
+`data/example.jsonl`, optional system messages, and records without curated metadata. Curated
+validation is a separate, stricter check before selecting a training file in `data.path`.
+
+For generation-based evaluation:
 
 ```python
-from endless_voices.contracts import benchmark_messages
+from endless_voices.contracts import evaluation_messages
 
-first_prompt = benchmark_messages(case, [])
-# Run generation elsewhere; append only the actual model response.
-second_prompt = benchmark_messages(case, [first_generated_response])
+prompt = evaluation_messages(record)
+# Pass prompt to generation; retain the full record separately for assessment.
 ```
 
-The helper returns fresh `role`/`content` dictionaries using only `inputs.system`, fixed user
-turns up to the current turn, and caller-supplied generated assistant history. It never inserts
-future user turns, evaluator references, or gold answers. History must contain one string per
-completed turn; after all user turns have answers there is no next prompt. The caller is
-responsible for keeping replies associated with this case and model run; a string's origin
-cannot be verified structurally. Tests show that changing evaluator references or metadata
-cannot change model inputs. This is an input-construction interface, **not an evaluation runner**.
+`evaluation_messages` returns fresh message dictionaries containing `messages[:-1]`. The prompt
+ends with the final user message. The final target, metadata, and evaluation criteria are never
+copied. The helper works identically for train, validation, and test samples.
 
-## Versioned manifests and split boundaries
+A multi-turn history remains fixed and authored. The helper evaluates one new response; it does
+not substitute generated replies into earlier turns or continue with prewritten follow-ups.
+Fixed-history evaluation measures response quality in supplied context, not persistence through
+a model's own unfolding conversation. Free-running dialogue evaluation is a later design.
 
-Store independent JSONL files for each split alongside a versioned JSON manifest, e.g.:
+Both model conditions receive identical system context, including selected lore. The evaluator
+can use the same lore and additional private criteria. Sharing canonical facts is intentional;
+exposing the withheld target or assessment notes is not. Authors must avoid copying private
+answers into model-visible context; structure checks cannot detect that semantic mistake.
+
+The first format stores the exact profile and selected lore text in the system message, with
+provenance in source references. A shared lore store can supply that text during later dataset
+preparation. This PR adds neither a retrieval service nor a second prompt renderer. Evaluators
+must respect the representative's knowledge limits even when the source contains more facts.
+
+The trainer still calculates loss on all non-padding tokens, including system and user text.
+Final-response-only loss was discussed but is not implemented or selected by this contract.
+The format supports that later change without changing sample structure.
+
+## Splits and manifests
+
+Use training samples for weight updates, validation samples for model/prompt selection, and
+reserved test samples for the final comparison. A benchmark is an evaluation suite, not a
+fourth split or a different record type.
+
+Store physical split files with a versioned manifest:
 
 ```text
 data/local/curated/v1/
   manifest.json
   train.jsonl
-  development.jsonl
-  benchmark.jsonl
+  validation.jsonl
+  test.jsonl
 ```
-
-A manifest has exactly these keys (replace the illustrative hash placeholders with SHA-256
-hashes of the exact file bytes):
 
 ```json
 {
@@ -149,32 +155,26 @@ hashes of the exact file bytes):
   "dataset_version": "v1",
   "files": {
     "train": [{"path": "train.jsonl", "sha256": "<64 lowercase hex digits>"}],
-    "development": [{"path": "development.jsonl", "sha256": "<64 lowercase hex digits>"}],
-    "benchmark": [{"path": "benchmark.jsonl", "sha256": "<64 lowercase hex digits>"}]
+    "validation": [{"path": "validation.jsonl", "sha256": "<64 lowercase hex digits>"}],
+    "test": [{"path": "test.jsonl", "sha256": "<64 lowercase hex digits>"}]
   }
 }
 ```
 
-All three splits need at least one nonempty file. Multiple shards per split are supported.
-Paths are relative to and must resolve inside the manifest directory. Files cannot be reused,
-including symlink/hard-link aliases. IDs are unique across every shard and split. Changes to
-records require reviewed checksum updates; released datasets should get a new dataset version
-and retain previous manifests. `schema_version` identifies the format, `dataset_version` the
-content snapshot. Source revisions remain independently pinned per source.
+Replace each hash placeholder with the SHA-256 of the exact file bytes. Complete manifests
+require at least one nonempty file per split and support multiple shards. Paths must resolve
+inside the manifest directory. Reusing a file, including through symlinks or hard links, fails
+validation. New dataset releases should retain earlier manifests and use new dataset versions.
+Schema versions identify the format; dataset versions identify the content snapshot.
 
-Complete conversations and **entire scenario families** are split units. Paraphrases, branch
-alternatives, source-scene reconstructions, and shared-template variants must reuse their
-family ID and stay in one split. A connected mission-chain reconstruction belongs together.
-Shared canonical facts may support distinct original scenarios in different splits: equal
-`source_group` alone is therefore not an automatic split violation. Reviewers must identify
-when those records are actually variants and assign the same `scenario_group`.
+Complete conversations stay in one split. Samples at different points in a conversation share
+`conversation_id`. Explicit paraphrases, branch alternatives, or shared-template variants also
+share `scenario_group`. A connected mission-chain reconstruction belongs in the same scenario
+group. Record known relationships; do not invent similarity classes for unrelated examples.
 
-Validation rejects cross-split scenario IDs, duplicate record IDs, mixed record types,
-incorrect declared splits, malformed structures, and hash mismatches. It reports counts by
-split, identity, and topic for coverage inspection; it sets no corpus-size or pilot-identity
-quotas. Semantic near-duplicate detection, undisclosed shared templates, mission-chain leakage
-review, approval gates, and benchmark freezing remain later corpus work. Do not feed benchmark
-files or evaluator references to training or prompt development.
+`source_group` records shared source/mission-chain provenance independently. The same canonical
+fact can support different situations across splits, so source-group equality alone is not an
+error. Semantic near-duplicate discovery and corpus-level leakage review remain later work.
 
 ## Offline validation
 
@@ -182,30 +182,49 @@ From the repository root after installing `.[dev]`:
 
 ```sh
 endless-validate tests/fixtures/contracts/manifest.json
-# Equivalent module invocation (also works before refreshing installed entry points):
+# Equivalent invocation before refreshing installed entry points:
 python -m endless_voices.contracts tests/fixtures/contracts/manifest.json
 ```
 
-Structural validation uses only the standard library, reads local files, and downloads nothing.
-It stops at the first error with a filename and physical JSONL line number, including blank
-lines in numbering. Manifest/file-level errors identify the manifest field or affected file;
-malformed manifest JSON reports its parser line/column. The intentionally invalid fixture is
-not included in the valid manifest; tests assert its missing-metadata error. Inspect one file
-programmatically with `read_records(Path(...), "train")`; use manifest validation for global
-ID and split checks.
+Structural validation uses only the standard library and downloads nothing. The command checks
+metadata, source fields, message order, file hashes, global IDs, declared splits, and known
+conversation/scenario groups crossing splits. Output contains record counts and identity/topic
+coverage per split. Counts impose no faction or corpus-size quotas.
 
-Optional **train/development** token checks reuse the loader's native-chat-template length
-check with an already saved local tokenizer:
+The command stops at the first error with a filename and physical JSONL line number. Blank
+lines count toward line numbers and are ignored as records. Manifest-level errors identify the
+manifest or affected file. The invalid fixture is excluded from the valid manifest.
+For an individual file, use `read_records(Path(...), "train")`; global checks require a manifest.
+
+Optional token checks use a saved local tokenizer and the existing loader's length check:
 
 ```sh
 endless-validate data/local/curated/v1/manifest.json \
   --tokenizer /absolute/path/to/local-tokenizer --max-length 2048
 ```
 
-Both flags are required together. No model weights are loaded; tokenizer loading is local-only
-with remote code disabled. Overlength or fewer-than-two-token conversations fail with their
-file/line; no truncation occurs. Structural-only success does not establish token fit. Benchmark
-length depends on generated history and must be enforced by the later runner at generation time.
-The existing trainer still computes loss on all non-padding tokens, including system/user text;
-assistant-only loss and trainer integration of manifests are outside this change. Train only
-on a separately validated training file selected in `data.path`.
+Both flags are required together. Tokenizer loading is local-only, with remote code disabled;
+no model weights are loaded. Every complete sample in every split must fit the limit and contain
+at least two tokens. Failures report file/line without truncation. The future generation runner
+must separately budget the prompt and generated output; an authored target's length does not
+bound the model's generated response.
+
+## Decisions for later issues
+
+Issue #3 supplies structure and input isolation. The next issues must use this format rather
+than the separate benchmark records described in the earlier roadmap.
+
+- Source preparation (#4) and authoring (#5) must preserve representative knowledge boundaries,
+  selected lore provenance, and known conversation relationships. Extraction and authoring
+  methods still need decisions before implementation.
+- Evaluation design (#6) should select and adapt published methods, including
+  [CharacterEval](https://aclanthology.org/2024.acl-long.638/),
+  [InCharacter](https://aclanthology.org/2024.acl-long.102/), and
+  [RAIDEN](https://aclanthology.org/2025.coling-main.735/). Dimensions, score scales, pairwise
+  judgments, and evaluator calibration remain decisions for that issue. Human-likeness and
+  empathy are not automatically appropriate measures for alien or hostile representatives.
+- Test-set freezing (#7), response generation (#8), and scoring reports (#9) must use fixed
+  authored histories and withhold the final target. The base and adapted conditions receive
+  identical context. The runner and scoring protocol are not implemented here.
+
+Each issue gets its own implementation and review before work proceeds to the next issue.

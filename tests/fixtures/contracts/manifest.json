@@ -5,19 +5,19 @@
     "train": [
       {
         "path": "train.jsonl",
-        "sha256": "5698ce57a96ff274e5f232ddf35b7cad2e9eb4a9b6be11acfc8d0e483b8e8013"
+        "sha256": "75cbd14834e73ef3784b11a62a9ada58d739a0b28f0b5567379e13411fa49c70"
       }
     ],
-    "development": [
+    "validation": [
       {
-        "path": "development.jsonl",
-        "sha256": "c04436f76b3e1ed83bb9acb5dfda58552d62b2d64f3b29442fca8146fc086a8f"
+        "path": "validation.jsonl",
+        "sha256": "d3f3999155d23ab9a4a7c581ff77bf95f19d1e7740ff595c998bb965f00a3d12"
       }
     ],
-    "benchmark": [
+    "test": [
       {
-        "path": "benchmark.jsonl",
-        "sha256": "795be71f934d1773f319ee78763e1cb6fddd8dd8dd70abbe5a5e177780deb766"
+        "path": "test.jsonl",
+        "sha256": "4c2cb1b5feaaef2dc211968457f296c011174f56b4b8ead2ecd106efa19b7d39"
       }
     ]
   }

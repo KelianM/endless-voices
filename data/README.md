@@ -8,8 +8,8 @@ training examples. No canonical training or held-out benchmark records have been
 
 ## Curated record and benchmark contracts
 
-[Version 1 contracts](contracts.md) define strict curated conversations, separate benchmark
-cases, versioned split manifests, and offline validation commands. Only invented test fixtures
+[Version 1 contracts](contracts.md) define one conversation format for train,
+validation, and test, with versioned split manifests and offline validation commands. Only invented test fixtures
 exist so far; source inventories below are evidence metadata, not records in those contracts.
 
 ## Scope and faction counts

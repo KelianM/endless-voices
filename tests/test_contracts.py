@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from endless_voices.contracts import (
-    benchmark_messages,
+    evaluation_messages,
     read_records,
     validate_manifest,
     validate_record,
@@ -42,7 +42,7 @@ def rewrite(manifest, split, records):
 def test_valid_manifest_and_loader_compatibility():
     counts = validate_manifest(FIXTURES / "manifest.json")
     assert counts["train"]["identities"] == {"invented-archive-guild": 1}
-    assert counts["benchmark"]["records"] == 1
+    assert counts["test"]["records"] == 1
     assert load_conversations(str(FIXTURES / "train.jsonl")) == [record()["messages"]]
     assert load_conversations(str(Path(__file__).parents[1] / "data" / "example.jsonl"))
 
@@ -65,7 +65,7 @@ def test_every_metadata_field_required(key):
         ("topics", []),
         ("topics", [None]),
         ("scenario_group", 2),
-        ("split", "development"),
+        ("split", "validation"),
         ("sources", []),
         ("authorship", []),
         ("review_status", "done"),
@@ -134,7 +134,7 @@ def test_committed_invalid_fixture():
         list(read_records(FIXTURES / "invalid.jsonl", "train"))
 
 
-@pytest.mark.parametrize("split", ["train", "development", "benchmark"])
+@pytest.mark.parametrize("split", ["train", "validation", "test"])
 def test_duplicate_ids_across_all_files(manifest, split):
     row = record(split)
     row["metadata"]["id"] = record()["metadata"]["id"]
@@ -144,27 +144,30 @@ def test_duplicate_ids_across_all_files(manifest, split):
 
 
 def test_declared_split(manifest):
-    rewrite(manifest, "development", [record()])
-    with pytest.raises(ValueError, match=r"development.jsonl:2:.*declared split"):
+    rewrite(manifest, "validation", [record()])
+    with pytest.raises(ValueError, match=r"validation.jsonl:2:.*declared split"):
         validate_manifest(manifest)
 
 
 def test_scenario_family_split_unit(manifest):
-    row = record("benchmark")
-    row["metadata"]["scenario_group"] = record()["metadata"]["scenario_group"]
-    rewrite(manifest, "benchmark", [row])
+    row = record("test")
+    train = record()
+    train["metadata"]["scenario_group"] = "known-variants"
+    rewrite(manifest, "train", [train])
+    row["metadata"]["scenario_group"] = "known-variants"
+    rewrite(manifest, "test", [row])
     with pytest.raises(ValueError, match="scenario_group.*crosses splits"):
         validate_manifest(manifest)
     row = record()
     row["metadata"]["id"] = "another-variant"
-    rewrite(manifest, "benchmark", [record("benchmark")])
+    rewrite(manifest, "test", [record("test")])
     rewrite(manifest, "train", [record(), row])
     assert validate_manifest(manifest)["train"]["records"] == 2
 
 
 def test_physical_separation_and_hash(manifest):
     contents = json.loads(manifest.read_text())
-    contents["files"]["development"] = contents["files"]["train"]
+    contents["files"]["validation"] = contents["files"]["train"]
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="split file reused"):
         validate_manifest(manifest)
@@ -176,53 +179,75 @@ def test_physical_separation_and_hash(manifest):
 @pytest.mark.parametrize(
     "change",
     [
-        lambda row: row["inputs"].update(gold_answer="never copy"),
-        lambda row: row["inputs"].update(user_turns=[{"role": "assistant", "content": "gold"}]),
-        lambda row: row["inputs"].update(user_turns=[]),
+        lambda row: row.update(inputs={"gold_answer": "never copy"}),
+        lambda row: row["messages"][0].update(reference="private evidence"),
         lambda row: row["evaluation"].update(dimensions=[]),
         lambda row: row["evaluation"].pop("uncertainty_expectations"),
         lambda row: row["evaluation"].update(sources=[]),
     ],
 )
-def test_benchmark_invalid_boundaries(change):
-    row = record("benchmark")
+def test_reject_mixed_formats_and_incomplete_evaluator_references(change):
+    row = record("test")
     change(row)
     with pytest.raises(ValueError):
-        validate_record(row, "benchmark")
+        validate_record(row, "test")
 
 
-def test_benchmark_generated_history_and_reference_exclusion():
-    row = record("benchmark")
+@pytest.mark.parametrize("split", ["train", "validation", "test"])
+def test_same_sample_format_withholds_only_final_target(split):
+    row = record(split)
     original = copy.deepcopy(row)
-    first = benchmark_messages(row, [])
-    assert first == [
-        {"role": "system", "content": row["inputs"]["system"]},
-        {"role": "user", "content": "May I enter?"},
-    ]
-    second = benchmark_messages(row, ["Actual model output"])
-    assert second == first + [
-        {"role": "assistant", "content": "Actual model output"},
-        {"role": "user", "content": "When should I return?"},
-    ]
-    row["metadata"]["character_role"] = "EVALUATOR_ONLY metadata"
-    row["evaluation"]["expected_facts"] = ["changed secret"]
-    assert benchmark_messages(row, ["Actual model output"]) == second
-    assert "EVALUATOR_ONLY" not in json.dumps(second)
-    assert original["inputs"] == row["inputs"]
-    second[0]["content"] = "caller edit"
-    assert row["inputs"]["system"] == original["inputs"]["system"]
-    for history in (["one", "two"], [""], [{"role": "assistant", "content": "x"}]):
-        with pytest.raises(ValueError):
-            benchmark_messages(row, history)
+    prompt = evaluation_messages(row)
+    assert prompt == row["messages"][:-1]
+    assert prompt[-1]["role"] == "user"
+    if split == "test":
+        assert prompt[2] == {"role": "assistant", "content": "The archive is closed."}
+    assert "Lore (fixture-v1)" in prompt[0]["content"]
+    row["messages"][-1]["content"] = "PRIVATE_TARGET"
+    row["metadata"]["character_role"] = "PRIVATE_METADATA"
+    row["evaluation"]["expected_facts"] = ["PRIVATE_CRITERIA"]
+    assert evaluation_messages(row) == prompt
+    assert "PRIVATE_" not in json.dumps(prompt)
+    assert "EVALUATOR_ONLY" not in json.dumps(prompt)
+    prompt[0]["content"] = "caller edit"
+    assert row["messages"][0] == original["messages"][0]
 
 
-def test_optional_length_check_has_line_error(manifest):
+def test_single_turn_sample_has_no_assistant_history():
+    row = record()
+    row["messages"] = row["messages"][:3]
+    assert [message["role"] for message in evaluation_messages(row)] == ["system", "user"]
+
+
+def test_conversation_prefix_samples_cannot_cross_splits(manifest):
+    row = record("validation")
+    row["metadata"]["conversation_id"] = record()["metadata"]["conversation_id"]
+    row["messages"] = row["messages"][:3]
+    rewrite(manifest, "validation", [row])
+    with pytest.raises(ValueError, match="conversation_id.*crosses splits"):
+        validate_manifest(manifest)
+
+
+def test_unknown_scenario_groups_do_not_merge_unrelated_conversations(manifest):
+    assert all(
+        record(split)["metadata"]["scenario_group"] is None
+        for split in ("train", "validation", "test")
+    )
+    assert validate_manifest(manifest)["test"]["records"] == 1
+
+
+@pytest.mark.parametrize("split", ["train", "validation", "test"])
+def test_optional_length_check_has_line_error(manifest, split):
+    row = record(split)
+    row["messages"][-1]["content"] = "LONG_TARGET"
+    rewrite(manifest, split, [row])
+
     class LocalTokenizer:
         def apply_chat_template(self, messages, **kwargs):
             assert kwargs == {"tokenize": True, "add_generation_prompt": False}
-            return list(range(10))
+            return list(range(10 if messages[-1]["content"] == "LONG_TARGET" else 3))
 
-    with pytest.raises(ValueError, match=r"train.jsonl:1:.*Shorten the conversation"):
+    with pytest.raises(ValueError, match=rf"{split}.jsonl:2:.*Shorten the conversation"):
         validate_manifest(manifest, tokenizer=LocalTokenizer(), max_length=5)
     assert validate_manifest(manifest, tokenizer=LocalTokenizer(), max_length=10)
 
@@ -231,7 +256,7 @@ def test_cli_offline_and_actionable_failure(manifest):
     command = [sys.executable, "-m", "endless_voices.contracts", str(manifest)]
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout)["development"]["records"] == 1
+    assert json.loads(result.stdout)["validation"]["records"] == 1
     rewrite(manifest, "train", [None])
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 1
@@ -271,11 +296,11 @@ def test_unsupported_schema_versions(manifest, value):
 
 def test_missing_split_and_path_escape(manifest):
     contents = json.loads(manifest.read_text())
-    del contents["files"]["benchmark"]
+    del contents["files"]["test"]
     manifest.write_text(json.dumps(contents))
-    with pytest.raises(ValueError, match="missing fields.*benchmark"):
+    with pytest.raises(ValueError, match="missing fields.*test"):
         validate_manifest(manifest)
-    contents["files"]["benchmark"] = [{"path": "../outside.jsonl", "sha256": "a" * 64}]
+    contents["files"]["test"] = [{"path": "../outside.jsonl", "sha256": "a" * 64}]
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="inside the manifest directory"):
         validate_manifest(manifest)
@@ -290,7 +315,7 @@ def test_physical_aliases(manifest, alias_kind):
     else:
         alias.hardlink_to(target)
     contents = json.loads(manifest.read_text())
-    contents["files"]["development"] = [dict(contents["files"]["train"][0], path=alias.name)]
+    contents["files"]["validation"] = [dict(contents["files"]["train"][0], path=alias.name)]
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="split file reused"):
         validate_manifest(manifest)

@@ -1,4 +1,4 @@
-"""Version 1 curated conversations, benchmark cases, and release manifests (offline)."""
+"""Validate version 1 conversation samples and split manifests offline."""
 
 import argparse
 import hashlib
@@ -8,7 +8,7 @@ from pathlib import Path
 
 from endless_voices.messages import validate_messages
 
-SPLITS = {"train", "development", "benchmark"}
+SPLITS = {"train", "validation", "test"}
 SLUG = re.compile(r"[a-z0-9]+(?:[-_][a-z0-9]+)*")
 
 
@@ -64,6 +64,7 @@ def metadata(value: object, split: str) -> None:
             "character_role",
             "topics",
             "scenario_group",
+            "conversation_id",
             "split",
             "sources",
             "authorship",
@@ -71,8 +72,10 @@ def metadata(value: object, split: str) -> None:
         },
         "metadata",
     )
-    for key in ("id", "identity", "species", "scenario_group"):
+    for key in ("id", "identity", "species", "conversation_id"):
         slug(value[key], f"metadata.{key}")
+    if value["scenario_group"] is not None:
+        slug(value["scenario_group"], "metadata.scenario_group")
     text(value["character_role"], "metadata.character_role")
     texts(value["topics"], "metadata.topics")
     for topic in value["topics"]:
@@ -86,29 +89,23 @@ def metadata(value: object, split: str) -> None:
         raise ValueError("metadata.review_status must be draft, reviewed, approved or rejected")
 
 
-def validate_record(record: object, split: str) -> None:
-    """Validate a curated record; labels remain open to all factions and species."""
-    if split not in SPLITS:
-        raise ValueError(f"unknown split {split!r}")
-    common = {"schema_version", "metadata"}
-    fields(
-        record,
-        common | ({"inputs", "evaluation"} if split == "benchmark" else {"messages"}),
-        "record",
-    )
+def validate_record(record: object, split: str | None = None) -> None:
+    """Validate one conversation sample and optionally its declared file split."""
+    fields(record, {"schema_version", "metadata", "messages", "evaluation"}, "record")
     version(record["schema_version"])
+    if split is None:
+        if not isinstance(record["metadata"], dict):
+            raise ValueError("metadata must be an object")
+        split = record["metadata"].get("split")
+    if not isinstance(split, str) or split not in SPLITS:
+        raise ValueError(f"unknown split {split!r}; expected train, validation or test")
     metadata(record["metadata"], split)
-    if split != "benchmark":
-        validate_messages(record["messages"])
-        if record["messages"][0]["role"] != "system":
-            raise ValueError("curated messages require a leading identity-setting system message")
-        for message in record["messages"]:
-            fields(message, {"role", "content"}, "message")
-        return
-    inputs, evaluation = record["inputs"], record["evaluation"]
-    fields(inputs, {"system", "user_turns"}, "inputs")
-    text(inputs["system"], "inputs.system (identity and scene context)")
-    texts(inputs["user_turns"], "inputs.user_turns")
+    validate_messages(record["messages"])
+    if record["messages"][0]["role"] != "system":
+        raise ValueError("curated messages require a leading identity-setting system message")
+    for message in record["messages"]:
+        fields(message, {"role", "content"}, "message")
+    evaluation = record["evaluation"]
     fields(
         evaluation,
         {
@@ -134,24 +131,10 @@ def validate_record(record: object, split: str) -> None:
     sources(evaluation["sources"], "evaluation.sources")
 
 
-def benchmark_messages(case: dict, generated_assistant_history: list[str]) -> list[dict[str, str]]:
-    """Build the next prompt from fixed user turns and caller-supplied generated replies only.
-
-    Metadata and evaluation fields are never copied. Call with [] for the first turn,
-    then the model's actual replies; a completed case has no next prompt.
-    """
-    validate_record(case, "benchmark")
-    texts(generated_assistant_history, "generated_assistant_history", allow_empty=True)
-    turns = case["inputs"]["user_turns"]
-    if len(generated_assistant_history) >= len(turns):
-        raise ValueError("no remaining user turn for this assistant history")
-    messages = [{"role": "system", "content": case["inputs"]["system"]}]
-    for index, reply in enumerate(generated_assistant_history):
-        messages.extend(
-            [{"role": "user", "content": turns[index]}, {"role": "assistant", "content": reply}]
-        )
-    messages.append({"role": "user", "content": turns[len(generated_assistant_history)]})
-    return messages
+def evaluation_messages(record: dict) -> list[dict[str, str]]:
+    """Return a copy of the authored context with the final assistant target withheld."""
+    validate_record(record)
+    return [dict(message) for message in record["messages"][:-1]]
 
 
 def read_records(path: Path, split: str):
@@ -218,14 +201,18 @@ def validate_manifest(path: Path, *, tokenizer=None, max_length: int | None = No
                         f"{location}: duplicate ID {meta['id']!r}; first at {ids[meta['id']]}"
                     )
                 ids[meta["id"]] = location
-                group = meta["scenario_group"]
-                if group in groups and groups[group][0] != split:
-                    raise ValueError(
-                        f"{location}: scenario_group {group!r} crosses splits; "
-                        f"first at {groups[group][1]}"
-                    )
-                groups[group] = (split, location)
-                if tokenizer is not None and split != "benchmark":
+                for field in ("conversation_id", "scenario_group"):
+                    group = meta[field]
+                    if group is None:
+                        continue
+                    key = (field, group)
+                    if key in groups and groups[key][0] != split:
+                        raise ValueError(
+                            f"{location}: {field} {group!r} crosses splits; "
+                            f"first at {groups[key][1]}"
+                        )
+                    groups.setdefault(key, (split, location))
+                if tokenizer is not None:
                     from endless_voices.data import tokenize_messages
 
                     try:
@@ -245,7 +232,7 @@ def main() -> None:
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--tokenizer", type=Path, help="optional local tokenizer directory only")
     parser.add_argument(
-        "--max-length", type=int, help="train/development token limit; no truncation"
+        "--max-length", type=int, help="complete-sample token limit for all splits; no truncation"
     )
     args = parser.parse_args()
     if (args.tokenizer is None) != (args.max_length is None):
