@@ -17,7 +17,7 @@ they are not an additional unversioned canon source.
 
 To inspect the exact evidence locally, run `python scripts/fetch_sources.py` from this repository
 and open the listed files and ranges in `data/local/endless-sky-7140eb2a29ce/`.
-See the [dataset README](../../data/README.md) for verification and explicit refresh instructions. Hash the raw file bytes (before newline conversion) with
+See the [dataset README](../overview/README.md) for verification and explicit refresh instructions. Hash the raw file bytes (before newline conversion) with
 SHA-256 and compare with the inventory. No upstream checkout, copied game dialogue, artwork,
 or downloaded model is required to use the existing Endless Voices pipeline.
 
@@ -31,7 +31,8 @@ must be flagged, deferred, or excluded rather than guessed.
 
 The pilot excludes third-party plugins, community lore additions, images/audio, UI/deprecated
 content, unreviewed campaign outcomes, and the existing invented archivist from canonical
-training. Referenced but unreviewed factions are not new target identities. The inventory also
+training. Additional campaign stages and identities require explicit review in the
+[pilot annotations](../README.md); the initial four-file inventory is not the full release scope. Referenced but unreviewed factions are not new target identities. The inventory also
 records three deferred passages and two excluded records so later authors do not mistake all
 inspected material for usable speech.
 
@@ -51,13 +52,12 @@ not a claim that no other
 contributors changed the files; preserve the upstream contributors/credits context as well.
 Artwork has separate terms and is not included in this pilot.
 
-This PR stores source links, attribution metadata, and newly written curation summaries; it does
-not vendor the game text. Before redistributing extracted/adapted dialogue, record the applicable
-license and preserve required notices/attribution and license material. Do not relabel copied
-source as public domain or assume generated paraphrases erase source obligations. Decide and
-document the release terms for that dataset when preparing it. The implications for model or
-adapter redistribution are not established by this source review and remain a release question;
-this is not a claim that trained weights necessarily inherit GPL.
+The initial source review stores links, attribution metadata and summaries. The
+[pilot release](../README.md) commits extracted speech with the upstream license,
+copyright, credits, selected file-header notices and per-message provenance. The combined
+source-derived dataset uses GPL-3.0-or-later. Original speech, rendered game variables,
+punctuation normalization and agent-authored context remain identifiable. No conclusion about
+future model or adapter redistribution is implied by these dataset terms.
 
 ## Review handoff
 

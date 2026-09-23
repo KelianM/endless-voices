@@ -19,17 +19,17 @@ These are experiment directions, not demonstrated results.
 ## What is here
 
 ```text
-configs/train.toml           Model, data, LoRA and training settings
-data/example.jsonl          One original, non-canonical format example
-docs/curation/             Reviewed pilot sources, identity briefs, and scope
-docs/evaluation/           Authenticity protocol and development calibration recipe
-src/endless_voices/
-  common.py                Config and tokenizer loading
-  data.py                  Validation, tokenization and padding
-  contracts.py             Offline curated dataset and benchmark contracts
-  train.py                 LoRA supervised fine-tuning
-  chat.py                  Base-model or adapter chat
-tests/                     Offline data and tiny-model smoke tests
+src/endless_voices/         Training, chat, tokenization and dataset validation
+scripts/                   Source fetching, preparation and dataset assembly
+tests/                     Offline tests and format fixtures
+configs/                   Training settings
+docs/contracts.md          Conversation format and validator reference
+docs/adr/                  Architecture decisions
+data/README.md             Start here to reconstruct or annotate the dataset
+data/pilot-v1/              Versioned samples, annotations and evidence (Git LFS)
+data/source-review/        Source-selection policy and historical review
+data/evaluation/           Evaluation protocol and calibration evidence
+data/overview/             Upstream source inventory and statistics
 ```
 
 There is no frontend, general game-data ingestion, synthetic data generator, or evaluation runner.
@@ -39,12 +39,13 @@ into the loader or model.
 
 ## Pilot data curation
 
-The [initial source review](docs/curation/README.md) selects early Free Worlds militia, Quarg, and non-Unfettered Hai.
-The [dataset overview](data/README.md) inventories all upstream content groups and text categories,
-with qualitative examples and dataset storage guidance. The curation package includes
-a pinned source inventory, role-specific identity briefs, coverage gaps, and attribution
-policy. It is evidence for the next dataset-authoring steps; canonical training examples and
-a held-out benchmark have not yet been added.
+The [first conversation dataset](data/README.md) covers Free Worlds representatives,
+Republic Navy, mainstream Hai and Quarg. Reviewed annotations record speaker attribution,
+branch routes, profiles and selected lore. Deterministic preparation builds original-speech
+samples into Git LFS-versioned train, validation and test files under `data/pilot-v1/`, with frozen hashes,
+source provenance, agent review evidence and attribution. The [dataset overview](data/overview/README.md)
+distinguishes the available source corpus from the selected coverage. Install Git LFS, then run
+`git lfs install --local` and `git lfs pull` to fetch the committed release payload.
 
 ## Setup
 
@@ -92,14 +93,14 @@ of sources and identity labels. Put private or larger local datasets in `data/lo
 and change `data.path`. Paths in configuration are relative to the working directory.
 
 For curated train/validation/test samples, use the shared
-[versioned data contracts](data/contracts.md). Validate a complete split manifest offline with
+[versioned data contracts](docs/contracts.md). Validate a complete split manifest offline with
 `python -m endless_voices.contracts tests/fixtures/contracts/manifest.json`. This reports
 structural coverage and checks metadata, hashes, IDs, and known conversation/scenario split boundaries.
 
 The single example is an **invented archivist**, not a claim about an Endless Sky species, and is
 only suitable for checking the pipeline. Meaningful identity learning needs a larger, carefully
 reviewed dataset spanning different situations. Keep provenance and permissions for future game
-text or generated examples; this repository does not include game assets or dialogue.
+text or generated examples; this repository includes the curated dialogue release, but not the raw upstream corpus or game assets.
 
 The tokenizer's native chat template formats each conversation. This first implementation uses
 causal language-modelling loss on **all non-padding tokens**, including system and user text;
@@ -156,13 +157,13 @@ saved alongside the adapter, as the training command does.
 The first comparison uses the same identity instructions, selected lore, and authored history
 for the base model and adapted model. Evaluation withholds the final assistant response and
 generates one answer. Entire conversations and known scenario variants stay in one split.
-The [authenticity protocol](docs/evaluation/README.md) compares generated replies against original
-game continuations in blinded pairs. Its small development calibration pack has an
+The [authenticity protocol](data/evaluation/README.md) compares generated replies against original
+game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
 result is claimed. Generation and reporting
 commands remain future work. Fixed-history evaluation does not establish persistence through a
 model’s own unfolding conversation. See the
-[data contract](data/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
+[data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
 ## Development
 
@@ -178,3 +179,7 @@ not model quality or hardware performance.
 Implementation references: [Transformers chat templates](https://huggingface.co/docs/transformers/v4.57.1/chat_templating),
 [PEFT LoRA](https://huggingface.co/docs/peft/en/package_reference/lora), and
 [Transformers on Apple Silicon](https://huggingface.co/docs/transformers/v4.57.1/perf_train_special).
+
+## Licensing
+
+[Dataset licensing notice](NOTICE.md) identifies the upstream license and attribution bundle.

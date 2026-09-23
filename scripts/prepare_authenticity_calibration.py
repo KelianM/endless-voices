@@ -11,8 +11,8 @@ from pathlib import Path
 from endless_voices.contracts import evaluation_messages, validate_record
 
 ROOT = Path(__file__).resolve().parents[1]
-RECIPE = ROOT / "docs/evaluation/calibration.json"
-INVENTORY = ROOT / "docs/curation/source-inventory.json"
+RECIPE = ROOT / "data/evaluation/calibration.json"
+INVENTORY = ROOT / "data/source-review/source-inventory.json"
 
 
 def extract(lines, selector, ranges):
@@ -206,7 +206,7 @@ def prepare(source_root, output, form):
         (output / f"{stage}-template.json").write_text(json.dumps(reviews, indent=2) + "\n")
         text = [
             "# Authenticity calibration\n",
-            (ROOT / "docs/evaluation/judge-instructions.md").read_text(),
+            (ROOT / "data/evaluation/judge-instructions.md").read_text(),
         ]
         for row in rows:
             text.append(f"\n## Trial {row['trial_id']}\n")

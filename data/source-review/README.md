@@ -2,8 +2,10 @@
 
 This is the completed first source review for [issue #2](https://github.com/KelianM/endless-voices/issues/2).
 It selects three pilot identities, records 21 inspected passages, and supplies evidence-backed
-briefs for conversation authors. It contains neither training conversations nor benchmark cases.
-For whole-source counts across every content group, see the [dataset overview](../../data/README.md).
+briefs for conversation authors. The initial inventory contains neither training conversations nor benchmark cases.
+The [pilot release](../README.md) extends this evidence with conversation annotations,
+profiles and selected lore, including Republic Navy coverage.
+For whole-source counts across every content group, see the [dataset overview](../overview/README.md).
 
 - [Source inventory](source-inventory.json): pinned files, checksums, line links, speakers,
   prerequisites, evidence types, dispositions, and limitations.
@@ -11,7 +13,7 @@ For whole-source counts across every content group, see the [dataset overview](.
   value, and sound like, with evidence IDs.
 - [Source policy](source-policy.md): canon boundaries, attribution, and review rules.
 
-## Pilot decision
+## Initial selection
 
 | Identity ID | Species ID | Faction / government boundary | Representative roles |
 | --- | --- | --- | --- |
@@ -29,7 +31,7 @@ of the entire source total. Volume is a strong reason to sample it, not proof th
 is high quality or belongs to one faction. The first attributable human target is the early
 Free Worlds militia; Republic, Syndicate, and other human groups remain separate candidates.
 Quarg provides contrasting first-contact discourse and Hai broader civilian cultural dialogue.
-Defer other targets until this bounded pilot is prepared and evaluated.
+The current release extends that initial selection with Republic Navy and later Free Worlds encounters.
 
 ## Canon and scene assumptions
 
@@ -37,7 +39,7 @@ Use development commit `7140eb2a29ce4d2797933075c751791a892c7d4f` from the offic
 This preserves the inspected snapshot; it is not advertised as the latest stable release.
 The inventory has SHA-256 hashes for the four inspected text files and immutable passage links.
 
-The pilot covers local contact/culture encounters and early Free Worlds reconnaissance,
+The initial inventory covers local contact/culture encounters and early Free Worlds reconnaissance,
 before importing later campaign outcomes. Free Worlds records are after initial deployment
 and before the player chooses sides; JJ’s local no-shooting-yet account must retain that timing.
 Prewar Pact material is historical context only, not an interchangeable faction voice.
@@ -62,11 +64,11 @@ multiple passages from one mission do not create independent source scenes.
 | Other human speakers (not targets) | 0 | 0 | 0 | 1 | 1 |
 | Total | 14 | 11 | 2 | 3 | 2 |
 
-The three retained Free Worlds missions form one connected chain, not three independent
-scenario families. Keep source-derived variants of that chain in one split.
+The three retained Free Worlds missions form one connected story chain. The current pilot
+keeps each actual conversation and its variants together; the shared chain alone no longer
+forces these separate encounters into one split.
 The excluded Hai record covers three related sports scenes. Counts are inventory records,
-not utterances, independent facts, future examples, or word counts. No usable-example yield
-has been measured yet. See each record's `context` and `caveat` before using its summary.
+not utterances, independent facts, future examples, or word counts. The initial inventory did not measure usable-example yield; the release now reports materialized coverage. See each record's `context` and `caveat` before using its summary.
 
 | Topic | Quarg evidence | Hai evidence | Main limitation |
 | --- | --- | --- | --- |
@@ -83,30 +85,14 @@ Moral decisions can probe the tension between defense and covert surveillance. T
 not support alien attitudes, civilian Free Worlds culture, or an authoritative war history.
 Use political-group relationships for the human pilot rather than inventing interspecies views.
 
-## Initial authoring budget
+## Dataset construction
 
-Set a deliberately small target of **24 training conversations, 6 development conversations,
-and 12 benchmark cases per identity**: 72 / 18 / 36 overall (126 records). This is a scope cap
-for the first pass, not a claim that the reviewed sources already yield 84 independent examples.
-For each identity, aim for 4 / 1 / 2 primary-topic records across the six topics above (human political-group relationships replace unsupported alien attitudes). Secondary
-tags may overlap but do not inflate counts. Include at least two multi-turn cases and four novel
-situations among each identity's 12 benchmark cases; these categories may overlap.
+[Issue #5](https://github.com/KelianM/endless-voices/issues/5) absorbs the former source-preparation
+and benchmark-authoring issues. The [pilot release](../README.md) replaces the provisional
+per-identity quotas with source-backed conversation annotation and deterministic sample assembly.
+The initial three-identity evidence remains useful but is not a closed list of allowed speakers.
 
-Use different conversational situations across splits. Novel scenarios can apply supported
-values without adding canonical history or technology. Reduce and document counts when evidence
-is inadequate rather than padding with paraphrases, and report narrow Quarg coverage explicitly.
-This sample supports a pilot comparison, not statistically strong general claims.
-
-Before writing variants, reserve scenario families for train/development/benchmark. All source
-reconstructions, branch alternatives, and paraphrases of the same scene must remain together.
-The `source_group` field records common provenance, **not a split assignment**. Shared canon
-facts may support distinct original scenarios across splits; benchmark prompts, gold responses,
-and derived variants must never become training or prompt-development examples. The next
-curation stages must record those assignments and inspect overlap before freezing the benchmark.
-
-## Handoff
-
-The source review is complete at this boundary. Data contracts (#3), prepared passage extraction
-(#4), final conversation authoring (#5), and benchmark authoring (#7) are separate PRs. Use these
-briefs as evidence, not as frozen model prompts or benchmark answer keys. The runtime remains
-faction-agnostic and the existing invented archivist remains only a pipeline fixture.
+Reserve actual conversations and known branch/repeated-scene variants together. Broad themes,
+mission chains and shared source facts alone do not determine a split. Profile and lore annotations
+state the relevant speaker role and story date. The original calibration conversations remain
+validation material; unrelated encounters in the same campaign can be assigned independently.

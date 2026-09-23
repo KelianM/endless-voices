@@ -1,200 +1,233 @@
-# Endless Voices dataset: source overview and pilot status
+# Dataset reconstruction and annotation
 
-**Status: source inventory and initial curation, not a released training dataset.**
-The complete upstream scan below describes what is available to curate. The smaller reviewed
-pilot describes what we have actually read for authoring. Neither measures final usable
-training examples. No canonical training or held-out benchmark records have been produced yet;
-`example.jsonl` remains one invented pipeline fixture.
+This release is constructed from reviewed conversation annotations and pinned Endless Sky
+speech. Agents identify speakers, coherent branch routes, profiles and relevant lore. Scripts
+extract the selected speech and generate conversation prefixes, provenance, split files and
+checksums. An annotation is not a handwritten copy of every resulting sample.
 
-## Curated record and benchmark contracts
+The release covers Free Worlds representatives, Republic Navy, mainstream Hai and Quarg. Faction labels
+come from speaker evidence, not filenames or the government of the planet where a mission runs.
+Human factions remain distinct. Profiles describe a particular role and story state rather than
+an omniscient faction spokesperson. Topic labels organize coverage; topics do not determine splits.
 
-[Version 1 contracts](contracts.md) define one conversation format for train,
-validation, and test, with versioned split manifests and offline validation commands. Only invented test fixtures
-exist so far; source inventories below are evidence metadata, not records in those contracts.
+The pilot contains **176 samples from 61 conversations**: 101 training, 48 validation and 27 test
+samples. [Coverage and review findings](pilot-v1/evidence/findings.md) document exclusions, corrections and limits.
 
-## Scope and faction counts
+Start with this document to rebuild the existing release or coordinate annotations for a new
+release. The executable preparation tools live in `scripts/`; the instructions and dataset
+research live here under `data/`.
 
-Source: official Endless Sky development commit
-[`7140eb2a29ce`](https://github.com/endless-sky/endless-sky/commit/7140eb2a29ce4d2797933075c751791a892c7d4f),
-inspected on 2026-09-22. This is not a named release or a claim about today's latest version.
-All 204 tracked `data/**/*.txt` files are counted, including shared, UI, and deprecated data.
-Third-party plugins, artwork, audio, translations outside these files, and repository history
-are outside the inventory.
+- [Source overview](overview/README.md): pinned-source retrieval, inventory and corpus limits.
+- [Source review](source-review/README.md): historical identity reviews and source-selection policy.
+- [Evaluation](evaluation/README.md): authenticity protocol, judge instructions and calibration evidence.
+- [Conversation contract](../docs/contracts.md): the format enforced by the Python validator.
+- [Annotation decision](../docs/adr/0005-build-datasets-from-reviewed-conversation-annotations.md):
+  why annotation uses manually orchestrated agents and what that choice costs.
 
-There is no single authoritative “number of factions” field in these sources:
+Instructions and historical research use ordinary Git so they can be read without downloading
+LFS objects. Versioned release contents under `pilot-v1/` use Git LFS. Raw sources, tokenizer
+files and temporary build outputs live in gitignored `local/`.
 
-- **19 species/region content directories:** avgi, bunrodea, coalition, drak, gegno, hai, human, iije, incipias, kahet, korath, pug, quarg, remnant, rulei, sheragi, successors, vyrmeid, wanderer.
-- **128 distinct government identifiers**, also 128 root government declarations in this
-  snapshot. These include political groups, location/hostility variants, and technical entities
-  such as `Test Dummy`, `Uninhabited`, and `Escort`. They are not 128 independently trainable voices.
-- **Three selected pilot identities:** early Free Worlds militia, Quarg, and non-Unfettered Hai. They are curation choices,
-  not the full set available in the game.
+## Use and reconstruct the release
 
-Directory groups are the reproducible breakdown below, **not a completed faction taxonomy or
-speaker attribution**. For example, `human` includes multiple human factions, `hai` contains
-Unfettered material too, and Coalition contains several species. Quarg speech and lore also
-appear outside the Quarg directory. An exact semantic faction/species census requires a separate
-mapping; these statistics do not invent one. All government names are listed in
-[source-statistics.json](overview/source-statistics.json).
+The [complete release](pilot-v1) is versioned through Git LFS, including
+the three split files, provenance, review copy and license material. Agent-authored annotations,
+profiles and lore live in that same dataset directory. All versioned release files use LFS; code, tests,
+instructions and ADRs use ordinary Git. Fetch the payload after cloning with Git LFS installed:
 
-## Whole-source scale
+```sh
+git lfs install --local
+git lfs pull
+```
 
-| Measure | Count |
-| --- | ---: |
-| Text files | 204 |
-| Raw bytes | 10,461,684 (10.46 MB / 9.98 MiB) |
-| Physical lines, including comments and blanks | 261,599 |
-| Root mission declarations | 2,331 |
-| Conversation blocks with children | 1,745 |
-| Conversation references without children | 126 |
-| Of the conversation declarations, root named conversations | 54 |
-| Root phrase declarations | 868 |
-| Root news declarations | 219 |
-| Recognized text words across the categories below | 1,018,481 |
+A checkout without LFS contains pointer files. After fetching the LFS objects, no raw source
+download or reconstruction is required to read the dataset. Generated release files are collapsed
+in GitHub review; inspect the local `data/pilot-v1/evidence/review.md` for full sample context and targets.
 
-Missions often contain conversations; these are overlapping structural counts, not separate
-pools of examples. The 54 named conversations are not additional to the 1,745 blocks. References
-are not independently counted as conversations. One mission may have multiple conversations;
-one conversation can contain many branches and repeated text.
+Validate the committed split manifest offline:
 
-| Text category | Approximate words | What is included / limitation |
-| --- | ---: | --- |
-| Conversation display text | 682,165 | Narrative paragraphs and player choices as well as NPC speech; not a count of spoken dialogue |
-| Mission/action dialog text | 37,921 | Literal `dialog` messages; phrase references are not expanded |
-| Descriptions | 156,324 | Mission summaries, ships, outfits, planets, and other `description` values |
-| Spaceport text | 32,772 | Literal `spaceport` descriptions |
-| Logs | 22,105 | Recorded summaries; often repeat information from conversations |
-| Phrase/news fragments | 87,194 | `word` alternatives, including names and hails; not fully assembled sentences |
+```sh
+python -m endless_voices.contracts data/pilot-v1/samples/manifest.json
+```
 
-The categories are disjoint in this lexical count, but their **meaning is not deduplicated**.
-They do not cover every possible text-bearing construct. These refined estimates replace the
-initial reconnaissance's rough ~1.01-million-word estimate; the source snapshot is unchanged,
-but short text and fragment handling and structural classification are now explicit.
-
-## Data by source group
-
-“Conv.” means a block with children. “Conv. words” includes narration and player choices.
-“All text words” sums the six categories above; it is not all file tokens or exclusively lore.
-KiB uses 1,024 bytes, rounded to the nearest integer. Rows are sorted by conversation-word volume.
-
-| Source group | Files | KiB | Missions | Conv. | Conv. words | All text words |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| human | 41 | 3359 | 1,124 | 688 | 249,660 | 368,083 |
-| coalition | 10 | 913 | 248 | 250 | 101,539 | 120,116 |
-| remnant | 10 | 677 | 151 | 186 | 68,084 | 80,541 |
-| kahet | 9 | 545 | 84 | 95 | 57,408 | 63,694 |
-| successors | 18 | 541 | 108 | 106 | 46,569 | 60,176 |
-| wanderer | 8 | 484 | 203 | 155 | 37,973 | 53,727 |
-| hai | 11 | 471 | 167 | 88 | 33,795 | 49,035 |
-| avgi | 14 | 429 | 89 | 43 | 24,708 | 40,665 |
-| gegno | 9 | 254 | 42 | 24 | 21,405 | 27,071 |
-| sheragi | 3 | 144 | 33 | 41 | 17,199 | 19,518 |
-| korath | 11 | 298 | 30 | 21 | 6,039 | 14,983 |
-| quarg | 5 | 86 | 8 | 9 | 5,321 | 9,153 |
-| incipias | 5 | 62 | 11 | 11 | 4,141 | 6,302 |
-| (shared root) | 19 | 1574 | 5 | 6 | 2,370 | 93,440 |
-| bunrodea | 5 | 57 | 1 | 2 | 2,288 | 4,443 |
-| drak | 5 | 38 | 13 | 7 | 1,612 | 2,325 |
-| rulei | 3 | 15 | 7 | 5 | 798 | 1,046 |
-| pug | 5 | 31 | 4 | 2 | 685 | 1,981 |
-| _ui | 8 | 179 | 0 | 5 | 542 | 542 |
-| _deprecated | 3 | 46 | 3 | 1 | 29 | 1,393 |
-| iije | 1 | 6 | 0 | 0 | 0 | 80 |
-| vyrmeid | 1 | 7 | 0 | 0 | 0 | 167 |
-
-The machine-readable report also includes per-group description, spaceport, dialog, log, and
-phrase/news word counts, text-line counts, conversation references, and every source-file hash.
-Human and Coalition folders together supply about 51% of conversation words. Hai has about
-6.4 times the Quarg directory's conversation volume. Some groups have almost no dialogue in
-their own folder; this does **not** prove they have no lore or speech elsewhere.
-
-Shared-root files hold much of the map/planet description material. UI and deprecated rows are
-included for an honest full inventory but excluded from the selected canonical authoring pool.
-Numbers for text volume say nothing by themselves about topic diversity, speaker certainty,
-independent scenes, or sufficient material for a benchmark.
-
-## What the examples tell us
-
-These are paraphrased qualitative findings from selected passages, not new training responses.
-They illustrate why both volume and reading the source matter.
-
-| Source example | Learning signal | Preparation concern |
-| --- | --- | --- |
-| [Free Worlds reconnaissance](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L329-L425) | Practical cooperation, defensive framing, and concern about provoking the Navy | A Republic captain speaks inside the same mission; preserve faction attribution, early-campaign timing, and shared-chain split boundaries |
-| [Quarg first contact](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L22-L70) | Patient explanation, collective identity, peaceful coexistence backed by strength | Narration and player questions interrupt speech; Quarg claims about the Drak must remain attributed |
-| [Quarg at Kuwaru Efreti](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L74-L118) | More archaic register; protection of Efreti and withholding dangerous knowledge | Branches repeat answers; one speaker's register is not mandatory for every Quarg |
-| [Hai first contact](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20missions.txt#L14-L96) | Hospitality and curiosity about humans; a young Hai defers history to elders | Human merchant exposition is interleaved with Hai speech; characters have different knowledge |
-| [Hai gambling discussion](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L179-L212) | Honesty as a cultural norm, with explicit acknowledgement that Hai can bluff | Avoid converting a norm into a biological inability or inventing unspecified tenets |
-| [Hai theater conversation](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20culture%20conversations.txt#L14-L34) | Everyday taste, disagreement, and a human/Hai friendship | Two species speak in the same paragraph; personal taste is not a universal faction belief |
-| [Coalition folklore](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/coalition/coalition%20culture%20conversations.txt#L14-L60) | Cultural performance and distinctive speech | Embedded theatrical stories are not necessarily literal history; this is reconnaissance, not pilot-approved evidence |
-| [Avgi hails](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/avgi/avgi%20hails.txt#L17-L52) | Friendly/hostile voice material assembled from phrases | Weighted fragments and references need rendering; many combinations do not imply many independent examples |
-
-The strongest material teaches values through decisions, explanations, disagreement, and
-knowledge boundaries. The main risks are speaker mixing, lost branch context, treating opinions
-as omniscient facts, and generating many near-duplicates from a small number of scenes.
-
-## Curated pilot versus available source
-
-The [curation package](../docs/curation/README.md) contains **21 inspected passage records**:
-14 retained as evidence, two context-only, three deferred, and two excluded. Retained material
-spans **11 mission groups**: three Free Worlds, two Quarg, and six Hai. The three Free Worlds
-missions share one reconnaissance chain and are not independent scenario families. This is an agent source review, not
-independent human adjudication or final example approval.
-
-Quarg has strong first-contact/knowledge-restraint evidence but narrow everyday coverage.
-Hai has more varied civilian contexts, but speakers' ages, tastes, political views, and
-translation conditions must be preserved. Free Worlds adds practical militia dialogue about cooperation, surveillance, and avoiding
-escalation; its initial sample does not represent all human-space factions or civilian life.
-Initial authoring targets are **72 training,
-18 development, and 36 held-out benchmark records** across the three identities. These are
-future targets, not current dataset sizes or a measured usable yield; reduce them if evidence
-cannot support sufficient diversity. Reserve scenario families before authoring variants.
-
-## Reproduce and interpret the statistics
-
-Fetch the pinned source using Python 3.11+ and Git (no Git LFS or Python packages required):
+To verify reconstruction, run these commands from the repository root with the development
+dependencies installed:
 
 ```sh
 python scripts/fetch_sources.py
-python scripts/inventory_sources.py data/local/endless-sky-7140eb2a29ce --output data/overview/source-statistics.json
+python scripts/prepare_conversations.py catalog --output data/local/pilot-candidates-v1
 ```
 
-The fetch command reads the revision and all 204 SHA-256 hashes from the committed statistics
-manifest. It fetches only that commit with a sparse checkout of `data/` plus root files,
-including upstream license, copyright, and credits. Game images/audio and full Git history are
-not checked out. Git metadata and root files add some overhead to the 10.46 MB text corpus.
-The default destination is gitignored and independent of your shell's current directory.
-`--destination /another/path` selects a different location; ensure custom locations stay out of Git.
+The catalog contains 785 source conversation blocks from the human, Hai and Quarg directories.
+The catalog is an unreviewed reading aid, not 785 usable conversations. Reading sheets retain
+physical line numbers, branch instructions and proposed speech spans. Quoted narration, other
+speakers, untranslated speech, and runtime placeholders still require review. Source conditions
+outside a conversation must be checked in the original mission.
 
-A second run verifies the existing checkout without network access. Missing, changed, extra,
-or wrong-revision data fails verification rather than overwriting local work. Downloads are
-staged in a temporary sibling directory and published only after verification succeeds.
-To recover from a failed verification, move the old checkout aside or select a new destination.
-Network access to GitHub is required only for the initial fetch.
+Download only the selected tokenizer and its license:
 
-To refresh deliberately: obtain a separate clean upstream checkout at the desired full commit,
-update `REVISION` in `scripts/inventory_sources.py`, and regenerate the committed statistics
-manifest from that checkout. Review the source changes, inventory counts, curation citations,
-file hashes, and this README together in a PR. The fetch command then uses the new manifest
-and a new revision-specific directory. Do not switch to a moving branch on each run: existing
-training and benchmark artifacts must retain the revision they were built against.
+```sh
+hf download Qwen/Qwen3-4B-Instruct-2507 \
+  tokenizer.json tokenizer_config.json vocab.json merges.txt LICENSE \
+  --revision cdbee75f17c01a7cc42f958dc650907174af0554 \
+  --local-dir data/local/tokenizers/qwen3-4b-instruct-2507
+python scripts/build_pilot.py \
+  --output data/local/pilot-v1-rebuilt \
+  --tokenizer data/local/tokenizers/qwen3-4b-instruct-2507 --max-length 8192 \
+  --verify-release data/pilot-v1/release.json
+```
 
-The standard-library script checks the commit, a clean data tree, and completeness against the
-tracked file list. It stores SHA-256 hashes and uses indentation and quoted tokens to count
-structural nodes and selected text categories. Words are whitespace-separated units, **not
-model tokens**. It does not execute game conditions, expand phrases, resolve speakers, deduplicate
-scenes, or fully parse the game format. Tiny hand-counted fixtures test the counting boundaries.
-The statistics are descriptive estimates, not an extraction pipeline or quality benchmark.
+Both preparation commands require a new output directory. Reconstruction after the source and
+tokenizer downloads is offline. The frozen measurement used Transformers 4.57.6 and Tokenizers
+0.22.2; those versions can be installed if another supported version changes reconstruction. The builder re-verifies the source snapshot and tokenizer file
+hashes. The 8,192-token complete-sample budget includes the profile, lore, full selected history
+and target; it is a dataset preparation limit, not the model's maximum context length. No sample
+is truncated. The trainer's existing configuration is unchanged and must use an appropriate
+length limit if this dataset is selected later. No weights, generation or training are needed.
 
-## Storage, licensing, and release status
+The `samples/` directory contains `train.jsonl`, `validation.jsonl`, `test.jsonl`, and a
+versioned `manifest.json`. The `evidence/` directory holds the review and provenance files. `coverage.json` records counts and measured token lengths.
+`provenance.json` records every extracted source span, original or agent-authored user turn,
+and punctuation normalization. `review.md` is an organizer's reading copy with targets and source
+labels; it is not a blinded judge input. `construction.json` records annotation and script hashes.
+The root `release.json` fixes the dataset version, tokenizer specification and artifact hashes.
+The builder copies the committed annotations and authored review evidence, then regenerates the
+samples and mechanical reports. No agent runs during reconstruction.
 
-Keep this README, inventory statistics, curation metadata, and small test fixtures in ordinary
-Git so they remain reviewable. Raw upstream files are fetched into `data/local/` and ignored;
-no raw payload is committed and Git LFS is not configured or required. Storage and packaging
-of the post-processed dataset will be handled in later dataset issues, together with source
-manifests, split checksums, attribution, and updated counts.
+```text
+data/pilot-v1/
+  annotations/    Profiles, lore, scenes and dialogue selections
+  samples/        Split files and their manifest
+  evidence/       Provenance, reviews, findings and coverage
+  licensing/      Attribution, license and upstream notices
+  release.json    Version, tokenizer specification and frozen hashes
+```
 
-The selected text files carry GPL-3.0-or-later notices. Preserve their provenance and assess
-redistribution terms when publishing source-derived examples; do not assume “open source” means
-public domain. See the [source policy](../docs/curation/source-policy.md) for header credits,
-source boundaries, and the unresolved model/adapter-release question. Fetching raw sources does not constitute a reviewed dataset release.
+## Annotate additional conversations
+
+Reconstructing the committed release needs no agent calls. Expanding the release requires new
+source-backed annotations and review. A lead agent or person coordinates the following work;
+there is no unattended annotation runner.
+
+1. Agree on identities, coverage and source scope. Read the source policy and calibration
+   findings linked above, then prepare the source catalog with the reconstruction commands.
+2. Assign bounded conversation batches to annotators. Supply this document, the source reading
+   sheets, the pinned original files and the existing annotation JSON as format examples.
+   Annotators record profiles, selected lore, speaker attribution, routes and story assumptions
+   using the rules below. Scripts extract the dialogue; annotators do not recopy target speech.
+3. Inspect every proposed conversation against the source. Correct speaker mixing, incomplete
+   replies, branch assumptions and context that reveals the withheld answer. Reconcile split
+   assignments across batches, including calibration reservations and known encounter variants.
+4. Assemble the candidate release with `scripts/build_pilot.py --annotations` pointing to the
+   new annotation directory. Include sibling release metadata and review evidence following the
+   existing release layout. Inspect the resulting reading copy, coverage and overlap reports;
+   resolve findings before freezing artifact hashes.
+5. Run structural validation, tokenizer length checks and offline tests. Record who actually
+   reviewed the annotations, retain agent work and submit the new version for owner review.
+   Follow the correction policy below rather than overwriting a released test set.
+
+## Annotation format
+
+The four faction JSON files hold reusable profiles and lore, with immutable source citations.
+Every conversation selects a profile and lore entries, records its scene state, and lists reviewed
+routes through its original dialogue. The builder copies that exact context into the system
+message, identically for the base and adapted model conditions. There is no retrieval service or
+runtime dependence on annotation IDs.
+
+A turn annotates a source player line and the source paragraphs making up the complete next reply:
+
+```json
+{"user": 123, "assistant": [125, 126]}
+```
+
+Line numbers refer to the physical source file identified by `catalog_id`. An explicit selection
+such as `{"line": 125, "quotes": [0, 2]}` selects only the attributed quoted fragments when a
+paragraph contains other speakers. An implicit or narrated player action can instead use
+`{"user": {"prompt": "An authored connective prompt.", "reason": "Source basis."},
+"assistant": [125]}`. The reason remains in the provenance ledger, outside model input.
+Agents annotate these exceptions; the script never invents a reply or fills missing dialogue.
+
+Each route produces a sample after each complete user/assistant turn, retaining its earlier
+original replies as history. Repeated targets within the same annotated conversation produce only
+one sample, using the first annotated route to that target. Different paragraphs in one response
+are not counted as separate turns. Branch alternatives can supply different responses, but they
+remain members of the same actual conversation for split checks and reporting.
+
+Speech extraction removes narrator insertions and enclosing quotation marks. Quoted fragments
+from one source paragraph join with a space; successive paragraphs retain paragraph breaks.
+A trailing comma left by a removed narrator tag becomes a period. Explicit
+`sentence_breaks_after` indices can apply that same correction between selected fragments.
+Every correction is recorded. Unresolved runtime placeholders are rejected. Explicit `substitutions` may render player-selected
+names or source-backed mission values; `substitution_notes` identifies their basis, and the same
+values appear in the system context and provenance. Rendering a declared game variable does not
+author new dialogue. Other word changes are not supported.
+
+The builder checks possible paths through source choices, labels and jumps, and rejects selected
+reply paths that skip intervening quoted dialogue. Conditions are not evaluated against a save
+state, so static reachability does not prove that the annotated story assumptions hold.
+Annotators check labels,
+choices, conditions and speaker changes and record the chosen assumptions in `review_notes`.
+The catalog makes those checks auditable without implementing a general game engine.
+
+## Lore and knowledge
+
+The lore library supplies setting facts, faction relationships, history and customs relevant to
+the selected role and story date. A young Hai and a Hai elder need not receive the same historical
+knowledge. Disputed accounts remain attributed accounts; a faction's interpretation is not silently
+promoted to omniscient truth. Scene context establishes what has happened before the selected route.
+Earlier authored history is not replaced with generated replies.
+
+Canonical facts may be shared across splits, including facts also discussed in a held-out
+response. The withheld answer's text, distinctive phrasing, and instructions to reproduce its
+particular argument do not belong in the profile or scene summary. The aim is to supply knowledge
+for an in-world reply, not to test unaided lore recall or coach imitation of one answer.
+The calibration pack supplied only short scene profiles; this release adds explicit selected lore.
+
+## Splits and review
+
+The actual source conversation is the split unit. All selected routes and earlier-response
+prefixes from that conversation stay together, even when different characters speak in it.
+Known repeated versions of the same encounter also stay together through `scenario_group`.
+A shared mission chain, subject, faction, speaker or source file alone does not require one split.
+This replaces the earlier blanket reservation of the Free Worlds reconnaissance chain.
+The actual Quarg first-contact, Hai first-contact, and Free Worlds scan-request calibration
+conversations and their known variants remain validation material.
+
+The builder checks exact normalized assistant passages of at least twelve words across splits,
+including paragraphs and passages appearing in earlier history. `overlap-candidates.json` also
+lists shared twelve-word phrases across splits and between a sample's system context and target,
+for review of partial copying and answer exposure. Shared facts can be intentional; the report
+does not label every match as contamination. Short conventional replies are not automatically
+classified as contamination. Review also checks source routes and known repeated encounters;
+there is no broad similarity taxonomy or claim that exact matching discovers every paraphrase.
+Shared source provenance is retained separately from scenario grouping.
+
+Construction-agent review and implementing-agent review are recorded separately in `review.json`.
+`reviewed` means source and construction review by agents, not human approval or a validated model
+result. The project owner reviews the PR and may inspect `review.md`; approval of the PR does not
+create a claim that the owner checked every sample. The original calibration judgments and their
+limits remain in [calibration findings](evaluation/calibration-findings.md).
+
+## Release corrections and limitations
+
+The first release is frozen by its dataset version and artifact hashes. A correction to speech,
+context, attribution, split membership or test content requires a new release directory/version,
+a change record identifying affected sample IDs, and new hashes. Retain earlier releases and
+report which release each experiment used. Do not silently fix a test after observing model
+performance or compare results from different test versions as if they used the same questions.
+A contaminated test scene must be replaced with a fresh scene in a new version and disclosed.
+
+This dataset measures continuation of selected game dialogue with supplied context. It does not
+establish free-running role-play quality. Multiple samples from one conversation are dependent;
+record counts are not independent-scene counts. Coverage is uneven, source text is public, and
+possible pretraining memorization remains unmeasured. The small calibration used easy authored
+alternatives; its successful origin judgments are not model-quality results. Future evaluator
+validation still needs fresh scenes, subtler alternatives and actual generated responses.
+
+The whole dataset stays in Git LFS, including agent-authored annotations, profiles, lore,
+review records and reconstruction hashes. Code and explanatory documentation use ordinary Git. Only raw
+upstream sources, tokenizer caches and temporary reconstruction outputs stay under gitignored
+`data/local/`. This source-derived dataset uses GPL-3.0-or-later. The committed bundle preserves
+the upstream license, copyright manifest, credits and selected file-header notices. Source URLs
+and hashes identify the original text; profiles and connective prompts are identified as agent
+work. Dataset release terms do not settle licensing of any future trained adapter.

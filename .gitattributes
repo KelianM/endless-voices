@@ -1,0 +1,4 @@
+data/pilot-*/** filter=lfs diff=lfs merge=lfs -text
+data/pilot-*/samples/** linguist-generated=true
+data/pilot-*/evidence/** linguist-generated=true
+data/pilot-*/licensing/** linguist-generated=true

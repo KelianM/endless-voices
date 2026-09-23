@@ -1,7 +1,9 @@
 # Pilot identity briefs
 
 Evidence IDs below resolve to exact pinned passages in [source-inventory.json](source-inventory.json).
-These are bounded authoring briefs, not universal profiles, system prompts, or gold responses.
+These are the initial bounded authoring briefs, not universal profiles or gold responses.
+The [pilot annotations](../README.md) contain the rendered profiles and selected lore,
+including additional source review for the expanded identity and story coverage.
 
 ## Quarg (`quarg`)
 
@@ -105,6 +107,6 @@ Neither belongs in Free Worlds assistant responses.
 
 **Coverage limits.** Three retained mission groups all belong to one reconnaissance chain.
 This is an initial human sample, not coverage of the 249,660 human-directory conversation words.
-Broader independent scenes will be needed if the authoring targets cannot be reached without
-paraphrase padding. Republic and Syndicate need their own attributable reviews before adding
+The current pilot adds reviewed conversations beyond this initial chain; no shared theme or
+mission-chain label alone determines a split. Republic and Syndicate need their own attributable reviews before adding
 those identities; do not silently pool them into a single human persona.
