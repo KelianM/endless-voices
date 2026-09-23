@@ -11,13 +11,14 @@ Human factions remain distinct. Profiles describe a particular role and story st
 an omniscient faction spokesperson. Topic labels organize coverage; topics do not determine splits.
 
 The pilot contains **176 samples from 61 conversations**: 101 training, 48 validation and 27 test
-samples. [Coverage and review findings](findings.md) document exclusions, corrections and limits.
+samples. [Coverage and review findings](../data/pilot-v1/evidence/findings.md) document exclusions, corrections and limits.
 
 ## Use and reconstruct the release
 
-The [complete release](../../../data/curated/pilot-v1/) is versioned through Git LFS, including
+The [complete release](../data/pilot-v1/) is versioned through Git LFS, including
 the three split files, provenance, review copy and license material. Agent-authored annotations,
-profiles and lore are committed alongside this document. Fetch the versioned payload after cloning with Git LFS installed:
+profiles and lore live in that same dataset directory. All dataset files use LFS; code, tests,
+instructions and ADRs use ordinary Git. Fetch the payload after cloning with Git LFS installed:
 
 ```sh
 git lfs install --local
@@ -26,12 +27,12 @@ git lfs pull
 
 A checkout without LFS contains pointer files. After fetching the LFS objects, no raw source
 download or reconstruction is required to read the dataset. Generated release files are collapsed
-in GitHub review; inspect the local `review.md` for full sample context and targets.
+in GitHub review; inspect the local `data/pilot-v1/evidence/review.md` for full sample context and targets.
 
 Validate the committed split manifest offline:
 
 ```sh
-python -m endless_voices.contracts data/curated/pilot-v1/manifest.json
+python -m endless_voices.contracts data/pilot-v1/samples/manifest.json
 ```
 
 To verify reconstruction, run these commands from the repository root with the development
@@ -58,7 +59,7 @@ hf download Qwen/Qwen3-4B-Instruct-2507 \
 python scripts/build_pilot.py \
   --output data/local/pilot-v1-rebuilt \
   --tokenizer data/local/tokenizers/qwen3-4b-instruct-2507 --max-length 8192 \
-  --verify-release docs/curation/pilot-v1/release.json
+  --verify-release data/pilot-v1/release.json
 ```
 
 Both preparation commands require a new output directory. Reconstruction after the source and
@@ -69,12 +70,23 @@ and target; it is a dataset preparation limit, not the model's maximum context l
 is truncated. The trainer's existing configuration is unchanged and must use an appropriate
 length limit if this dataset is selected later. No weights, generation or training are needed.
 
-The committed release contains separate `train.jsonl`, `validation.jsonl`, `test.jsonl`, and a
-versioned `manifest.json`. `coverage.json` records counts and measured token lengths.
+The `samples/` directory contains `train.jsonl`, `validation.jsonl`, `test.jsonl`, and a
+versioned `manifest.json`. The `evidence/` directory holds the review and provenance files. `coverage.json` records counts and measured token lengths.
 `provenance.json` records every extracted source span, original or agent-authored user turn,
 and punctuation normalization. `review.md` is an organizer's reading copy with targets and source
 labels; it is not a blinded judge input. `construction.json` records annotation and script hashes.
-The committed `release.json` fixes the expected artifact hashes for reconstruction.
+The root `release.json` fixes the dataset version, tokenizer specification and artifact hashes.
+The builder copies the committed annotations and authored review evidence, then regenerates the
+samples and mechanical reports. No agent runs during reconstruction.
+
+```text
+data/pilot-v1/
+  annotations/    Profiles, lore, scenes and dialogue selections
+  samples/        Split files and their manifest
+  evidence/       Provenance, reviews, findings and coverage
+  licensing/      Attribution, license and upstream notices
+  release.json    Version, tokenizer specification and frozen hashes
+```
 
 ## Annotation format
 
@@ -156,7 +168,7 @@ Construction-agent review and implementing-agent review are recorded separately 
 `reviewed` means source and construction review by agents, not human approval or a validated model
 result. The project owner reviews the PR and may inspect `review.md`; approval of the PR does not
 create a claim that the owner checked every sample. The original calibration judgments and their
-limits remain in [calibration findings](../../evaluation/calibration-findings.md).
+limits remain in [calibration findings](evaluation/calibration-findings.md).
 
 ## Release corrections and limitations
 
@@ -174,8 +186,8 @@ possible pretraining memorization remains unmeasured. The small calibration used
 alternatives; its successful origin judgments are not model-quality results. Future evaluator
 validation still needs fresh scenes, subtler alternatives and actual generated responses.
 
-The complete materialized release stays in Git LFS. Agent-authored annotations, profiles, lore,
-curation review records and reconstruction hashes stay in ordinary Git. Only raw
+The whole dataset stays in Git LFS, including agent-authored annotations, profiles, lore,
+review records and reconstruction hashes. Code and explanatory documentation use ordinary Git. Only raw
 upstream sources, tokenizer caches and temporary reconstruction outputs stay under gitignored
 `data/local/`. This source-derived dataset uses GPL-3.0-or-later. The committed bundle preserves
 the upstream license, copyright manifest, credits and selected file-header notices. Source URLs

@@ -1,7 +1,7 @@
 # Endless Voices dataset: source overview and pilot status
 
-The [first conversation dataset](../docs/curation/pilot-v1/README.md) is committed under
-`data/curated/pilot-v1/`, with versioned train, validation and test files and reconstruction annotations. Original game speech is
+The [first conversation dataset](../docs/dataset.md) is committed under
+`data/pilot-v1/`, with versioned train, validation and test files and reconstruction annotations. Original game speech is
 paired with source-backed profiles, selected lore and coherent conversation history. The release
 includes Free Worlds representatives, Republic Navy, mainstream Hai and Quarg; its own coverage report
 records actual sample and conversation counts. `example.jsonl` remains an invented pipeline fixture.
@@ -12,7 +12,7 @@ three-identity source review was a starting selection, not a limit on dataset co
 ## Curated record and benchmark contracts
 
 [Version 1 contracts](contracts.md) define one conversation format for train,
-validation, and test, with versioned split manifests and offline validation commands. The [pilot release](../docs/curation/pilot-v1/README.md) uses these contracts.
+validation, and test, with versioned split manifests and offline validation commands. The [pilot release](../docs/dataset.md) uses these contracts.
 Source inventories below remain evidence metadata, not conversation samples.
 
 ## Scope and faction counts
@@ -149,7 +149,7 @@ Hai has more varied civilian contexts, but speakers' ages, tastes, political vie
 translation conditions must be preserved. Free Worlds adds practical militia dialogue about cooperation, surveillance, and avoiding
 escalation; its initial sample does not represent all human-space factions or civilian life.
 The old per-identity quotas have been replaced by source-supported conversation annotation.
-The [pilot release documentation](../docs/curation/pilot-v1/README.md) records the current scope,
+The [pilot release documentation](../docs/dataset.md) records the current scope,
 exclusions, split rules and review evidence.
 
 ## Reproduce and interpret the statistics
@@ -192,9 +192,9 @@ The statistics are descriptive estimates, not an extraction pipeline or quality 
 
 Keep this README, inventory statistics, curation metadata, and small test fixtures in ordinary
 Git so they remain reviewable. Raw upstream files are fetched into `data/local/` and ignored;
-no raw corpus is committed. The complete curated release is versioned through Git LFS to keep
-generated output from dominating the code diff. Agent-authored annotations, profiles, lore,
-curation review records and frozen hashes remain in ordinary Git.
+no raw corpus is committed. The whole `data/pilot-v1/` dataset is versioned through Git LFS, including
+annotations, profiles, lore, samples, review evidence and frozen hashes. Dataset contents remain
+separate from code and explanatory documentation, which use ordinary Git.
 The release includes source notices, licensing material, provenance and a readable review copy.
 Run `git lfs install --local` and `git lfs pull` after cloning to obtain the release payload.
 Reconstruction checks the versioned release; it is not required to obtain the dataset.

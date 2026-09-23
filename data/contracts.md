@@ -6,7 +6,7 @@ message, one target response, and evaluator-only criteria. The first experiment 
 prompted and fine-tuned models given identical identity instructions, lore, and history.
 
 [ADR 3](../docs/adr/0003-use-one-conversation-format-across-splits.md) records the design.
-The [fixtures](../tests/fixtures/contracts/) are invented format examples. The [pilot release](../docs/curation/pilot-v1/README.md) reconstructs the first source-backed
+The [fixtures](../tests/fixtures/contracts/) are invented format examples. The [pilot release](../docs/dataset.md) reconstructs the first source-backed
 corpus and freezes its test content with versioned hashes. Source statistics and curation inventories remain separate
 formats because evidence passages are not conversation samples.
 
@@ -220,7 +220,7 @@ receives neither origin labels nor private assessment criteria. Training samples
 authored targets. This is an evaluation eligibility rule, not a schema change.
 
 The legacy calibration pack contains only draft validation samples, without invented train/test shards.
-Use `read_records(path, "validation")` for that file. The [pilot release](../docs/curation/pilot-v1/README.md) supplies all
+Use `read_records(path, "validation")` for that file. The [pilot release](../docs/dataset.md) supplies all
 three physical splits and a manifest. Reserve calibration conversations and their known variants
 from the eventual test set.
 

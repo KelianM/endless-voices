@@ -2,7 +2,7 @@
 
 Evidence IDs below resolve to exact pinned passages in [source-inventory.json](source-inventory.json).
 These are the initial bounded authoring briefs, not universal profiles or gold responses.
-The [pilot annotations](pilot-v1/README.md) contain the rendered profiles and selected lore,
+The [pilot annotations](../dataset.md) contain the rendered profiles and selected lore,
 including additional source review for the expanded identity and story coverage.
 
 ## Quarg (`quarg`)

@@ -13,7 +13,7 @@ from prepare_conversations import DEFAULT_SOURCES, ROOT, SOURCE_MANIFEST, catalo
 
 from endless_voices.contracts import slug, text, validate_manifest, validate_record
 
-ANNOTATIONS = ROOT / "docs/curation/pilot-v1"
+ANNOTATIONS = ROOT / "data/pilot-v1/annotations"
 BATCHES = ("free-worlds.json", "hai.json", "republic.json", "quarg.json")
 RESERVED = {
     "data/quarg/quarg missions.txt": 46,
@@ -266,7 +266,11 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
         raise ValueError("tokenizer and max_length must be supplied together")
     source_manifest = json.loads(SOURCE_MANIFEST.read_text())
     source_catalog = catalog(source_root, source_manifest)
-    review_file = annotations / "review.json"
+    release_root = annotations.parent
+    specification_file = release_root / "release.json"
+    specification = (json.loads(specification_file.read_text())
+                     if specification_file.exists() else {})
+    review_file = release_root / "evidence/review.json"
     reviews = json.loads(review_file.read_text()) if review_file.exists() else {}
     all_records, ledger, annotation_hashes = [], [], {}
     context_paths = set()
@@ -288,16 +292,29 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
     with tempfile.TemporaryDirectory(prefix=".pilot-", dir=output.parent) as temporary:
         staged = Path(temporary) / "release"
         staged.mkdir()
-        manifest = {"schema_version": 1, "dataset_version": annotations.name, "files": {}}
+        samples, evidence, licensing = (staged / name for name in
+                                        ("samples", "evidence", "licensing"))
+        for directory in (samples, evidence, licensing):
+            directory.mkdir()
+        shutil.copytree(annotations, staged / "annotations")
+        for name in ("review.json", "findings.md"):
+            source = release_root / "evidence" / name
+            if source.exists():
+                shutil.copyfile(source, evidence / name)
+        if specification_file.exists():
+            shutil.copyfile(specification_file, staged / "release.json")
+        manifest = {"schema_version": 1,
+                    "dataset_version": specification.get("dataset_version", release_root.name),
+                    "files": {}}
         for split in ("train", "validation", "test"):
             rows = sorted((r for r in all_records if r["metadata"]["split"] == split),
                           key=lambda r: r["metadata"]["id"])
-            path = staged / f"{split}.jsonl"
+            path = samples / f"{split}.jsonl"
             path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
                             encoding="utf-8")
             manifest["files"][split] = [{"path": path.name, "sha256": digest(path)}]
-        dump(staged / "manifest.json", manifest)
-        counts = validate_manifest(staged / "manifest.json", tokenizer=tokenizer,
+        dump(samples / "manifest.json", manifest)
+        counts = validate_manifest(samples / "manifest.json", tokenizer=tokenizer,
                                    max_length=max_length)
         for split, stats in counts.items():
             rows = [r for r in all_records if r["metadata"]["split"] == split]
@@ -311,10 +328,10 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
                     "min": min(lengths), "median": lengths[len(lengths) // 2],
                     "max": max(lengths), "limit": max_length,
                 }
-        dump(staged / "coverage.json", counts)
-        dump(staged / "overlap-candidates.json", overlap_candidates(all_records))
-        dump(staged / "provenance.json", sorted(ledger, key=lambda r: r["id"]))
-        dump(staged / "construction.json", {"source_revision": source_catalog["revision"],
+        dump(evidence / "coverage.json", counts)
+        dump(evidence / "overlap-candidates.json", overlap_candidates(all_records))
+        dump(evidence / "provenance.json", sorted(ledger, key=lambda r: r["id"]))
+        dump(evidence / "construction.json", {"source_revision": source_catalog["revision"],
                                            "annotation_sha256": annotation_hashes,
                                            "review": reviews,
                                            "preparation_sha256": {
@@ -331,7 +348,7 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
                 else:
                     break
             notices.extend([f"## {name}\n", "```text\n" + "\n".join(header) + "\n```\n"])
-        (staged / "SOURCE-NOTICES.md").write_text("\n".join(notices), encoding="utf-8")
+        (licensing / "SOURCE-NOTICES.md").write_text("\n".join(notices), encoding="utf-8")
         review_text = ["# Pilot dataset review\n",
                        "Organizer copy: includes withheld test targets and source labels.\n"]
         for row in sorted(all_records, key=lambda r: (r["metadata"]["split"],
@@ -341,14 +358,14 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
             review_text.append(f"Source: {meta['sources'][0]['reference']}\n")
             for message in row["messages"]:
                 review_text.append(f"**{message['role']}**\n\n{message['content']}\n")
-        (staged / "review.md").write_text("\n".join(review_text), encoding="utf-8")
+        (evidence / "review.md").write_text("\n".join(review_text), encoding="utf-8")
         for name in ("license.txt", "copyright", "credits.txt"):
-            shutil.copyfile(source_root / name, staged / name)
-        (staged / "ATTRIBUTION.md").write_text(
+            shutil.copyfile(source_root / name, licensing / name)
+        (licensing / "ATTRIBUTION.md").write_text(
             "# Attribution\n\nThis source-derived conversation dataset is distributed under "
             "GPL-3.0-or-later. Dialogue comes from Endless Sky at " + source_catalog["revision"]
             + ". Preserve license.txt, copyright, credits.txt, SOURCE-NOTICES.md, "
-            "and provenance.json. "
+            "and ../evidence/provenance.json. "
             "Those files retain upstream notices and contributor attribution. Profiles, lore "
             "summaries, scene context and connective prompts were written by agents for "
             "Endless Voices; the combined dataset uses GPL-3.0-or-later. Extracted dialogue "
@@ -376,12 +393,13 @@ def main():
     try:
         tokenizer = None
         if args.tokenizer:
-            specification = json.loads((args.annotations / "tokenizer.json").read_text())
+            specification = json.loads(
+                (args.annotations.parent / "release.json").read_text())["tokenizer"]
             for name, expected in specification["files"].items():
                 if digest(args.tokenizer / name) != expected:
                     raise ValueError(f"Tokenizer checksum mismatch: {name}")
             if args.max_length != specification["max_length"]:
-                raise ValueError("Use the complete-sample limit recorded in tokenizer.json")
+                raise ValueError("Use the complete-sample limit recorded in release.json")
             from transformers import AutoTokenizer
 
             tokenizer = AutoTokenizer.from_pretrained(str(args.tokenizer.resolve()),

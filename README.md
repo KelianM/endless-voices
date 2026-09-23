@@ -21,7 +21,9 @@ These are experiment directions, not demonstrated results.
 ```text
 configs/train.toml           Model, data, LoRA and training settings
 data/example.jsonl          One original, non-canonical format example
-docs/curation/             Source review, conversation annotations, lore and release hashes
+data/pilot-v1/              Complete dataset, including annotations and evidence (Git LFS)
+docs/dataset.md             Dataset workflow and reconstruction instructions
+docs/curation/              Historical source review and policy
 docs/evaluation/           Authenticity protocol and development calibration recipe
 scripts/prepare_conversations.py  Source reading sheets and possible dialogue paths
 scripts/build_pilot.py      Deterministic dataset construction from annotations
@@ -41,10 +43,10 @@ into the loader or model.
 
 ## Pilot data curation
 
-The [first conversation dataset](docs/curation/pilot-v1/README.md) covers Free Worlds representatives,
+The [first conversation dataset](docs/dataset.md) covers Free Worlds representatives,
 Republic Navy, mainstream Hai and Quarg. Reviewed annotations record speaker attribution,
 branch routes, profiles and selected lore. Deterministic preparation builds original-speech
-samples into Git LFS-versioned train, validation and test files under `data/curated/pilot-v1/`, with frozen hashes,
+samples into Git LFS-versioned train, validation and test files under `data/pilot-v1/`, with frozen hashes,
 source provenance, agent review evidence and attribution. The [dataset overview](data/README.md)
 distinguishes the available source corpus from the selected coverage. Install Git LFS, then run
 `git lfs install --local` and `git lfs pull` to fetch the committed release payload.

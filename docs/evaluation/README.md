@@ -169,7 +169,7 @@ remain development material. A background citation alone does not reserve a diff
 prior transport assignment is a shared story fact, while its dialogue is a separate conversation.
 Shared canonical facts may still inform unrelated scenes in other splits. Do not create fake
 training or test files merely to satisfy a complete-manifest check; `read_records(path,
-"validation")` validates this development-only file. The [pilot release](../curation/pilot-v1/README.md) retains these conversation reservations
+"validation")` validates this development-only file. The [pilot release](../dataset.md) retains these conversation reservations
 and adds selected lore to its newly prepared contexts. The legacy calibration remains reproducible
 with its original short contexts; the recorded judgments are not relabelled as reviews of new prompts.
 

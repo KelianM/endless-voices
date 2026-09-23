@@ -32,7 +32,7 @@ must be flagged, deferred, or excluded rather than guessed.
 The pilot excludes third-party plugins, community lore additions, images/audio, UI/deprecated
 content, unreviewed campaign outcomes, and the existing invented archivist from canonical
 training. Additional campaign stages and identities require explicit review in the
-[pilot annotations](pilot-v1/README.md); the initial four-file inventory is not the full release scope. Referenced but unreviewed factions are not new target identities. The inventory also
+[pilot annotations](../dataset.md); the initial four-file inventory is not the full release scope. Referenced but unreviewed factions are not new target identities. The inventory also
 records three deferred passages and two excluded records so later authors do not mistake all
 inspected material for usable speech.
 
@@ -53,7 +53,7 @@ contributors changed the files; preserve the upstream contributors/credits conte
 Artwork has separate terms and is not included in this pilot.
 
 The initial source review stores links, attribution metadata and summaries. The
-[pilot release](pilot-v1/README.md) commits extracted speech with the upstream license,
+[pilot release](../dataset.md) commits extracted speech with the upstream license,
 copyright, credits, selected file-header notices and per-message provenance. The combined
 source-derived dataset uses GPL-3.0-or-later. Original speech, rendered game variables,
 punctuation normalization and agent-authored context remain identifiable. No conclusion about

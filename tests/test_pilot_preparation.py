@@ -199,3 +199,53 @@ def test_explicit_accept_label_is_not_confused_with_terminal_accept():
                  '\t`"An unused answer."`\n\t\tdecline\n'
                  '\tlabel accept\n\t`"Here are the arrangements."`\n\t\taccept\n')
     assert reachable(flow_graph(nodes[0]), 3, 8)
+
+
+def test_release_layout_preserves_inputs_and_reconstructs_all_artifact_hashes(
+        example, tmp_path, monkeypatch):
+    import json
+
+    batch, source_catalog, source_root = example
+    dataset = tmp_path / "dataset"
+    annotations = dataset / "annotations"
+    annotations.mkdir(parents=True)
+    (dataset / "evidence").mkdir()
+    (dataset / "evidence/findings.md").write_text("Authored review findings.\n")
+    pilot.dump(dataset / "release.json", {"dataset_version": "fixture-v1"})
+    names = []
+    candidates = []
+    for split in ("train", "validation", "test"):
+        name = f"{split}.json"
+        names.append(name)
+        candidate = copy.deepcopy(source_catalog["conversations"][0])
+        candidate["id"] = f"{split}-conversation"
+        candidates.append(candidate)
+        selected = copy.deepcopy(batch)
+        selected["conversations"][0].update(
+            id=f"{split}-arrival", catalog_id=candidate["id"], split=split)
+        pilot.dump(annotations / name, selected)
+    for name in ("license.txt", "copyright", "credits.txt"):
+        (source_root / name).write_text("Fixture attribution.\n")
+    source_catalog["conversations"] = candidates
+    monkeypatch.setattr(pilot, "BATCHES", tuple(names))
+    monkeypatch.setattr(pilot, "catalog", lambda *_: source_catalog)
+    first, second = tmp_path / "first-build", tmp_path / "second-build"
+    pilot.build(source_root, annotations, first)
+    manifest = json.loads((first / "samples/manifest.json").read_text())
+    assert manifest["dataset_version"] == "fixture-v1"
+    assert {p.name for p in first.iterdir()} == {
+        "annotations", "samples", "evidence", "licensing", "release.json"}
+    for name in names:
+        assert (first / "annotations" / name).read_bytes() == (annotations / name).read_bytes()
+    assert (first / "evidence/findings.md").read_bytes() == (
+        dataset / "evidence/findings.md").read_bytes()
+    frozen = {"artifact_sha256": {str(p.relative_to(first)): pilot.digest(p)
+                                  for p in first.rglob("*") if p.is_file()}}
+    pilot.build(source_root, annotations, second, expected_release=frozen)
+    assert all(pilot.digest(second / name) == expected
+               for name, expected in frozen["artifact_sha256"].items())
+    frozen["artifact_sha256"]["samples/train.jsonl"] = "0" * 64
+    rejected = tmp_path / "rejected-build"
+    with pytest.raises(ValueError, match="Frozen release checksum mismatch"):
+        pilot.build(source_root, annotations, rejected, expected_release=frozen)
+    assert not rejected.exists()

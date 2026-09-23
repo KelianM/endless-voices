@@ -28,7 +28,7 @@ the annotation rules and source references. Construction agents annotate speaker
 profiles, lore and scene assumptions. The lead agent inspects those annotations against the source,
 requests or makes corrections, resolves attribution and split conflicts, and assembles the release
 for the owner's PR review. Construction review, implementing review and human approval remain
-distinct claims, as recorded in the [pilot review evidence](../curation/pilot-v1/review.json).
+distinct claims, as recorded in the [pilot review evidence](../../data/pilot-v1/evidence/review.json).
 
 Source preparation, speech extraction, sample assembly and validation run in deterministic scripts.
 Agent dispatch, follow-up instructions, correction cycles and acceptance of annotations are
@@ -46,9 +46,11 @@ Keep each actual conversation and its known repeated/branch variants in one spli
 themes, faction labels and shared lore alone do not determine split membership. Preserve source
 provenance independently from those relationships.
 
-Version the complete curated release through Git LFS, retaining its manifest and reconstruction
-hashes. Keep agent-authored annotations and curation review records in ordinary Git. Mark the
-materialized release as generated so dataset output does not dominate code review. Keep the retrievable raw upstream corpus
+Keep the whole dataset under `data/pilot-v1/` and version every dataset file through Git LFS.
+Annotations, samples, evidence and licensing have separate subdirectories within that one root;
+`release.json` carries the version, tokenizer specification and reconstruction hashes. Keep code,
+tests and explanatory documentation in ordinary Git. Mark generated outputs so dataset material
+does not dominate code review. Keep the retrievable raw upstream corpus
 outside Git. Agent work must remain available without rerunning generation or reconstruction.
 Content corrections produce new dataset versions. Annotation and source review is explicit agent
 review; human approval is recorded only when actually supplied.
@@ -78,5 +80,6 @@ review; human approval is recorded only when actually supplied.
   compact pointers while LFS stores the payload; a checkout without LFS contains only pointers
   until the objects are fetched. This adds an LFS installation and storage dependency. The pilot
   is small in bytes, but its generated text dominates the PR diff; review visibility motivates
-  LFS here. Reviewers inspect materialized samples locally and review annotations in Git.
+  LFS here. Reviewers fetch the LFS objects to inspect annotations and samples locally; ordinary PR diffs
+  show dataset pointers rather than the editorial changes inside them.
   Reconstruction hashes still detect payload drift; storage format does not establish quality.
