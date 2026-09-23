@@ -1,4 +1,4 @@
-# 1. Save LoRA adapters separately from base models
+# 1. Training saves LoRA adapters separately from base models
 
 - **Status:** Accepted
 - **Date:** 2026-09-23
@@ -6,26 +6,28 @@
 
 ## Context
 
-The initial project compares a starting language model with an adapted model for fictional
-identity conversations. The training foundation predates the issue roadmap. This record
-captures the implementation introduced on 2026-09-22; the repository contains no notebooks
-for that decision.
+The training and chat commands use the same configured base checkpoint. Adapted behaviour
+needs a saved artifact that the chat command can load. The implementation predates issue
+tracking and was committed on 2026-09-22. This record documents that existing code.
 
 ## Decision
 
-`src/endless_voices/train.py` uses PEFT LoRA with a causal language model. Each run saves
-adapter weights, a tokenizer, and `run_config.json` in an independent output directory.
-`src/endless_voices/chat.py` loads the configured base model and optionally applies an adapter.
-Identity labels are supplied through data and prompts, without faction-specific model code.
+[train.py](../../src/endless_voices/train.py) wraps the base model with PEFT's `get_peft_model`
+and a `LoraConfig`. After training, `model.save_pretrained(output)` saves the adapter. The
+output directory also contains the tokenizer and `run_config.json`, but not the base weights.
+
+[chat.py](../../src/endless_voices/chat.py) loads the configured base checkpoint and applies
+`PeftModel.from_pretrained` when an adapter is supplied. The
+[CPU smoke test](../../tests/test_pipeline.py) trains a tiny random model, checks the saved
+adapter, reloads the adapter, and exercises generation.
 
 ## Consequences
 
-A saved adapter requires the matching base checkpoint; the output directory is not a standalone
-model. Users must preserve the base revision and tokenizer alongside experiment records.
-LoRA limits trainable parameters but the current float32 implementation still loads the full
-base weights. The implementation uses adapters instead of updating and saving all base weights;
-no comparison establishing LoRA's quality advantage has been performed.
+An adapter directory cannot be used as a standalone base model. Loading an adapter requires
+the matching base checkpoint and tokenizer. Each training run rejects a nonempty output
+directory, preserving existing artifacts.
 
-One adapter per identity and a shared adapter remain possible. The decision does not select a
-model, dataset size, quantization method, or response-only loss. The current trainer computes
-loss on every non-padding token; changing that objective requires a separate implementation.
+The implementation trains and saves adapter parameters instead of updating and saving all
+base weights. Adapter training reduces the number of trainable parameters, but the current
+float32 implementation still loads the full base model into memory. The smoke test verifies
+the mechanism; the repository contains no trained faction model or measured quality result.

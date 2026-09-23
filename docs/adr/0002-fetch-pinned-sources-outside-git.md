@@ -1,4 +1,4 @@
-# 2. Fetch pinned sources outside Git
+# 2. Raw sources are fetched at a pinned revision outside Git
 
 - **Status:** Accepted
 - **Date:** 2026-09-23
@@ -12,8 +12,8 @@ only initial identity samples. This record captures the source-storage decision 
 
 ## Decision
 
-`scripts/fetch_sources.py` reads the upstream revision and file hashes from
-`data/overview/source-statistics.json`. The default checkout is under gitignored `data/local/`.
+[fetch_sources.py](../../scripts/fetch_sources.py) reads the upstream revision and file hashes from
+[source-statistics.json](../../data/overview/source-statistics.json). The default checkout is under gitignored `data/local/`.
 The script verifies the pinned revision and all inventoried text hashes, retains upstream
 attribution files, and reuses verified checkouts offline.
 
@@ -30,3 +30,6 @@ therefore depends on upstream access or a previously verified local checkout.
 
 The inventory and identity briefs remain evidence metadata, not training examples. Fetching
 sources does not establish permission to release derived datasets or model weights.
+
+[Fetch tests](../../tests/test_fetch_sources.py) cover offline reuse and rejection of changed,
+missing, extra, or wrong-revision sources.
