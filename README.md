@@ -21,8 +21,10 @@ These are experiment directions, not demonstrated results.
 ```text
 configs/train.toml           Model, data, LoRA and training settings
 data/example.jsonl          One original, non-canonical format example
-docs/curation/             Reviewed pilot sources, identity briefs, and scope
+docs/curation/             Source review, conversation annotations, lore and release hashes
 docs/evaluation/           Authenticity protocol and development calibration recipe
+scripts/prepare_conversations.py  Source reading sheets and possible dialogue paths
+scripts/build_pilot.py      Deterministic dataset construction from annotations
 src/endless_voices/
   common.py                Config and tokenizer loading
   data.py                  Validation, tokenization and padding
@@ -39,12 +41,12 @@ into the loader or model.
 
 ## Pilot data curation
 
-The [initial source review](docs/curation/README.md) selects early Free Worlds militia, Quarg, and non-Unfettered Hai.
-The [dataset overview](data/README.md) inventories all upstream content groups and text categories,
-with qualitative examples and dataset storage guidance. The curation package includes
-a pinned source inventory, role-specific identity briefs, coverage gaps, and attribution
-policy. It is evidence for the next dataset-authoring steps; canonical training examples and
-a held-out benchmark have not yet been added.
+The [first conversation dataset](docs/curation/pilot-v1/README.md) covers Free Worlds representatives,
+Republic Navy, mainstream Hai and Quarg. Reviewed annotations record speaker attribution,
+branch routes, profiles and selected lore. Deterministic preparation builds original-speech
+samples into separate train, validation and test files under `data/local/`, with frozen hashes,
+source provenance, agent review evidence and attribution. The [dataset overview](data/README.md)
+distinguishes the available source corpus from the selected coverage.
 
 ## Setup
 
@@ -157,7 +159,7 @@ The first comparison uses the same identity instructions, selected lore, and aut
 for the base model and adapted model. Evaluation withholds the final assistant response and
 generates one answer. Entire conversations and known scenario variants stay in one split.
 The [authenticity protocol](docs/evaluation/README.md) compares generated replies against original
-game continuations in blinded pairs. Its small development calibration pack has an
+game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
 result is claimed. Generation and reporting
 commands remain future work. Fixed-history evaluation does not establish persistence through a

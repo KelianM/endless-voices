@@ -1,16 +1,19 @@
 # Endless Voices dataset: source overview and pilot status
 
-**Status: source inventory and initial curation, not a released training dataset.**
-The complete upstream scan below describes what is available to curate. The smaller reviewed
-pilot describes what we have actually read for authoring. Neither measures final usable
-training examples. No canonical training or held-out benchmark records have been produced yet;
-`example.jsonl` remains one invented pipeline fixture.
+The [first conversation dataset](../docs/curation/pilot-v1/README.md) is reconstructed from
+reviewed annotations into versioned train, validation and test files. Original game speech is
+paired with source-backed profiles, selected lore and coherent conversation history. The release
+includes Free Worlds representatives, Republic Navy, mainstream Hai and Quarg; its own coverage report
+records actual sample and conversation counts. `example.jsonl` remains an invented pipeline fixture.
+
+The whole-source statistics below describe availability, not usable sample yield. The historical
+three-identity source review was a starting selection, not a limit on dataset coverage.
 
 ## Curated record and benchmark contracts
 
 [Version 1 contracts](contracts.md) define one conversation format for train,
-validation, and test, with versioned split manifests and offline validation commands. Only invented test fixtures
-exist so far; source inventories below are evidence metadata, not records in those contracts.
+validation, and test, with versioned split manifests and offline validation commands. The [pilot release](../docs/curation/pilot-v1/README.md) uses these contracts.
+Source inventories below remain evidence metadata, not conversation samples.
 
 ## Scope and faction counts
 
@@ -27,7 +30,7 @@ There is no single authoritative “number of factions” field in these sources
 - **128 distinct government identifiers**, also 128 root government declarations in this
   snapshot. These include political groups, location/hostility variants, and technical entities
   such as `Test Dummy`, `Uninhabited`, and `Escort`. They are not 128 independently trainable voices.
-- **Three selected pilot identities:** early Free Worlds militia, Quarg, and non-Unfettered Hai. They are curation choices,
+- **Three identities in the initial source review:** early Free Worlds militia, Quarg, and non-Unfettered Hai. They are curation choices,
   not the full set available in the game.
 
 Directory groups are the reproducible breakdown below, **not a completed faction taxonomy or
@@ -120,7 +123,7 @@ They illustrate why both volume and reading the source matter.
 
 | Source example | Learning signal | Preparation concern |
 | --- | --- | --- |
-| [Free Worlds reconnaissance](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L329-L425) | Practical cooperation, defensive framing, and concern about provoking the Navy | A Republic captain speaks inside the same mission; preserve faction attribution, early-campaign timing, and shared-chain split boundaries |
+| [Free Worlds reconnaissance](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/human/free%20worlds%200%20prologue.txt#L329-L425) | Practical cooperation, defensive framing, and concern about provoking the Navy | A Republic captain speaks inside the same mission; preserve faction attribution, early-campaign timing, and actual-conversation split boundaries |
 | [Quarg first contact](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L22-L70) | Patient explanation, collective identity, peaceful coexistence backed by strength | Narration and player questions interrupt speech; Quarg claims about the Drak must remain attributed |
 | [Quarg at Kuwaru Efreti](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/quarg/quarg%20missions.txt#L74-L118) | More archaic register; protection of Efreti and withholding dangerous knowledge | Branches repeat answers; one speaker's register is not mandatory for every Quarg |
 | [Hai first contact](https://github.com/endless-sky/endless-sky/blob/7140eb2a29ce4d2797933075c751791a892c7d4f/data/hai/hai%20missions.txt#L14-L96) | Hospitality and curiosity about humans; a young Hai defers history to elders | Human merchant exposition is interleaved with Hai speech; characters have different knowledge |
@@ -145,10 +148,9 @@ Quarg has strong first-contact/knowledge-restraint evidence but narrow everyday 
 Hai has more varied civilian contexts, but speakers' ages, tastes, political views, and
 translation conditions must be preserved. Free Worlds adds practical militia dialogue about cooperation, surveillance, and avoiding
 escalation; its initial sample does not represent all human-space factions or civilian life.
-Initial authoring targets are **72 training,
-18 development, and 36 held-out benchmark records** across the three identities. These are
-future targets, not current dataset sizes or a measured usable yield; reduce them if evidence
-cannot support sufficient diversity. Reserve scenario families before authoring variants.
+The old per-identity quotas have been replaced by source-supported conversation annotation.
+The [pilot release documentation](../docs/curation/pilot-v1/README.md) records the current scope,
+exclusions, split rules and review evidence.
 
 ## Reproduce and interpret the statistics
 
@@ -190,9 +192,9 @@ The statistics are descriptive estimates, not an extraction pipeline or quality 
 
 Keep this README, inventory statistics, curation metadata, and small test fixtures in ordinary
 Git so they remain reviewable. Raw upstream files are fetched into `data/local/` and ignored;
-no raw payload is committed and Git LFS is not configured or required. Storage and packaging
-of the post-processed dataset will be handled in later dataset issues, together with source
-manifests, split checksums, attribution, and updated counts.
+no raw payload is committed and Git LFS is not configured or required. The curated payload is also materialized locally, while its annotations and frozen artifact
+hashes remain in ordinary Git. Reconstruction bundles source notices, licensing material,
+provenance and a readable review copy; see the pilot release instructions.
 
 The selected text files carry GPL-3.0-or-later notices. Preserve their provenance and assess
 redistribution terms when publishing source-derived examples; do not assume “open source” means

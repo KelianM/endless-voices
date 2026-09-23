@@ -6,8 +6,8 @@ message, one target response, and evaluator-only criteria. The first experiment 
 prompted and fine-tuned models given identical identity instructions, lore, and history.
 
 [ADR 3](../docs/adr/0003-use-one-conversation-format-across-splits.md) records the design.
-The [fixtures](../tests/fixtures/contracts/) are invented format examples. No canonical training
-corpus or frozen test set exists yet. Source statistics and curation inventories remain separate
+The [fixtures](../tests/fixtures/contracts/) are invented format examples. The [pilot release](../docs/curation/pilot-v1/README.md) reconstructs the first source-backed
+corpus and freezes its test content with versioned hashes. Source statistics and curation inventories remain separate
 formats because evidence passages are not conversation samples.
 
 ## Record format
@@ -45,7 +45,7 @@ Store one complete JSON object per line in UTF-8 JSONL. The example below is exp
     "review_status": "draft"
   },
   "evaluation": {
-    "dimensions": ["knowledge_fidelity", "persona_fidelity", "conversational_quality"],
+    "dimensions": ["authenticity"],
     "expected_facts": [],
     "expected_behaviours": ["Acknowledge the clerk's knowledge limit."],
     "expected_style": ["Use plain language."],
@@ -169,12 +169,13 @@ Schema versions identify the format; dataset versions identify the content snaps
 
 Complete conversations stay in one split. Samples at different points in a conversation share
 `conversation_id`. Explicit paraphrases, branch alternatives, or shared-template variants also
-share `scenario_group`. A connected mission-chain reconstruction belongs in the same scenario
-group. Record known relationships; do not invent similarity classes for unrelated examples.
+share `scenario_group`. Repeated versions of one actual encounter belong together, but a shared mission chain or
+theme alone does not require a shared scenario group. Record known relationships; do not invent similarity classes for unrelated examples.
 
 `source_group` records shared source/mission-chain provenance independently. The same canonical
 fact can support different situations across splits, so source-group equality alone is not an
-error. Semantic near-duplicate discovery and corpus-level leakage review remain later work.
+error. The pilot preparation adds exact dialogue overlap checks and recorded source-route review.
+Those checks do not establish exhaustive semantic deduplication.
 
 ## Offline validation
 
@@ -218,14 +219,14 @@ that context plus the original and generated continuations as unlabelled alterna
 receives neither origin labels nor private assessment criteria. Training samples can still have
 authored targets. This is an evaluation eligibility rule, not a schema change.
 
-The calibration pack contains only draft validation samples, without invented train/test shards.
-Use `read_records(path, "validation")` for that file. A full dataset release still requires all
+The legacy calibration pack contains only draft validation samples, without invented train/test shards.
+Use `read_records(path, "validation")` for that file. The [pilot release](../docs/curation/pilot-v1/README.md) supplies all
 three physical splits and a manifest. Reserve calibration conversations and their known variants
 from the eventual test set.
 
 - Evaluation design (#6) supplies the protocol and calibration material; the initial human review, including controls, is recorded.
 - Dataset construction (#5) now includes source preparation and test freezing, replacing #4 and #7.
-  Initial coverage and authoring methods still need decisions before implementation.
+  The pilot records selected identities, source annotations, lore, review and reconstruction hashes.
 - Response generation (#8) uses existing models and adapters; it does not fine-tune.
 - Assessment and reporting (#9) implement the calibrated method.
 - The first training experiment (#12) selects the training objective and uses validation data for

@@ -162,11 +162,16 @@ scenes chosen before the final run. This pilot makes no such claim and sets no a
 ## Split reservations and remaining work
 
 All three examples are development material (`split: validation`). Reserve their conversations
-and known source-derived variants from the final test set, including the whole Free Worlds
-reconnaissance chain. Context passages and wrong-context donors are included in this reservation.
+and known source-derived variants from the final test set, including the actual Free Worlds
+scan-request conversation and its branch variants. Separate encounters in that chain are no
+longer reserved solely because they share the chain. Quoted control donors and known alternatives
+remain development material. A background citation alone does not reserve a different encounter: the
+prior transport assignment is a shared story fact, while its dialogue is a separate conversation.
 Shared canonical facts may still inform unrelated scenes in other splits. Do not create fake
 training or test files merely to satisfy a complete-manifest check; `read_records(path,
-"validation")` validates this development-only file. #5 will include it in a complete release.
+"validation")` validates this development-only file. The [pilot release](../curation/pilot-v1/README.md) retains these conversation reservations
+and adds selected lore to its newly prepared contexts. The legacy calibration remains reproducible
+with its original short contexts; the recorded judgments are not relabelled as reviews of new prompts.
 
 - #5 supplies independent scenes, attributable original continuations, coverage, and final split
   review. Agent-written targets can serve training or development, but cannot be labelled original
