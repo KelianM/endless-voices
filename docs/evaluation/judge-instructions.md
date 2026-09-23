@@ -10,12 +10,11 @@ Record one judgment per trial:
 
 - `choice`: `A`, `B`, or `abstain` when you cannot distinguish them, including identical text.
 - `confidence`: `low`, `medium`, or `high` in an A/B choice; `null` for abstention.
-- `reason`: a short explanation referring to observable wording or contextual fit.
+- `reason`: a short explanation of why the response felt like the original game continuation, or why the alternative
+  felt inauthentic. Use your own words; no categories or tags are required.
 - `recognized_source`: `true` if you remember either passage or have previously seen its key,
   otherwise `false`. Recognition is a separate limitation, not proof of authenticity quality.
-- `diagnostics`: optional explanations tagged `knowledge`, `persona`, `conversation`, or
-  `presentation`. Use objects with `dimension`, `candidate` (`A` or `B`), and `note`.
-  These are explanations, not numerical quality scores.
+
 
 Use `reviewer_type` of `human` or `llm` and identify the reviewer. For an LLM, record its exact
 model/version and the complete judge prompt/settings separately in `judge_model_and_prompt`.

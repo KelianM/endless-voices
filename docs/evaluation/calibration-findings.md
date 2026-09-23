@@ -28,8 +28,9 @@ reviewer to distinguish. Their failure to preserve vocabulary, cadence, and dram
 is useful calibration evidence. It is not a measurement of any independently run model:
 the implementing agent wrote the alternatives while reading the original passages.
 
-No primary instruction change follows from this review. Keep authenticity as the primary
-question and record voice-related observations as diagnostics. Do not convert the cited phrases
+Keep authenticity as the primary question and preserve reviewers' reasons in free text.
+After completing the sheets, the reviewer found the diagnostic tags unnecessary. The instructions
+and blank templates now omit those tags; the submitted reasons already explain the judgments. Do not convert the cited phrases
 into mandatory catchphrases, add them to these examples' visible profiles, or require more
 ornate writing everywhere. Those changes would reward imitation of these particular answers
 rather than the appropriate voice of another scene or individual.
@@ -58,6 +59,9 @@ No numerical confidence value was supplied for the controls; none has been inven
 The initial human calibration round is complete. The authenticity question produced relevant
 voice-based explanations, and the controls behaved as intended. Keep the primary protocol.
 The control review does not justify additional routine human labeling of equally obvious cases.
+Recorded review-sheet hashes identify the sheets actually seen, before diagnostic tags were
+removed. The seven submitted judgments and reasons are unchanged; only empty diagnostic fields
+were removed from the stored records.
 
 For future evaluator validation, use fresh source scenes for human controls and isolate automated
 judge calls from previous trials and keys. Include subtler alternatives that preserve surface

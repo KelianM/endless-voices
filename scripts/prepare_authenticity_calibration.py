@@ -199,7 +199,6 @@ def prepare(source_root, output, form):
                     "confidence": None,
                     "reason": None,
                     "recognized_source": None,
-                    "diagnostics": [],
                 }
                 for row in rows
             ],

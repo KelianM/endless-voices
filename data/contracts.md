@@ -215,7 +215,7 @@ The [authenticity protocol](../docs/evaluation/README.md) uses the same sample f
 authenticity trial, the final target must be attributable original game speech, not an agent-written
 reference presented as original. The generator receives `messages[:-1]`; the blinded judge sees
 that context plus the original and generated continuations as unlabelled alternatives. The judge
-receives neither origin labels nor private diagnostic criteria. Training samples can still have
+receives neither origin labels nor private assessment criteria. Training samples can still have
 authored targets. This is an evaluation eligibility rule, not a schema change.
 
 The calibration pack contains only draft validation samples, without invented train/test shards.

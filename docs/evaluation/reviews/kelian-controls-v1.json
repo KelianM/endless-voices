@@ -10,32 +10,28 @@
       "choice": "B",
       "confidence": null,
       "reason": "Obviously B; A isn't even human it's quarg. Also these answers are also in the previous callibration, not sure if that's intentional.",
-      "recognized_source": true,
-      "diagnostics": []
+      "recognized_source": true
     },
     {
       "trial_id": "a-03",
       "choice": "A",
       "confidence": null,
       "reason": "Obviously A, pretty much same as above, not even remotely related",
-      "recognized_source": null,
-      "diagnostics": []
+      "recognized_source": null
     },
     {
       "trial_id": "a-04",
       "choice": "B",
       "confidence": null,
       "reason": "B, same",
-      "recognized_source": null,
-      "diagnostics": []
+      "recognized_source": null
     },
     {
       "trial_id": "a-07",
       "choice": "abstain",
       "confidence": null,
       "reason": "abstain, identical responses",
-      "recognized_source": null,
-      "diagnostics": []
+      "recognized_source": null
     }
   ],
   "review_sheet_sha256": "23c1f4769ed4f24b5a3475212ddf11ac1b4f8066a3cc71cc2d513b9050a671ce",

@@ -10,26 +10,23 @@
       "choice": "A",
       "confidence": "high",
       "reason": "reasoning is mostly in the vocabulary choice. e.g. our 'Unfettered' brethren vs our northern neighbors; one is clearly not using the game's language. There's also a vaguer element of mystery to A that fits the feel of the game more, where B feels flatter, e.g. 'That began long before I was born.'. I don't remember the exact encounter itself though.",
-      "recognized_source": false,
-      "diagnostics": []
+      "recognized_source": false
     },
     {
       "trial_id": "a-05",
       "choice": "A",
       "confidence": "high",
       "reason": "Again I could get it almost instantly by the vocab/mannerisms, 'We the Quarg ' vs 'We came from a small moon'. It's super easy to distinguish the human vs alien feel. The strange mannerisms, attention to detail, it just feels super obvious to me.",
-      "recognized_source": null,
-      "diagnostics": []
+      "recognized_source": null
     },
     {
       "trial_id": "a-06",
       "choice": "B",
       "confidence": "high",
       "reason": "The human example is a little less obvious than the others, but still, the writing is more creative. The very first intro gives it away \"I'm sure you understand the... tensions between the Free Worlds\" vs \"Because a militia ship taking a close interest \". It just feels far more in character. I guess it's more stylised vs the bland straight text of the other.",
-      "recognized_source": null,
-      "diagnostics": []
+      "recognized_source": null
     }
   ],
   "review_sheet_sha256": "45f833400d2ba50d468eca7c821d91cbe1a29d5c1f448e3e76fecf27ca716af5",
-  "recording_note": "Choices, confidence, and reasons transcribed from the project owner's task message. Source recognition was explicitly denied for a-01 and not reported for a-05 or a-06. Diagnostics are left empty rather than assigning tags on the reviewer's behalf."
+  "recording_note": "Choices, confidence, and reasons transcribed from the project owner's task message. Source recognition was explicitly denied for a-01 and not reported for a-05 or a-06."
 }

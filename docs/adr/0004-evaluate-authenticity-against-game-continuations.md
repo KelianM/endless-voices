@@ -22,8 +22,8 @@ question: given the same speaker and scene, can a blinded judge identify the ori
 continuation among an original and a generated reply? The base and adapted model are each
 compared against the same source continuation, with the same supplied context.
 
-Knowledge, persona, and conversation quality remain diagnostic explanations rather than a
-weighted definition of success. Original-identification accuracy is reported with abstentions,
+Judges give an authenticity choice and a free-text reason. No diagnostic categories or separate
+persona scores are requested; the initial review found the reasons sufficient to explain choices. Original-identification accuracy is reported with abstentions,
 failures, recognition, and control results; chance performance alone does not establish quality.
 
 The [development calibration pack](../evaluation/calibration.json) uses source continuations,

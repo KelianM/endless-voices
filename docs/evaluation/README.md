@@ -2,9 +2,8 @@
 
 The first benchmark asks whether a generated reply could pass for a continuation written
 for Endless Sky. The primary comparison presents the original continuation and one generated
-alternative under identical speaker and scene context. The judge identifies the original;
-knowledge, persona, and conversational quality explain judgments rather than form a combined
-quality score. [ADR 4](../adr/0004-evaluate-authenticity-against-game-continuations.md) records
+alternative under identical speaker and scene context. The judge identifies the original and explains the choice in free text. No diagnostic tags
+or separate persona scores are requested. [ADR 4](../adr/0004-evaluate-authenticity-against-game-continuations.md) records
 this choice.
 
 This issue supplies a protocol and a small development calibration pack. No discriminator is
@@ -27,8 +26,8 @@ base and adapted responses are not the two alternatives in the authenticity tria
 The generator must never receive the withheld target. The authenticity judge necessarily sees
 that target as one unlabelled alternative; withholding its identity is different from hiding
 its text. The judge receives no third reference answer or hints about preferred phrasing.
-Use a separate diagnostic pass if source-backed expectations are needed to explain a failure;
-never feed those expectations back into the primary authenticity judgment.
+Reviewers explain their choices in their own words. No second assessment pass is required.
+Private expectations remain outside the authenticity judgment.
 
 The shared sample contract remains unchanged. `messages[-1]` holds the extracted game speech,
 and `evaluation_messages(sample)` supplies the generator's context. Authored histories stay
@@ -41,7 +40,7 @@ conversation, universal lore accuracy, or the absence of memorized public text.
 | --- | --- | --- |
 | [Li et al., 2017](https://aclanthology.org/D17-1230/), sections 4.1–4.3 | Real/generated discrimination as an evaluation question; controls for evaluator weakness and incoherent responses | Fooling one evaluator proves dialogue quality, or adversarial training is required |
 | [Bruni and Fernández, 2017](https://aclanthology.org/W17-5534/) | Compare automated discrimination with human judgments | Origin labels remove the need to check evaluator validity |
-| [CharacterEval](https://aclanthology.org/2024.acl-long.638/), section 5 | Knowledge, persona, and conversation distinctions for diagnostic explanations | Its complete rubric, numerical scales, human-likeness, or empathy are our objective |
+| [CharacterEval](https://aclanthology.org/2024.acl-long.638/), section 5 | Background on persona evaluation considered when choosing the method | Its dimensions, numerical scales, human-likeness, or empathy are required judge fields |
 | [RAIDEN](https://aclanthology.org/2025.coling-main.735/), section 4 | Fixed-context, blinded response pairs and reasons for judgments | Preference between responses is identical to identifying their origin |
 | [InCharacter](https://aclanthology.org/2024.acl-long.102/), section 3 | Behavioral probes can expose more than superficial style | Human personality inventories define an alien species or political faction |
 | [RoleLLM](https://aclanthology.org/2024.findings-acl.878/), section 4 | Role knowledge and speaking style are distinct aspects of evaluation | Reference word overlap is a sufficient authenticity metric |
@@ -141,7 +140,7 @@ Report original-identification accuracy among decided primary trials, together w
 correct, incorrect, abstained, and failed trials and their denominators. Report abstention and
 failure rates over all scheduled primary trials. Never silently remove abstentions or failures.
 Show recognized-source cases separately alongside the full results, rather than deleting them
-post hoc. Report controls separately. Do not turn diagnostics into a weighted persona score.
+post hoc. Report controls separately. Preserve free-text reasons without imposing a category scheme or weighted persona score.
 
 With balanced A/B positions and no abstentions, random choice identifies the original 50% of
 the time. With selective abstention, accuracy is conditional on the decided cases and cannot
@@ -150,7 +149,7 @@ pack cannot establish a model ranking. An evaluator far below chance may have re
 or a systematic preference for generated prose; lower accuracy is not an unbounded quality reward.
 
 For the eventual model comparison, show detection rates for each condition and their paired
-change on the same scenes, alongside abstention, failures, recognition, and diagnostic findings.
+change on the same scenes, alongside abstention, failures, recognition, and the reviewers' reasons.
 Cluster uncertainty estimates by conversation/scenario family; repeated turns, reviewer votes,
 and reversed positions are not independent examples. Report counts by representative so a
 large faction does not silently dominate. The exact reporting implementation belongs to #9.
