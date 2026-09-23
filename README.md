@@ -165,6 +165,40 @@ reports remain future work. Fixed-history evaluation does not establish persiste
 model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
+## Browse conversation samples
+
+Build a standalone reader for the 101 training samples:
+
+```bash
+python scripts/view_samples.py --output outputs/training-samples.html
+open outputs/training-samples.html
+```
+
+The HTML file works offline in a browser without a server or model download. Filter by identity,
+search sample IDs, roles or topics, and use Previous/Next or the left/right arrow keys outside
+form controls. Each sample shows authored history and the final target, with expandable model
+instructions, lore, source metadata and assessment-only notes.
+
+Use `--split validation` for validation samples. Held-out content is excluded from the default
+export; `--split test` or `--split all` explicitly includes it. The complete manifest is still
+validated across splits. Review of held-out content must not drive development or tuning.
+
+Add a saved generation run to compare available model replies with their targets:
+
+```bash
+python scripts/view_samples.py --split validation \
+  --run outputs/qwen3-4b-validation-c7ab423 \
+  --output outputs/validation-responses.html
+open outputs/validation-responses.html
+```
+
+Replace the run path with any compatible run directory. Missing responses, failures and samples
+not selected for the run remain distinct. The reader checks the dataset manifest and response
+hash when recorded. Choose a new output filename for each export; existing files are protected.
+The reader displays saved data and does not generate, score, edit or approve samples. It embeds
+the selected source text and private assessment notes, so it is an organizer's reading copy,
+not a blinded judge input. Keep the [dataset attribution and licensing](NOTICE.md) with shared copies.
+
 ## Generate comparable responses
 
 Generate one final reply per selected validation sample, retaining authored history:
