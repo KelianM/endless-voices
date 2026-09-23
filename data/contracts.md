@@ -209,22 +209,26 @@ at least two tokens. Failures report file/line without truncation. The future ge
 must separately budget the prompt and generated output; an authored target's length does not
 bound the model's generated response.
 
-## Decisions for later issues
+## Evaluation and remaining work
 
-Issue #3 supplies structure and input isolation. The next issues must use this format rather
-than the separate benchmark records described in the earlier roadmap.
+The [authenticity protocol](../docs/evaluation/README.md) uses the same sample format. For an
+authenticity trial, the final target must be attributable original game speech, not an agent-written
+reference presented as original. The generator receives `messages[:-1]`; the blinded judge sees
+that context plus the original and generated continuations as unlabelled alternatives. The judge
+receives neither origin labels nor private diagnostic criteria. Training samples can still have
+authored targets. This is an evaluation eligibility rule, not a schema change.
 
-- Source preparation (#4) and authoring (#5) must preserve representative knowledge boundaries,
-  selected lore provenance, and known conversation relationships. Extraction and authoring
-  methods still need decisions before implementation.
-- Evaluation design (#6) should select and adapt published methods, including
-  [CharacterEval](https://aclanthology.org/2024.acl-long.638/),
-  [InCharacter](https://aclanthology.org/2024.acl-long.102/), and
-  [RAIDEN](https://aclanthology.org/2025.coling-main.735/). Dimensions, score scales, pairwise
-  judgments, and evaluator calibration remain decisions for that issue. Human-likeness and
-  empathy are not automatically appropriate measures for alien or hostile representatives.
-- Test-set freezing (#7), response generation (#8), and scoring reports (#9) must use fixed
-  authored histories and withhold the final target. The base and adapted conditions receive
-  identical context. The runner and scoring protocol are not implemented here.
+The calibration pack contains only draft validation samples, without invented train/test shards.
+Use `read_records(path, "validation")` for that file. A full dataset release still requires all
+three physical splits and a manifest. Reserve calibration conversations and their known variants
+from the eventual test set.
+
+- Evaluation design (#6) supplies the protocol and calibration material; human calibration is pending.
+- Dataset construction (#5) now includes source preparation and test freezing, replacing #4 and #7.
+  Initial coverage and authoring methods still need decisions before implementation.
+- Response generation (#8) uses existing models and adapters; it does not fine-tune.
+- Assessment and reporting (#9) implement the calibrated method.
+- The first training experiment (#12) selects the training objective and uses validation data for
+  development before the final held-out comparison. Adversarial training is not selected.
 
 Each issue gets its own implementation and review before work proceeds to the next issue.

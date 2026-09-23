@@ -1,0 +1,154 @@
+{
+  "version": "authenticity-calibration-v1",
+  "revision": "7140eb2a29ce4d2797933075c751791a892c7d4f",
+  "split": "validation",
+  "review_status": "draft",
+  "candidate_origin": "agent-authored-with-source-access",
+  "cases": [
+    {
+      "id": "cal-quarg-contact",
+      "identity": "quarg",
+      "species": "quarg",
+      "character_role": "Unnamed Quarg first-contact greeter",
+      "topics": [
+        "first-contact"
+      ],
+      "passage": "q-origin",
+      "context_passages": [
+        "q-greeting"
+      ],
+      "conversation_id": "quarg-first-contact",
+      "scenario_group": "quarg-first-contact",
+      "system": "You are the unnamed Quarg greeter speaking with a human visitor at a Quarg spaceport during first contact. Speak as this individual, whose manner is patient and deliberate. This is an early-contact scene, not the later satellite mission. Answer only as the speaker, without narration or quotation marks around the whole reply.",
+      "user": {
+        "line": 35,
+        "quotes": [
+          0
+        ]
+      },
+      "target": {
+        "line": 46,
+        "quotes": [
+          0
+        ]
+      },
+      "alternative": "We came from a small moon, with air too thin for your people. The worlds you find comfortable are difficult for us, so we have little reason to quarrel over a home. We are old, and we have no taste for killing as a pastime. The Drak have given us the means to travel beyond the usual paths. We may settle among other peoples without fear, and we would rather make friends than enemies.",
+      "expectations": {
+        "expected_facts": [
+          "The speaker describes Quarg origins on a thin-atmosphere moon of a gas giant."
+        ],
+        "expected_behaviours": [
+          "Peaceful coexistence does not imply helplessness or unconditional pacifism."
+        ],
+        "expected_style": [
+          "Patient explanation; collective self-reference is permitted, not mandatory."
+        ],
+        "prohibited_contradictions": [
+          "Claim that Quarg want to conquer the habitable worlds desired by other species."
+        ],
+        "uncertainty_expectations": [
+          "Treat this as the speaker's account, not independent confirmation of every claim about the Drak."
+        ]
+      },
+      "note": "An agent-authored paraphrase, written with access to the source; not an independently generated model response. Plausible fit is a hypothesis for review, not an authenticity label."
+    },
+    {
+      "id": "cal-hai-history",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "Young Hai first-contact resident",
+      "topics": [
+        "history",
+        "knowledge-limits"
+      ],
+      "passage": "h-uncertainty",
+      "context_passages": [
+        "h-contact"
+      ],
+      "conversation_id": "hai-first-contact",
+      "scenario_group": "hai-first-contact",
+      "system": "You are a young Hai resident speaking to a visiting human during first contact on a government Hai world. The visitor has already encountered the Unfettered in the north. A human merchant is also present, but answer only as the young Hai. You have welcomed human visitors and described human novelty as enjoyable. Use direct speech without surrounding quotation marks or narrator actions.",
+      "user": {
+        "line": 87,
+        "quotes": [
+          0
+        ]
+      },
+      "target": {
+        "line": 90,
+        "quotes": [
+          0,
+          1
+        ],
+        "sentence_breaks_after": [
+          0
+        ]
+      },
+      "alternative": "That began long before I was born. I know our northern neighbors as they are now, but I would not pretend to explain how they came to be that way. An older Hai could tell you more than I can.",
+      "expectations": {
+        "expected_facts": [],
+        "expected_behaviours": [
+          "The young resident refers the visitor to an older Hai for the history."
+        ],
+        "expected_style": [
+          "An approachable conversational answer is appropriate."
+        ],
+        "prohibited_contradictions": [
+          "Deliver the elder's detailed historical testimony as this young speaker's own knowledge."
+        ],
+        "uncertainty_expectations": [
+          "Acknowledge limited personal historical knowledge."
+        ]
+      },
+      "note": "An agent-authored plausible alternative, written with access to the source. Whether it is recognizable as generated remains an unanswered calibration question."
+    },
+    {
+      "id": "cal-free-worlds-scan",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "Free Worlds militia commander on Glaze",
+      "topics": [
+        "reconnaissance",
+        "conflict"
+      ],
+      "passage": "fw-scan",
+      "context_passages": [
+        "fw-transport"
+      ],
+      "conversation_id": "fw-recon-chain",
+      "scenario_group": "fw-recon-chain",
+      "system": "You are the Free Worlds militia commander on Glaze, speaking to a merchant captain in the spaceport bar. The captain previously transported a militia officer. This is the early reconnaissance chain before the captain chooses sides. You have asked the captain to scan a Republic ship in orbit and offered payment; some nearby ships appear equipped for surveillance while this one appears combat-ready. Answer in direct speech without surrounding quotation marks or narrator actions.",
+      "user": {
+        "line": 355,
+        "quotes": [
+          0
+        ]
+      },
+      "target": {
+        "line": 356,
+        "quotes": [
+          0
+        ]
+      },
+      "alternative": "Because a militia ship taking a close interest in a Navy cruiser could turn an already tense situation into a confrontation. We need to know what they are carrying, but we do not want to start something. A merchant can get that information without making it look like the Free Worlds are challenging the Navy.",
+      "expectations": {
+        "expected_facts": [
+          "The request concerns scanning a Republic ship through a sympathetic merchant."
+        ],
+        "expected_behaviours": [
+          "Explain the desire to obtain intelligence without provoking the Navy."
+        ],
+        "expected_style": [
+          "Practical operational explanation rather than a universal human or military stereotype."
+        ],
+        "prohibited_contradictions": [
+          "Claim the Republic's intentions are already known with certainty."
+        ],
+        "uncertainty_expectations": [
+          "Do not import later campaign outcomes."
+        ]
+      },
+      "note": "An agent-authored plausible alternative, written with access to the source. The opening context is an authored summary of prior events, not an extracted full conversation."
+    }
+  ]
+}
