@@ -3,9 +3,9 @@
 This is the completed first source review for [issue #2](https://github.com/KelianM/endless-voices/issues/2).
 It selects three pilot identities, records 21 inspected passages, and supplies evidence-backed
 briefs for conversation authors. The initial inventory contains neither training conversations nor benchmark cases.
-The [pilot release](../dataset.md) extends this evidence with conversation annotations,
+The [pilot release](../README.md) extends this evidence with conversation annotations,
 profiles and selected lore, including Republic Navy coverage.
-For whole-source counts across every content group, see the [dataset overview](../../data/README.md).
+For whole-source counts across every content group, see the [dataset overview](../overview/README.md).
 
 - [Source inventory](source-inventory.json): pinned files, checksums, line links, speakers,
   prerequisites, evidence types, dispositions, and limitations.
@@ -88,7 +88,7 @@ Use political-group relationships for the human pilot rather than inventing inte
 ## Dataset construction
 
 [Issue #5](https://github.com/KelianM/endless-voices/issues/5) absorbs the former source-preparation
-and benchmark-authoring issues. The [pilot release](../dataset.md) replaces the provisional
+and benchmark-authoring issues. The [pilot release](../README.md) replaces the provisional
 per-identity quotas with source-backed conversation annotation and deterministic sample assembly.
 The initial three-identity evidence remains useful but is not a closed list of allowed speakers.
 

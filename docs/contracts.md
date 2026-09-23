@@ -5,8 +5,8 @@ representative's identity and selected lore, authored conversation history, a fi
 message, one target response, and evaluator-only criteria. The first experiment compares
 prompted and fine-tuned models given identical identity instructions, lore, and history.
 
-[ADR 3](../docs/adr/0003-use-one-conversation-format-across-splits.md) records the design.
-The [fixtures](../tests/fixtures/contracts/) are invented format examples. The [pilot release](../docs/dataset.md) reconstructs the first source-backed
+[ADR 3](adr/0003-use-one-conversation-format-across-splits.md) records the design.
+The [fixtures](../tests/fixtures/contracts) are invented format examples. The [pilot release](../data/README.md) reconstructs the first source-backed
 corpus and freezes its test content with versioned hashes. Source statistics and curation inventories remain separate
 formats because evidence passages are not conversation samples.
 
@@ -212,7 +212,7 @@ bound the model's generated response.
 
 ## Evaluation and remaining work
 
-The [authenticity protocol](../docs/evaluation/README.md) uses the same sample format. For an
+The [authenticity protocol](../data/evaluation/README.md) uses the same sample format. For an
 authenticity trial, the final target must be attributable original game speech, not an agent-written
 reference presented as original. The generator receives `messages[:-1]`; the blinded judge sees
 that context plus the original and generated continuations as unlabelled alternatives. The judge
@@ -220,7 +220,7 @@ receives neither origin labels nor private assessment criteria. Training samples
 authored targets. This is an evaluation eligibility rule, not a schema change.
 
 The legacy calibration pack contains only draft validation samples, without invented train/test shards.
-Use `read_records(path, "validation")` for that file. The [pilot release](../docs/dataset.md) supplies all
+Use `read_records(path, "validation")` for that file. The [pilot release](../data/README.md) supplies all
 three physical splits and a manifest. Reserve calibration conversations and their known variants
 from the eventual test set.
 

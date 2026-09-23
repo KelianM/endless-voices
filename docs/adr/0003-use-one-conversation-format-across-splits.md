@@ -23,7 +23,7 @@ identity and selected lore; provenance and assessment criteria remain outside th
 
 Training reads the complete conversation. Evaluation input includes the same authored context
 and withholds only the final assistant response. Earlier assistant replies are not replaced by
-model generations ([data contract](../../data/contracts.md),
+model generations ([data contract](../contracts.md),
 [evaluation_messages](../../src/endless_voices/contracts.py)).
 
 Keep every sample from one conversation in the same split. Known scenario variants also stay

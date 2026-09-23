@@ -3,7 +3,7 @@
 The first benchmark asks whether a generated reply could pass for a continuation written
 for Endless Sky. The primary comparison presents the original continuation and one generated
 alternative under identical speaker and scene context. The judge identifies the original and explains the choice in free text. No diagnostic tags
-or separate persona scores are requested. [ADR 4](../adr/0004-evaluate-authenticity-against-game-continuations.md) records
+or separate persona scores are requested. [ADR 4](../../docs/adr/0004-evaluate-authenticity-against-game-continuations.md) records
 this choice.
 
 This issue supplies a protocol and a small development calibration pack. No discriminator is
@@ -169,7 +169,7 @@ remain development material. A background citation alone does not reserve a diff
 prior transport assignment is a shared story fact, while its dialogue is a separate conversation.
 Shared canonical facts may still inform unrelated scenes in other splits. Do not create fake
 training or test files merely to satisfy a complete-manifest check; `read_records(path,
-"validation")` validates this development-only file. The [pilot release](../dataset.md) retains these conversation reservations
+"validation")` validates this development-only file. The [pilot release](../README.md) retains these conversation reservations
 and adds selected lore to its newly prepared contexts. The legacy calibration remains reproducible
 with its original short contexts; the recorded judgments are not relabelled as reviews of new prompts.
 
