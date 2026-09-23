@@ -1,33 +1,31 @@
-# 1. Training saves LoRA adapters separately from base models
+# 1. Fine-tuning changes an adapter, not the base model
 
 - **Status:** Accepted
 - **Date:** 2026-09-23
-- **Sources:** [Initial implementation, f26cb1a](https://github.com/KelianM/endless-voices/commit/f26cb1a2e8f7a4f86cbc085ee723e6d0b179c54e), [PR #11, retrospective record](https://github.com/KelianM/endless-voices/pull/11)
+- **Sources:** [Initial implementation, f26cb1a](https://github.com/KelianM/endless-voices/commit/f26cb1a2e8f7a4f86cbc085ee723e6d0b179c54e), [PR #11](https://github.com/KelianM/endless-voices/pull/11)
 
 ## Context
 
-The training and chat commands use the same configured base checkpoint. Adapted behaviour
-needs a saved artifact that the chat command can load. The implementation predates issue
-tracking and was committed on 2026-09-22. This record documents that existing code.
+The project asks whether fine-tuning improves a model's portrayal of a fictional identity.
+The starting checkpoint is both the foundation for training and the baseline for comparison.
+Updating every model weight would require training and storing a complete model for each
+experiment, even when every experiment starts from the same checkpoint.
 
 ## Decision
 
-[train.py](../../src/endless_voices/train.py) wraps the base model with PEFT's `get_peft_model`
-and a `LoraConfig`. After training, `model.save_pretrained(output)` saves the adapter. The
-output directory also contains the tokenizer and `run_config.json`, but not the base weights.
-
-[chat.py](../../src/endless_voices/chat.py) loads the configured base checkpoint and applies
-`PeftModel.from_pretrained` when an adapter is supplied. The
-[CPU smoke test](../../tests/test_pipeline.py) trains a tiny random model, checks the saved
-adapter, reloads the adapter, and exercises generation.
+Fine-tuning trains a LoRA adapter while keeping the base weights fixed. Each run saves the
+adapter separately, together with the tokenizer and run configuration. Chat loads the same
+base checkpoint with or without an adapter
+([train.py](../../src/endless_voices/train.py), [chat.py](../../src/endless_voices/chat.py)).
 
 ## Consequences
 
-An adapter directory cannot be used as a standalone base model. Loading an adapter requires
-the matching base checkpoint and tokenizer. Each training run rejects a nonempty output
-directory, preserving existing artifacts.
-
-The implementation trains and saves adapter parameters instead of updating and saving all
-base weights. Adapter training reduces the number of trainable parameters, but the current
-float32 implementation still loads the full base model into memory. The smoke test verifies
-the mechanism; the repository contains no trained faction model or measured quality result.
+- Experiments can share a base checkpoint without storing another full copy of its weights
+  for every trained variant. Each adapter remains an independent artifact.
+- An adapter is not a standalone model. Reproducing a run requires the matching base checkpoint,
+  tokenizer, and configuration; keeping only the adapter is insufficient.
+- Fewer parameters are trained, but the full base model still occupies memory. The current
+  implementation loads the base weights in float32, so a small adapter does not make a large
+  base model cheap to run.
+- Adaptation is restricted to the changes LoRA can represent. Full-weight fine-tuning is not
+  implemented, and the project has not measured whether that restriction affects persona quality.

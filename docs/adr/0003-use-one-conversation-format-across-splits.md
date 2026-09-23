@@ -1,4 +1,4 @@
-# 3. All splits use one conversation sample format
+# 3. All splits contain authored conversations with one final target
 
 - **Status:** Proposed
 - **Date:** 2026-09-23
@@ -6,50 +6,42 @@
 
 ## Context
 
-The [training loader](../../src/endless_voices/data.py) consumes complete conversations.
-Curated samples also need provenance and private assessment criteria. Split assignment must
-not change the sample format, and generation inputs must exclude the target response.
+A character can give several reasonable answers to the same question. A prewritten follow-up
+may make sense after the reference answer but not after another valid answer. Substituting a
+model's replies into a fixed conversation can therefore create incoherent context and penalize
+the model for a flaw in the test.
 
-The original issue proposed separate training and benchmark formats and fixed user follow-ups
-with generated assistant history. A valid generated answer can make a prewritten follow-up
-incoherent. Separate formats also make split assignment affect how a sample is represented.
-The reviewed design instead evaluates one response against an authored history, following the
-profile-plus-dialogue formulation used by CharacterEval.
+Training and evaluation both need the same underlying example: a representative's identity,
+relevant lore, a conversation, and an appropriate response. Separate formats would make the
+split determine how that example is represented.
 
 ## Decision
 
-[data/contracts.md](../../data/contracts.md) defines one version 1 sample format. `SPLITS` in
-[contracts.py](../../src/endless_voices/contracts.py) contains `train`, `validation`, and `test`. Every sample
-contains `messages`, `metadata`, and `evaluation` with the same requirements in every split.
-The system message is the model-visible context. The
-[fixtures](../../tests/fixtures/contracts/) include a representative profile and selected lore
-in that message; the validator requires nonempty text but does not interpret its meaning.
+Use one sample format across train, validation, and test. Each sample contains authored
+conversation history ending in a target assistant response. The system context supplies the
+identity and selected lore; provenance and assessment criteria remain outside the messages.
 
-The final assistant message is an example target response. `evaluation_messages` returns a
-copy of all preceding messages and excludes metadata and evaluation criteria. Earlier
-assistant messages remain authored history. Training continues to load the complete messages
-through `src/endless_voices/data.py`.
+Training reads the complete conversation. Evaluation input includes the same authored context
+and withholds only the final assistant response. Earlier assistant replies are not replaced by
+model generations ([data contract](../../data/contracts.md),
+[evaluation_messages](../../src/endless_voices/contracts.py)).
 
-Manifests keep split files physically separate. Conversation IDs and known scenario groups
-cannot cross splits. Unknown scenario relationships are represented by `null`, without a
-similarity-classification requirement. Source groups retain shared provenance independently.
+Keep every sample from one conversation in the same split. Known scenario variants also stay
+together. Shared source provenance alone does not force unrelated conversations into one split;
+unknown scenario relationships can remain unset.
 
 ## Consequences
 
-One validator and one loader cover all splits. The permissive loader and invented example remain
-compatible. Curated samples require stricter metadata, a system message, and evaluation fields.
-The unmerged separate benchmark format is replaced; no released dataset needs migration.
-
-Fixed-history evaluation does not measure persistence through a model's own unfolding dialogue.
-The helper constructs a prompt but performs no generation or scoring. The sample retains the
-target and private criteria for the caller; neither enters the returned prompt.
-
-Authored histories can contain answer-relevant facts by design. Authors must keep the final
-answer and private criteria out of the prompt; structural validation cannot detect copied
-meaning. Group checks detect declared overlap, not semantic similarity.
-
-The trainer still computes loss on all non-padding tokens. The contract does not change that
-behaviour or implement a lore store, comparison runner, or scoring rubric.
-
-[Contract tests](../../tests/test_contracts.py) verify the same format across splits, preservation
-of authored history, exclusion of targets and criteria, and rejection of cross-split groups.
+- Split assignment changes how a sample is used, not its shape. One loader and validator serve
+  all splits, and a sample's complete history remains available for inspection.
+- Models can receive identical context for a response comparison. The test measures the next
+  response in that context, not whether a model maintains its identity through its own unfolding
+  conversation.
+- An earlier authored reply may contain useful facts. Those facts are intentionally visible;
+  the final target and private assessment criteria are withheld. A target is an example answer,
+  not a requirement to reproduce its wording.
+- Known conversation and scenario relationships prevent declared variants from crossing splits.
+  The checks do not discover paraphrases, copied answers, or other semantic overlap.
+- Every curated sample carries assessment fields, including training samples. The shared format
+  adds authoring work but avoids a second representation for evaluation. The existing permissive
+  loader still accepts the original invented example without those fields.

@@ -1,35 +1,37 @@
-# 2. Raw sources are fetched at a pinned revision outside Git
+# 2. Source evidence is pinned and fetched outside Git
 
 - **Status:** Accepted
 - **Date:** 2026-09-23
-- **Sources:** [Issue #2](https://github.com/KelianM/endless-voices/issues/2), [PR #10](https://github.com/KelianM/endless-voices/pull/10), [Merge commit 63a69bb](https://github.com/KelianM/endless-voices/commit/63a69bb)
+- **Sources:** [Issue #2](https://github.com/KelianM/endless-voices/issues/2), [PR #10](https://github.com/KelianM/endless-voices/pull/10)
 
 ## Context
 
-Dataset preparation needs repeatable access to upstream text and attributable evidence. The
-source inventory covers the complete pinned text corpus, while the reviewed passages cover
-only initial identity samples. This record captures the source-storage decision merged in PR #10.
+Endless Sky's development text changes over time. A passage used to justify a character's
+knowledge or behaviour must remain traceable to the version that was reviewed. Downloading
+the latest source whenever data is prepared would let the evidence change without a project
+review.
+
+The available source corpus is broader than the passages reviewed for the first identities.
+Restricting the download to those passages would make an initial curation choice determine
+what later authors can inspect.
 
 ## Decision
 
-[fetch_sources.py](../../scripts/fetch_sources.py) reads the upstream revision and file hashes from
-[source-statistics.json](../../data/overview/source-statistics.json). The default checkout is under gitignored `data/local/`.
-The script verifies the pinned revision and all inventoried text hashes, retains upstream
-attribution files, and reuses verified checkouts offline.
+Fetch the complete inventoried text corpus at one pinned upstream commit. Verify the revision
+and file hashes before accepting a checkout, and reuse a verified checkout offline.
 
-Documentation, source statistics, checksums, and curation evidence remain in ordinary Git.
-Raw source payloads are fetched separately; the repository does not use Git LFS. The reviewed
-pilot identities do not limit which upstream text files are fetched.
+Keep the raw checkout under gitignored `data/local/`. Keep the revision, hashes, statistics,
+and curation evidence in ordinary Git. Raw sources are neither committed nor stored through
+Git LFS ([fetch_sources.py](../../scripts/fetch_sources.py),
+[source manifest](../../data/overview/source-statistics.json)).
 
 ## Consequences
 
-A fresh checkout needs network access once. Changed or incomplete local sources fail verification
-rather than being overwritten. Updating upstream evidence requires a deliberate revision and
-manifest update. Keeping raw sources in Git or Git LFS was not selected; source availability
-therefore depends on upstream access or a previously verified local checkout.
-
-The inventory and identity briefs remain evidence metadata, not training examples. Fetching
-sources does not establish permission to release derived datasets or model weights.
-
-[Fetch tests](../../tests/test_fetch_sources.py) cover offline reuse and rejection of changed,
-missing, extra, or wrong-revision sources.
+- Authors can work from the same source snapshot even after upstream changes. Updating the
+  evidence requires an explicit revision and manifest change.
+- A changed or incomplete local checkout is rejected, not silently repaired. Local edits cannot
+  pass as the reviewed source, and recovery requires a separate checkout or deliberate cleanup.
+- A fresh project checkout does not contain the raw corpus. Source access depends on an initial
+  download or an existing verified copy; subsequent reuse needs no network connection.
+- All inventoried text is available for inspection, but availability does not imply review or
+  suitability for training. Curation remains separate from fetching.
