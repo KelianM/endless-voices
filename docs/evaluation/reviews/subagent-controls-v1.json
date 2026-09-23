@@ -1,0 +1,48 @@
+{
+  "reviewer_type": "llm",
+  "reviews": [
+    {
+      "trial_id": "a-02",
+      "choice": "B",
+      "confidence": "high",
+      "reason": "B addresses the commander's request to scan a Republic ship. A describes Quarg origins and does not fit the speaker or question. I remember both passages from the primary review.",
+      "recognized_source": true
+    },
+    {
+      "trial_id": "a-03",
+      "choice": "A",
+      "confidence": "high",
+      "reason": "A answers the question about the Quarg in a distinctive, deliberate voice. B concerns a young Hai and the Unfettered. I remember both passages from the primary review.",
+      "recognized_source": true
+    },
+    {
+      "trial_id": "a-04",
+      "choice": "B",
+      "confidence": "high",
+      "reason": "B addresses the Unfettered and fits the young Hai speaker. A concerns a militia surveillance request unrelated to the scene. I remember both passages from the primary review.",
+      "recognized_source": true
+    },
+    {
+      "trial_id": "a-07",
+      "choice": "abstain",
+      "confidence": null,
+      "reason": "The alternatives are identical, so their text cannot distinguish their origin. I remember this passage from the primary review.",
+      "recognized_source": true
+    }
+  ],
+  "version": "authenticity-calibration-v1",
+  "form": "a",
+  "reviewer_id": "subagent-authenticity-judge",
+  "judge_model_and_prompt": {
+    "agent": "/root/authenticity_judge",
+    "fork_turns": "none",
+    "model_revision": null,
+    "sampling_parameters": null,
+    "configuration": "Parent defaults; exact runtime settings not exposed",
+    "invocation": "subagent-invocation.md",
+    "prompt_sha256": "10601da543b862bb1249b726c5a0fe2f93ecf718a23de6e6b7673b981fb673d9",
+    "instructions_sha256": "1ce81bf23b0839e192b95094e12507137b24b109ecb736443ff9c480af333d09",
+    "trials_sha256": "6629fec53ff1f9741ea9e1cc2c6f9a848ae057117fb240f8a29e9e7827ab482b",
+    "history": "Same agent after primary review; no correctness feedback or answer key supplied"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "reviewer_type": "llm",
+  "reviews": [
+    {
+      "trial_id": "a-01",
+      "choice": "A",
+      "confidence": "medium",
+      "reason": "The reference to 'Unfettered' brethren gives the reply a specific cultural perspective. Its slightly formal, uneven phrasing feels more like authored game dialogue than B's polished explanation.",
+      "recognized_source": false
+    },
+    {
+      "trial_id": "a-05",
+      "choice": "A",
+      "confidence": "high",
+      "reason": "The unusual syntax and repeated conjunctions create a distinctive alien speaking voice. B preserves the explanation but smooths away the linguistic traits that suggest an original character performance.",
+      "recognized_source": false
+    },
+    {
+      "trial_id": "a-06",
+      "choice": "B",
+      "confidence": "high",
+      "reason": "The hesitation before 'tensions' and appeal to a 'sympathetic merchant' suit a commander making a tactful request in conversation. A explains the tactical rationale more explicitly and impersonally.",
+      "recognized_source": false
+    }
+  ],
+  "version": "authenticity-calibration-v1",
+  "form": "a",
+  "reviewer_id": "subagent-authenticity-judge",
+  "judge_model_and_prompt": {
+    "agent": "/root/authenticity_judge",
+    "fork_turns": "none",
+    "model_revision": null,
+    "sampling_parameters": null,
+    "configuration": "Parent defaults; exact runtime settings not exposed",
+    "invocation": "subagent-invocation.md",
+    "prompt_sha256": "b23e1657c087dbf48113afc949f685176e1e5e07f6f00652f6e855fb6377dcc3",
+    "instructions_sha256": "1ce81bf23b0839e192b95094e12507137b24b109ecb736443ff9c480af333d09",
+    "trials_sha256": "bcb8a919911ab7a5dbec32136733ea413ce2509a5e0613dafb35bd4c3b52b569",
+    "history": "No parent conversation or prior trial stage"
+  }
+}

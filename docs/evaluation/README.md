@@ -9,8 +9,9 @@ this choice.
 This issue supplies a protocol and a small development calibration pack. No discriminator is
 trained, no generator is fine-tuned, and no model-quality result is claimed. The [initial human review](calibration-findings.md) identified all three originals with high
 confidence, citing vocabulary, mannerisms, and phrasing. All four subsequent control judgments
-matched their intended outcomes. The initial review is complete; evaluator reliability remains
-unestablished. The alternatives are authored examples, not model outputs.
+matched their intended outcomes. A fresh subagent also identified all three originals without
+seeing the human answers, with similar reasons. This small comparison does not establish evaluator
+reliability. The alternatives are authored examples, not independently generated model outputs.
 
 ## What the experiment measures
 
@@ -124,8 +125,8 @@ calibration round. Disclose reuse; repeated reviews are not independent evidence
 Compare reversed candidate positions with independent reviewers or isolated LLM calls. Count
 order changes as sensitivity, not extra independent scenes. A single human review provides
 initial feedback; reviewer agreement needs at least two independent judgments on the same
-items. No agreement figure is currently available. Preserve disagreements rather than silently
-replacing them with a consensus label.
+items. No human inter-reviewer agreement is available. The recorded human–subagent comparison
+covers only three cases. Preserve disagreements rather than replacing them with a consensus label.
 
 Before using an automated judge for headline results, compare its choices and reasons with
 independent human judgments on fresh validation examples, including subtle errors and outputs
@@ -181,3 +182,20 @@ training or test files merely to satisfy a complete-manifest check; `read_record
 Primary and control judgments are recorded in [calibration findings](calibration-findings.md).
 The initial human calibration is complete. Validation of an automated judge on fresh examples
 and actual model outputs remains a prerequisite for using that judge in headline comparisons.
+
+## Where review evidence lives
+
+Keep calibration evidence in this repository, not only in conversational memory:
+
+- `reviews/` preserves submitted judgments and reasons, reviewer identity/type, and the exact
+  review sheet or prompt hashes. Missing information stays unknown. Revisions do not rewrite
+  what a reviewer originally said.
+- [Calibration findings](calibration-findings.md) interprets the evidence, compares reviewers,
+  records limitations, and states what changes or follow-up the findings justify.
+- The ADR records the lasting evaluation choice; individual trial results belong in the evidence,
+  not in a growing decision log.
+
+The next dataset and evaluator work should read these findings before authoring new calibration
+material. Preserve the primary insight—voice can disappear in an otherwise sensible paraphrase—
+without turning specific phrases into required catchphrases. Add new review records for fresh
+scenes and model outputs, retaining the earlier results for comparison.

@@ -1,4 +1,4 @@
-# Initial human calibration findings
+# Initial authenticity calibration findings
 
 The project owner identified the original continuation in all three primary trials, with high
 confidence in each judgment. The [review record](reviews/kelian-primary-v1.json) preserves the
@@ -54,6 +54,37 @@ The controls can therefore be answered through recognition as well as contextual
 that the review procedure and abstention option make sense, not independent contextual reasoning.
 No numerical confidence value was supplied for the controls; none has been invented.
 
+## Blinded subagent review
+
+A fresh subagent received the same primary trials without the parent conversation, source labels,
+or the human answers. It was instructed to read only the prepared trial prompt, with no browsing
+or repository inspection. The [invocation](reviews/subagent-invocation.md) records the prompt
+construction and task messages; the [primary response](reviews/subagent-primary-v1.json) preserves
+its choices and reasons. Model settings inherited the parent defaults; the exact serving revision
+and sampling parameters were not exposed and are not invented in the record.
+
+| Trial | Human choice / confidence | Subagent choice / confidence | Shared reasoning |
+| --- | --- | --- | --- |
+| a-01 | A / high | A / medium | Culture-specific vocabulary; the alternative smooths away voice |
+| a-05 | A / high | A / high | Distinctive alien syntax and mannerisms |
+| a-06 | B / high | B / high | Hesitation and tactful phrasing fit the speaker better than an impersonal explanation |
+
+The subagent identified all three originals and agreed with the human on all three choices.
+There were no abstentions or reported source recognitions in its primary review. These are
+self-reported recognition judgments, not proof that the model never encountered the public text.
+The lower confidence on the Hai example is preserved rather than reconciled with the human rating.
+
+The reasons converge on style without requiring diagnostic tags. That supports retaining the
+free-text explanation and testing harder alternatives next. It does not establish human–model
+agreement beyond these three cases. The implementing agent authored the alternatives and the
+judge inherited the same task defaults, so shared model tendencies are another possible influence.
+
+The same subagent then completed the [control sheet](reviews/subagent-controls-v1.json), without
+receiving correctness feedback on its primary choices. It selected B, A, B, and abstain, matching
+all four intended outcomes and the human choices. It explicitly remembered the repeated passages
+in every control. Like the human control review, this is a procedural check rather than independent
+evidence of contextual sensitivity.
+
 ## Outcome and follow-up
 
 The initial human calibration round is complete. The authenticity question produced relevant
@@ -68,7 +99,7 @@ judge calls from previous trials and keys. Include subtler alternatives that pre
 style while failing scene or speaker context, alongside obvious sanity checks. Actual model
 outputs are needed before assessing an automated judge's usefulness for model comparison.
 
-Candidate-order sensitivity, independent reviewer agreement, and automated-judge agreement remain
-unmeasured. Three authored examples and one reviewer do not establish evaluator reliability or an
-indistinguishability threshold. No statistical or model-quality conclusion is drawn. The reviewed
+Candidate-order sensitivity and agreement between independent human reviewers remain unmeasured.
+The human–subagent comparison covers only three authored examples; it does not establish evaluator
+reliability or an indistinguishability threshold. No statistical or model-quality conclusion is drawn. The reviewed
 scenes and their known variants remain reserved for development, not final testing.
