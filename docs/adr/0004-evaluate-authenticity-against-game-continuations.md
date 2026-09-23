@@ -1,8 +1,8 @@
 # 4. Judge authenticity against original game continuations
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-23
-- **Sources:** [Issue #6](https://github.com/KelianM/endless-voices/issues/6), [Li et al., 2017](https://aclanthology.org/D17-1230/)
+- **Sources:** [Issue #6](https://github.com/KelianM/endless-voices/issues/6), [PR #13](https://github.com/KelianM/endless-voices/pull/13), [Li et al., 2017](https://aclanthology.org/D17-1230/)
 
 ## Context
 
@@ -23,11 +23,14 @@ continuation among an original and a generated reply? The base and adapted model
 compared against the same source continuation, with the same supplied context.
 
 Judges give an authenticity choice and a free-text reason. No diagnostic categories or separate
-persona scores are requested; the initial review found the reasons sufficient to explain choices. Original-identification accuracy is reported with abstentions,
+persona scores are requested; the initial review found the reasons sufficient to explain choices.
+Original-identification accuracy is reported with abstentions,
 failures, recognition, and control results; chance performance alone does not establish quality.
 
 The [development calibration pack](../evaluation/calibration.json) uses source continuations,
-authored alternatives, wrong-context speech, and identical pairs. The [initial human review](../evaluation/calibration-findings.md), including controls, is recorded. No automated discriminator or adversarial training loop is implemented. The fixed-context boundary
+authored alternatives, wrong-context speech, and identical pairs. The
+[initial human review](../evaluation/calibration-findings.md), including controls, is recorded.
+No automated discriminator or adversarial training loop is implemented. The fixed-context boundary
 from [ADR 3](0003-use-one-conversation-format-across-splits.md) remains unchanged.
 
 ## Consequences
