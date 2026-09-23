@@ -2,7 +2,8 @@
 
 - **Status:** Accepted
 - **Date:** 2026-09-23
-- **Sources:** [Issue #5](https://github.com/KelianM/endless-voices/issues/5)
+- **Sources:** [Issue #5](https://github.com/KelianM/endless-voices/issues/5),
+  [PR #14](https://github.com/KelianM/endless-voices/pull/14)
 
 ## Context
 
@@ -14,7 +15,25 @@ would mistake quotations and mission organization for speaker identity and coher
 The calibration profiles also lacked broader lore. Without relevant background, a response can
 reflect missing knowledge rather than the model's ability to portray the selected representative.
 
+Expanding the dataset requires judgment about speakers, story conditions and relevant knowledge.
+Those decisions need source inspection and correction, and the pilot has no validated automated
+annotation workflow. Agent delegation can share the reading and annotation work, but someone must
+define each assignment, reconcile findings and decide which constructions are ready to retain.
+
 ## Decision
+
+Use manually orchestrated agents for annotation under an owner-approved scope. A lead agent
+prepares the source catalog, assigns bounded source batches to construction agents, and supplies
+the annotation rules and source references. Construction agents annotate speakers, routes,
+profiles, lore and scene assumptions. The lead agent inspects those annotations against the source,
+requests or makes corrections, resolves attribution and split conflicts, and assembles the release
+for the owner's PR review. Construction review, implementing review and human approval remain
+distinct claims, as recorded in the [pilot review evidence](../curation/pilot-v1/review.json).
+
+Source preparation, speech extraction, sample assembly and validation run in deterministic scripts.
+Agent dispatch, follow-up instructions, correction cycles and acceptance of annotations are
+coordinated interactively. The repository does not contain an annotation job runner that performs
+that orchestration from API credentials and a command.
 
 Keep reviewed annotations of actual conversations, speakers, branch routes, reusable profiles and
 source-backed lore in Git. Deterministic scripts extract original speech, retain earlier replies,
@@ -35,6 +54,16 @@ review; human approval is recorded only when actually supplied.
 
 ## Consequences
 
+- The committed annotations reproduce the exact dataset without repeating agent work. Producing
+  annotations for additional sources requires another orchestrated curation and review pass;
+  supplying an API key alone is insufficient. Repeating the agent assignments may produce different
+  selections and judgments, even when the source revision is unchanged.
+- Expansion consumes agent tokens and coordinator attention. Progress depends on batch assignment,
+  available agent capacity and source review. The workflow accepts that operational cost for the
+  pilot; an unattended annotation service is outside the implemented design.
+- Review can catch speaker mixing and invalid story assumptions, but construction and implementing
+  agents can share mistakes. Agent review does not establish independent adjudication or replace
+  the owner's decision to accept the release.
 - Agents spend their effort on interpretation and context. Changing an annotation regenerates all
   affected samples without asking an agent to recopy speech or construct record metadata.
 - The preparation script can support a later annotation interface. It does not execute game state;
