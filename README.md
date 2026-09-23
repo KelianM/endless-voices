@@ -22,6 +22,7 @@ These are experiment directions, not demonstrated results.
 configs/train.toml           Model, data, LoRA and training settings
 data/example.jsonl          One original, non-canonical format example
 docs/curation/             Reviewed pilot sources, identity briefs, and scope
+docs/evaluation/           Authenticity protocol and development calibration recipe
 src/endless_voices/
   common.py                Config and tokenizer loading
   data.py                  Validation, tokenization and padding
@@ -31,7 +32,7 @@ src/endless_voices/
 tests/                     Offline data and tiny-model smoke tests
 ```
 
-There is no frontend, game-data ingestion, synthetic data generator, or evaluation framework.
+There is no frontend, general game-data ingestion, synthetic data generator, or evaluation runner.
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
@@ -155,8 +156,12 @@ saved alongside the adapter, as the training command does.
 The first comparison uses the same identity instructions, selected lore, and authored history
 for the base model and adapted model. Evaluation withholds the final assistant response and
 generates one answer. Entire conversations and known scenario variants stay in one split.
-The generation runner and scoring protocol remain future work; fixed-history evaluation does
-not establish persistence through a model’s own unfolding conversation. See the
+The [authenticity protocol](docs/evaluation/README.md) compares generated replies against original
+game continuations in blinded pairs. Its small development calibration pack has an
+completed initial human review, including controls; no evaluator reliability or model-quality
+result is claimed. Generation and reporting
+commands remain future work. Fixed-history evaluation does not establish persistence through a
+model’s own unfolding conversation. See the
 [data contract](data/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
 ## Development
