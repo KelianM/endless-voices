@@ -361,6 +361,7 @@ def test_mlx_runner_isolates_trials_and_records_partial_output_as_failure(tmp_pa
         max_tokens=50,
         max_context_tokens=100,
         seconds_per_trial=30,
+        allow_json_fence=False,
         limit=None,
     )
     assert judge.run(args) == 1
@@ -458,3 +459,21 @@ def test_agent_collection_preserves_missing_invalid_and_unavailable_identity_met
     assert result["reviews"][0]["agent_id"] == "simulated-agent-0"
     with pytest.raises(FileExistsError):
         module.collect(tmp_path, tmp_path / "collected.json")
+
+
+def test_optional_json_fence_does_not_accept_prose_or_coerce_fields():
+    answer = {
+        "choice": "abstain",
+        "confidence": None,
+        "reason": "Simulated",
+        "recognized_source": False,
+    }
+    fenced = "```json\n" + json.dumps(answer) + "\n```"
+    assert parse_answer(fenced, allow_json_fence=True) == answer
+    with pytest.raises(ValueError):
+        parse_answer(fenced)
+    with pytest.raises(ValueError):
+        parse_answer("Here is my answer:\n" + fenced, allow_json_fence=True)
+    answer["confidence"] = "null"
+    with pytest.raises(ValueError):
+        parse_answer("```json\n" + json.dumps(answer) + "\n```", allow_json_fence=True)

@@ -36,7 +36,15 @@ def judge_messages(trial, instructions):
     ]
 
 
-def parse_answer(raw):
+def parse_answer(raw, allow_json_fence=False):
+    lines = raw.strip().splitlines()
+    if (
+        allow_json_fence
+        and len(lines) >= 3
+        and lines[0] in {"```json", "```"}
+        and lines[-1] == "```"
+    ):
+        raw = "\n".join(lines[1:-1])
     answer = json.loads(raw)
     if not isinstance(answer, dict) or set(answer) != {
         "choice",
@@ -80,6 +88,7 @@ def run(args):
         judge_messages(trial, instructions)
     args.output.mkdir(parents=True)
     settings = {
+        "allow_json_fence": args.allow_json_fence,
         "temperature": 0,
         "enable_thinking": False,
         "seed": 42,
@@ -176,7 +185,7 @@ def run(args):
                     )
                 if last is None or last.finish_reason != "stop":
                     raise ValueError("Output limit reached; partial judgment is not accepted")
-                row.update(parse_answer(row["raw_output"]))
+                row.update(parse_answer(row["raw_output"], args.allow_json_fence))
                 row["status"] = "ok"
             except (Exception, KeyboardInterrupt) as error:
                 row["error"] = f"{type(error).__name__}: {error}"
@@ -211,6 +220,11 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=512)
     parser.add_argument("--max-context-tokens", type=int, default=8192)
     parser.add_argument("--seconds-per-trial", type=float, default=180)
+    parser.add_argument(
+        "--allow-json-fence",
+        action="store_true",
+        help="Accept one enclosing Markdown JSON fence; preserve raw output and strict fields",
+    )
     parser.add_argument("--limit", type=int, help="Infrastructure smoke checks only")
     args = parser.parse_args()
     try:

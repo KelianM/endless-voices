@@ -1,0 +1,6 @@
+{
+  "source": "mlx-community/Mistral-Small-3.2-24B-Instruct-2506-4bit",
+  "revision": "2a1d5eabfc504747bdc24178394821a1efc0edde",
+  "path": "data/local/hub/models--mlx-community--Mistral-Small-3.2-24B-Instruct-2506-4bit/snapshots/2a1d5eabfc504747bdc24178394821a1efc0edde",
+  "quantization": "4-bit MLX conversion"
+}

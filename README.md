@@ -324,6 +324,10 @@ a fresh conversation/cache per trial, an 8,192-token context budget and a 512-to
 The default 180-second trial budget is checked between generated tokens; it cannot interrupt a
 stalled model operation. No input is truncated. Invalid JSON, extra fields, context overflow,
 timeouts, and output-cap exhaustion become explicit failures without automatic retries.
+The opt-in `--allow-json-fence` accepts one enclosing Markdown JSON fence while retaining
+strict field validation and raw output. The setting is recorded; use a new reviewer ID when changing it.
+[The local model comparison](data/evaluation/local-judge-comparison-v1/README.md) records
+Qwen30B and Mistral24B results, memory use and the separate Mistral parsing attempt.
 
 Each new judge directory contains `review.json` (choices, reasons, recognition, raw output,
 failures, actual runtime/settings/model hashes), `prompts.jsonl` (complete messages, rendered
