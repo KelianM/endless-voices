@@ -162,7 +162,7 @@ The [authenticity protocol](data/evaluation/README.md) compares generated replie
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
 result is claimed. The generation command below saves continuations; the assessment workflow prepares blinded
-trials and exploratory reports. The local prompted judge still needs independent human calibration. Fixed-history evaluation does not establish persistence through a
+trials and exploratory reports. The local prompted judge is being calibrated against isolated agent reviews. Fixed-history evaluation does not establish persistence through a
 model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
@@ -296,8 +296,9 @@ use separate assignments for those cases. Review primary examples before exporti
 ### Local prompted judge
 
 The initial candidate is a pinned 4-bit MLX conversion of Qwen3-14B. It is **provisional**:
-compare the judge's answers and reasons with independent human judgments before interpreting
-headline results. The first review round has ten model-response pairs and two separate controls;
+compare the judge's answers and reasons with isolated agent reviews before interpreting
+results. The owner selected agent-based calibration in [ADR 6](docs/adr/0006-calibrate-a-local-prompted-judge-with-isolated-agents.md).
+The initial human review pack remains available; expanded calibration covers all validation samples;
 see [the calibration record](data/evaluation/prompted-judge-v1/README.md). No training is performed.
 
 Install the judge in a separate environment. MLX uses Apple Silicon, and its Transformers 5

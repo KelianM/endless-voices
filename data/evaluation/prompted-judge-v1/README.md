@@ -1,5 +1,8 @@
 # First prompted local judge round
 
+The owner replaced the planned human review with agent-based calibration on 2026-09-24.
+The original round below remains execution history; see the change record at the end.
+
 This round checks a local Qwen3-14B judge against up to twelve human judgments collected before showing judge answers:
 ten original-versus-generated pairs, followed by two procedural controls. Human judgments and
 judge usefulness have not yet been established. The ten generated alternatives are actual outputs
@@ -60,4 +63,13 @@ no failures were retried or promoted to successful responses.
 
 Test dialogue and generated test text were not inspected or judged. The checks used hashes,
 identifiers, identity metadata and execution status only. These counts establish generation
-coverage, not model quality; human calibration of the prompted judge is still pending.
+coverage, not model quality; the expanded agent calibration is still in progress.
+
+## Change to agent-based calibration
+
+On 2026-09-24 the owner replaced the planned human calibration with isolated sub-agent reviews,
+as recorded in [ADR 6](../../../docs/adr/0006-calibrate-a-local-prompted-judge-with-isolated-agents.md).
+The earlier human pack and local judge outputs remain preserved; no human answers were submitted.
+The expanded round uses all 48 successful validation outputs, one fresh sub-agent invocation per
+primary trial, and two isolated control reviews. The local judge also evaluates all reversed pairs.
+These calls cover 15 conversations, not 48 independent scenes. The expanded comparison is pending.
