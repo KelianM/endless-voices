@@ -37,3 +37,27 @@ because execution succeeds.
 The human review page supports brief reasons and explicit source recognition. A simulated browser
 form check was discarded; it is not a human judgment. The earlier four-identity smoke run remains
 integration evidence only. See the root README for commands and report denominators.
+
+## Full-dataset generation
+
+The requested full-dataset run produced 173 successful responses from 176 selected samples.
+Three responses reached the 512-token output cap and remain failures with their partial text
+preserved. No selected sample is missing. Generation used the existing pinned Qwen3-4B settings:
+MPS, float16, greedy decoding, a 4,096-token context ceiling and no adapter.
+
+| Split | Selected | Successful | Output-limit failures | Missing |
+| --- | ---: | ---: | ---: | ---: |
+| Train | 101 | 99 | 2 | 0 |
+| Validation | 48 | 48 | 0 | 0 |
+| Test | 27 | 26 | 1 | 0 |
+
+[The execution record](full-generation.json) preserves per-identity coverage, run and artifact
+hashes, timestamps and local output locations. All recorded artifact hashes and dataset hashes
+were verified. Ordered selections match the complete splits; response IDs match those selections
+without duplicates or omissions. Prompt IDs are unique and belong to the corresponding selection.
+All three output-limit failures belong to mainstream Hai samples. No settings were changed and
+no failures were retried or promoted to successful responses.
+
+Test dialogue and generated test text were not inspected or judged. The checks used hashes,
+identifiers, identity metadata and execution status only. These counts establish generation
+coverage, not model quality; human calibration of the prompted judge is still pending.
