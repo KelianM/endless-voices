@@ -177,9 +177,7 @@ Those checks do not establish exhaustive semantic deduplication.
 From the repository root after installing `.[dev]`:
 
 ```sh
-endless-validate tests/fixtures/contracts/manifest.json
-# Equivalent invocation before refreshing installed entry points:
-python -m endless_voices.contracts tests/fixtures/contracts/manifest.json
+validate tests/fixtures/contracts/manifest.json
 ```
 
 Structural validation uses only the standard library and downloads nothing. The command checks
@@ -195,14 +193,14 @@ For an individual file, use `read_records(Path(...), "train")`; global checks re
 Optional token checks use a saved local tokenizer and the existing loader's length check:
 
 ```sh
-endless-validate data/local/curated/v1/manifest.json \
+validate data/local/curated/v1/manifest.json \
   --tokenizer /absolute/path/to/local-tokenizer --max-length 2048
 ```
 
 Both flags are required together. Tokenizer loading is local-only, with remote code disabled;
 no model weights are loaded. Every complete sample in every split must fit the limit and contain
-at least two tokens. Failures report file/line without truncation. The future generation runner
-must separately budget the prompt and generated output; an authored target's length does not
+at least two tokens. Failures report file/line without truncation. The generation runner
+separately budgets the prompt and generated output; an authored target's length does not
 bound the model's generated response.
 
 ## Evaluation and remaining work

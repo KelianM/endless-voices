@@ -214,6 +214,6 @@ selection is neither a representative quality sample nor fresh judge-calibration
 No test samples are generated or inspected for tuning. The selection does not alter split
 membership or the frozen release.
 
-Use the [generation command](../../docs/generation.md) to collect responses and explicit failures.
+Use the [generation command](../../README.md#generate-comparable-responses) to collect responses and explicit failures.
 The pinned Qwen3-4B-Instruct-2507 configuration is a replaceable smoke-run checkpoint. Judge
 validation still needs fresh scenes and actual model outputs under the protocol above.

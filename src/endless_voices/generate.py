@@ -446,24 +446,49 @@ def run_generation(args) -> int:
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default="configs/generate.toml")
-    parser.add_argument("--manifest", type=Path, required=True)
-    parser.add_argument("--split", choices=["train", "validation", "test"], default="validation")
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument("--config", default="configs/generate.toml", help="Model TOML config")
+    parser.add_argument("--manifest", type=Path, required=True, help="Dataset split manifest")
+    parser.add_argument(
+        "--split",
+        choices=["train", "validation", "test"],
+        default="validation",
+        help="Split to generate",
+    )
     parser.add_argument("--sample-ids", type=Path, help="JSON list; order is preserved")
     parser.add_argument("--limit", type=int, help="First N selected samples")
     parser.add_argument("--output", type=Path, required=True, help="Must not already exist")
     parser.add_argument("--adapter", help="Existing local LoRA directory or Hub ID")
     parser.add_argument("--adapter-revision", help="Full Hub commit for the adapter")
-    parser.add_argument("--cache-dir", default="data/local/hub")
-    parser.add_argument("--offline", action="store_true")
-    parser.add_argument("--device", choices=["auto", "cpu", "mps", "cuda"], default="auto")
-    parser.add_argument("--dtype", choices=["float32", "float16", "bfloat16"], default="float32")
-    parser.add_argument("--max-context-tokens", type=int, default=4096)
-    parser.add_argument("--max-new-tokens", type=int, default=512)
-    parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument("--top-p", type=float, default=1.0)
-    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--cache-dir", default="data/local/hub", help="Model download cache")
+    parser.add_argument("--offline", action="store_true", help="Require cached model files")
+    parser.add_argument(
+        "--device", choices=["auto", "cpu", "mps", "cuda"], default="auto", help="Execution device"
+    )
+    parser.add_argument(
+        "--dtype",
+        choices=["float32", "float16", "bfloat16"],
+        default="float32",
+        help="Weight precision",
+    )
+    parser.add_argument(
+        "--max-context-tokens", type=int, default=4096, help="Total prompt and output budget"
+    )
+    parser.add_argument(
+        "--max-new-tokens", type=int, default=512, help="Output cap; reaching it is a failure"
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Zero for greedy decoding; positive for sampling",
+    )
+    parser.add_argument("--top-p", type=float, default=1.0, help="Nucleus probability for sampling")
+    parser.add_argument(
+        "--seed", type=int, default=42, help="Run seed used to derive stable per-sample seeds"
+    )
     args = parser.parse_args(argv)
     if not 0 < args.max_new_tokens < args.max_context_tokens:
         parser.error("require 0 < max-new-tokens < max-context-tokens")

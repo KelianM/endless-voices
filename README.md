@@ -19,10 +19,10 @@ These are experiment directions, not demonstrated results.
 ## What is here
 
 ```text
-src/endless_voices/         Training, chat, tokenization and dataset validation
+src/endless_voices/         Training, chat, generation and dataset validation
 scripts/                   Source fetching, preparation and dataset assembly
 tests/                     Offline tests and format fixtures
-configs/                   Training settings
+configs/                   Model and training settings
 docs/contracts.md          Conversation format and validator reference
 docs/adr/                  Architecture decisions
 data/README.md             Start here to reconstruct or annotate the dataset
@@ -114,7 +114,7 @@ limit within your model's supported context window.
 After selecting a model and supplying data:
 
 ```bash
-endless-train --config configs/train.toml
+train --config configs/train.toml
 ```
 
 The config exposes ordinary `TrainingArguments` settings and PEFT LoRA settings.
@@ -137,13 +137,13 @@ Use the same config for model identity in each comparison:
 
 ```bash
 # Starting checkpoint without an identity prompt
-endless-chat --config configs/train.toml
+chat --config configs/train.toml
 
 # Prompt-only condition
-endless-chat --config configs/train.toml --system "You are a cautious alien archivist."
+chat --config configs/train.toml --system "You are a cautious alien archivist."
 
 # Fine-tuned adapter, with an optional matching identity prompt
-endless-chat --config configs/train.toml --adapter outputs/example-adapter \
+chat --config configs/train.toml --adapter outputs/example-adapter \
   --system "You are a cautious alien archivist."
 ```
 
@@ -204,19 +204,52 @@ not a blinded judge input. Keep the [dataset attribution and licensing](NOTICE.m
 Generate one final reply per selected validation sample, retaining authored history:
 
 ```bash
-endless-generate --config configs/generate.toml \
+generate --config configs/generate.toml \
   --manifest data/pilot-v1/samples/manifest.json \
   --sample-ids data/evaluation/smoke-sample-ids.json \
   --device mps --dtype float16 --output outputs/qwen3-validation
 ```
 
-The example downloads a pinned Qwen3-4B-Instruct-2507 checkpoint into `data/local/hub/`.
-Use `--adapter` for an existing LoRA adapter, `--offline` to require cached weights, and a new
-output directory for each condition. The runner withholds the target and evaluator source
-references, rejects overlong inputs, and saves responses, failures and reproduction settings.
-Checkpoint, device, precision and generation limits remain configurable.
-See the [generation reference](docs/generation.md) for selection, adapter compatibility,
-JSON/JSONL output fields and reproducibility limits. This command performs no training or scoring.
+The example downloads approximately 8 GB of pinned Qwen3-4B-Instruct-2507 weights into
+`data/local/hub/`. Add `--offline` to require cached weights. Change `[model]` in the config to
+use another checkpoint; Hub models require a full commit revision, while local directories are
+identified by file hashes. Inference fitting in memory does not establish that training will fit.
+
+Selection defaults to validation. `--sample-ids` accepts an ordered JSON list of IDs;
+`--limit N` limits the selection. Reserve the test split for the final comparison.
+Run `generate --help` for all options and defaults.
+
+For an adapted condition, repeat the command with `--adapter path/to/adapter` and a new output
+directory. Hub adapters also require `--adapter-revision`. Both conditions use the base tokenizer;
+conflicting adapter checkpoint or tokenizer declarations are rejected. An adapter with no recorded
+training revision is marked `revision_verified: false`. Compare dataset hashes, selected IDs,
+prompt/token hashes and generation settings before treating runs as paired.
+
+Generation retains authored history and withholds the final target and private metadata.
+The full templated prompt plus output budget must fit the requested and model context limits.
+Overlong inputs and templates that alter authored text fail without truncation. Defaults are greedy
+decoding, 4,096 total tokens and at most 512 output tokens. Seeds are stable per sample;
+identical outputs across hardware or library versions are not guaranteed.
+
+Each run requires a fresh output directory and saves:
+
+| File | Contents |
+| --- | --- |
+| `run.json` | Run status/counts, dataset hashes, model/tokenizer/adapter identities, effective generation settings, software/device/code provenance and artifact hashes |
+| `sample-ids.json` | Ordered selection, reusable with `--sample-ids` |
+| `prompts.jsonl` | Model-visible messages, prompt hashes and token IDs; no targets or evaluator metadata |
+| `responses.jsonl` | One result per selected ID, including explicit failures |
+| `tokenizer/` | Effective tokenizer and chat template |
+
+Response rows contain `sample_id`, `status` (`ok` or `failed`) and `response` (text or null).
+Attempted generations also record timing, seed, token IDs/counts and finish reason. Failures include
+an `error` with stage, type and message. Reaching the output cap is an `OutputLimit` failure;
+the partial response is retained. Targets remain in the dataset and can be joined by sample ID.
+
+Exit codes are 0 for all samples completed, 1 for failure and 130 for a caught interrupt.
+A hard process kill can leave a `running` manifest and missing rows; check the saved selection
+before using a run. Keep [source attribution](NOTICE.md) with shared outputs. Smoke runs check
+execution, not model quality. Generation performs no training or scoring.
 
 ## Development
 
