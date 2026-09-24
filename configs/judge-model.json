@@ -1,0 +1,6 @@
+{
+  "source": "mlx-community/Qwen3-14B-4bit",
+  "revision": "a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+  "path": "data/local/hub/models--mlx-community--Qwen3-14B-4bit/snapshots/a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+  "quantization": "4-bit MLX conversion of Qwen/Qwen3-14B"
+}

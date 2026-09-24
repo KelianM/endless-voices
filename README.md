@@ -32,7 +32,8 @@ data/evaluation/           Evaluation protocol and calibration evidence
 data/overview/             Upstream source inventory and statistics
 ```
 
-There is no frontend, general game-data ingestion, synthetic data generator, or scoring runner.
+There is no general game-data ingestion or synthetic dataset generator.
+Blinded review pages and a local prompted judge assess saved generation runs.
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
@@ -160,8 +161,8 @@ generates one answer. Entire conversations and known scenario variants stay in o
 The [authenticity protocol](data/evaluation/README.md) compares generated replies against original
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
-result is claimed. The generation command below saves continuations; judging and comparison
-reports remain future work. Fixed-history evaluation does not establish persistence through a
+result is claimed. The generation command below saves continuations; the assessment workflow prepares blinded
+trials and exploratory reports. The local prompted judge still needs independent human calibration. Fixed-history evaluation does not establish persistence through a
 model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
@@ -250,6 +251,116 @@ Exit codes are 0 for all samples completed, 1 for failure and 130 for a caught i
 A hard process kill can leave a `running` manifest and missing rows; check the saved selection
 before using a run. Keep [source attribution](NOTICE.md) with shared outputs. Smoke runs check
 execution, not model quality. Generation performs no training or scoring.
+
+## Assess saved responses
+
+Prepare an organizer pack from compatible runs. This validates dataset and artifact hashes,
+selected IDs, authored context, and prompt/response provenance. Failed generations, including
+partial output at the token limit, are retained in coverage and never sent to the judge.
+
+```bash
+python -m endless_voices.assessment prepare \
+  --manifest data/pilot-v1/samples/manifest.json \
+  --run qwen3-4b=outputs/qwen3-4b-judge-calibration-v2 \
+  --controls data/evaluation/prompted-judge-v1/controls.json \
+  --reverse --output outputs/assessment
+```
+
+Repeat `--run NAME=DIRECTORY` for additional conditions. Each condition is compared against the
+original game continuation, never directly against the other model. The generator's authored
+context is identical for shared sample IDs. Model settings and tokenizer differences remain
+recorded in the organizer pack; paired arithmetic alone does not establish a controlled experiment.
+Validation is the default; `--split test` is an explicit final-evaluation choice.
+
+The pack separates `private.json` (answer mapping, random seed, run provenance and coverage)
+from `public/primary/`, `public/reversed/`, and `public/controls/`. Each public JSON/HTML file
+contains one opaque trial ID, the context, and anonymously ordered candidates. Keep the private
+file and run directories away from reviewers. The randomization seed is generated and stored
+privately unless supplied explicitly. Reversed trials are optional isolated LLM calls or separate
+human assignments; repeated positions are not extra independent scenes.
+
+Export a human review page for one condition:
+
+```bash
+python -m endless_voices.assessment human --pack outputs/assessment \
+  --condition qwen3-4b --output outputs/human-review.html
+```
+
+Open the HTML file in a browser. Enter a reviewer name, answer the examples, and download the
+judgments before closing. Brief reasons suffice. Saved answers cannot be replaced in the page;
+retain corrections as separate records. Unanswered examples remain missing. Restore a downloaded
+review into an empty page to continue. The export rejects repeated conversation/scenario groups;
+use separate assignments for those cases. Review primary examples before exporting controls with
+`--stage controls`. Never give one human multiple conditions that repeat the same original.
+
+### Local prompted judge
+
+The initial candidate is a pinned 4-bit MLX conversion of Qwen3-14B. It is **provisional**:
+compare the judge's answers and reasons with independent human judgments before interpreting
+headline results. The first review round has ten model-response pairs and two separate controls;
+see [the calibration record](data/evaluation/prompted-judge-v1/README.md). No training is performed.
+
+Install the judge in a separate environment. MLX uses Apple Silicon, and its Transformers 5
+requirement must not replace the generation environment's Transformers 4 dependencies.
+
+```bash
+python3.12 -m venv data/local/judge-env
+data/local/judge-env/bin/python -m pip install 'mlx-lm==0.31.1'
+hf download mlx-community/Qwen3-14B-4bit \
+  --revision a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4 --cache-dir data/local/hub
+PYTHONPATH=src data/local/judge-env/bin/python -m endless_voices.judge \
+  --trials outputs/assessment/public/primary \
+  --instructions outputs/assessment/public/instructions.txt \
+  --model-config configs/judge-model.json --reviewer-id qwen3-14b-v1 \
+  --output outputs/judge-primary
+```
+
+The model download is about 8.3 GB. Run generation and judging sequentially so both models need
+not occupy memory together. Judging uses only downloaded files, greedy decoding, thinking disabled,
+a fresh conversation/cache per trial, an 8,192-token context budget and a 512-token output cap.
+The default 180-second trial budget is checked between generated tokens; it cannot interrupt a
+stalled model operation. No input is truncated. Invalid JSON, extra fields, context overflow,
+timeouts, and output-cap exhaustion become explicit failures without automatic retries.
+
+Each new judge directory contains `review.json` (choices, reasons, recognition, raw output,
+failures, actual runtime/settings/model hashes), `prompts.jsonl` (complete messages, rendered
+prompts and token IDs), and `selection.json`. The runner receives public trials only and never
+loads the organizer key. Use the same reviewer ID and settings for separate primary, reversed,
+and control invocations, each with a fresh output directory. A new configuration needs a distinct
+reviewer ID. An interruption preserves submitted rows; remaining trials count as missing.
+
+### Reports
+
+```bash
+python -m endless_voices.assessment report --pack outputs/assessment \
+  --review outputs/judge-primary/review.json \
+  --review path/to/downloaded-human-review.json --output outputs/assessment-report
+```
+
+Repeat `--review` for controls, reversed trials, or additional reviewers. Reports treat every
+prepared trial as scheduled for each included reviewer. Duplicate submissions are rejected;
+combine disjoint stage files, not overlapping exports. Input review files are never modified.
+
+`report.md` is the reading copy; `report.json` preserves full records and calculations. Reports
+show correct/incorrect decisions, abstentions, failures and missing judgments, with explicit
+denominators; generation coverage by identity; recognized and unrecognized results; separate
+controls; reviewer disagreements; and all reasons. Accuracy is correct original identifications
+among A/B decisions. Abstention and failure rates use scheduled primary trials. Generation failures
+are counted separately against selected generation samples.
+
+Paired differences are right-condition minus left-condition detection accuracy on scenes decided
+for both conditions by the same reviewer. The report lists incomplete pairs, including generation
+failures and unequal selections. Reviewers are reported separately, without majority voting.
+Descriptive 95% intervals resample entire connected conversation/scenario groups with a saved
+seed, preserving dependent turns. Intervals are omitted with fewer than two contributing groups;
+undefined resamples are counted. Few groups can produce unstable or zero-width intervals, and
+these intervals do not capture uncertainty from judge choice or dataset selection. Shared mission
+chains and broad themes do not define groups.
+
+All report outputs remain exploratory. Lower detection is not automatically better writing;
+chance performance and failure to detect a difference do not establish equivalence. The test
+fixtures use invented dialogue and explicitly simulated judgments, not actual reviews. All
+commands refuse existing output destinations. Run each module with `--help` for options.
 
 ## Development
 
