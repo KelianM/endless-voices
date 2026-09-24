@@ -82,6 +82,7 @@ def build_viewer(manifest: Path, output: Path, split="train", run_directory: Pat
         visible_ids = {r["metadata"]["id"] for r in records}
         run["responses"] = {k: v for k, v in run["responses"].items() if k in visible_ids}
         run["selected_ids"] = [s for s in run["selected_ids"] if s in visible_ids]
+    records = [{key: value for key, value in row.items() if key != "evaluation"} for row in records]
     payload = {"dataset_version": declaration["dataset_version"], "samples": records, "run": run}
     # Escape script delimiters; sample text is rendered through textContent in the browser.
     serialized = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")

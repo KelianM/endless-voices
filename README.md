@@ -177,7 +177,7 @@ open outputs/training-samples.html
 The HTML file works offline in a browser without a server or model download. Filter by identity,
 search sample IDs, roles or topics, and use Previous/Next or the left/right arrow keys outside
 form controls. Each sample shows authored history and the final target, with expandable model
-instructions, lore, source metadata and assessment-only notes.
+instructions, lore and source metadata.
 
 Use `--split validation` for validation samples. Held-out content is excluded from the default
 export; `--split test` or `--split all` explicitly includes it. The complete manifest is still
@@ -187,7 +187,7 @@ Add a saved generation run to compare available model replies with their targets
 
 ```bash
 python scripts/view_samples.py --split validation \
-  --run outputs/qwen3-4b-validation-c7ab423 \
+  --run outputs/qwen3-4b-validation-cleaned-v1 \
   --output outputs/validation-responses.html
 open outputs/validation-responses.html
 ```
@@ -196,7 +196,7 @@ Replace the run path with any compatible run directory. Missing responses, failu
 not selected for the run remain distinct. The reader checks the dataset manifest and response
 hash when recorded. Choose a new output filename for each export; existing files are protected.
 The reader displays saved data and does not generate, score, edit or approve samples. It embeds
-the selected source text and private assessment notes, so it is an organizer's reading copy,
+the selected source text and target responses, so it is an organizer's reading copy,
 not a blinded judge input. Keep the [dataset attribution and licensing](NOTICE.md) with shared copies.
 
 ## Generate comparable responses
@@ -212,8 +212,8 @@ endless-generate --config configs/generate.toml \
 
 The example downloads a pinned Qwen3-4B-Instruct-2507 checkpoint into `data/local/hub/`.
 Use `--adapter` for an existing LoRA adapter, `--offline` to require cached weights, and a new
-output directory for each condition. The runner withholds the target and private assessment
-fields, rejects overlong inputs, and saves responses, failures and reproduction settings.
+output directory for each condition. The runner withholds the target and evaluator source
+references, rejects overlong inputs, and saves responses, failures and reproduction settings.
 Checkpoint, device, precision and generation limits remain configurable.
 See the [generation reference](docs/generation.md) for selection, adapter compatibility,
 JSON/JSONL output fields and reproducibility limits. This command performs no training or scoring.

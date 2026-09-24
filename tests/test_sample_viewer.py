@@ -26,6 +26,7 @@ def test_default_export_excludes_held_out_content_and_preserves_history(tmp_path
     assert viewer.build_viewer(FIXTURE, output) == 1
     data = payload(output)
     original = json.loads((FIXTURE.parent / "train.jsonl").read_text())
+    original.pop("evaluation")
     assert data["samples"] == [original]
     assert data["run"] is None
     before = output.read_bytes()

@@ -182,7 +182,7 @@ def test_physical_separation_and_hash(manifest):
         lambda row: row.update(inputs={"gold_answer": "never copy"}),
         lambda row: row["messages"][0].update(reference="private evidence"),
         lambda row: row["evaluation"].update(dimensions=[]),
-        lambda row: row["evaluation"].pop("uncertainty_expectations"),
+        lambda row: row["evaluation"].pop("dimensions"),
         lambda row: row["evaluation"].update(sources=[]),
     ],
 )
@@ -205,7 +205,7 @@ def test_same_sample_format_withholds_only_final_target(split):
     assert "Lore (fixture-v1)" in prompt[0]["content"]
     row["messages"][-1]["content"] = "PRIVATE_TARGET"
     row["metadata"]["character_role"] = "PRIVATE_METADATA"
-    row["evaluation"]["expected_facts"] = ["PRIVATE_CRITERIA"]
+    row["evaluation"]["sources"][0]["reference"] = "PRIVATE_CRITERIA"
     assert evaluation_messages(row) == prompt
     assert "PRIVATE_" not in json.dumps(prompt)
     assert "EVALUATOR_ONLY" not in json.dumps(prompt)
@@ -319,3 +319,20 @@ def test_physical_aliases(manifest, alias_kind):
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="split file reused"):
         validate_manifest(manifest)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "expected_facts",
+        "expected_behaviours",
+        "expected_style",
+        "prohibited_contradictions",
+        "uncertainty_expectations",
+    ],
+)
+def test_current_samples_reject_retired_checklist_fields(field):
+    row = record()
+    row["evaluation"][field] = []
+    with pytest.raises(ValueError, match="unknown fields"):
+        validate_record(row)

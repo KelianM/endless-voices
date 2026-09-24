@@ -63,7 +63,6 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 <section id="model-panel"><h2>Model response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre></section>
 </div>
 <details><summary>Sample metadata and sources</summary><pre id="metadata"></pre></details>
-<details><summary>Assessment-only notes · not model input</summary><pre id="assessment"></pre></details>
 <details id="run-details" hidden><summary>Generation run</summary><pre id="run-info"></pre></details>
 </article>
 </main>
@@ -115,7 +114,6 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     get('target').textContent = target;
     get('target-info').textContent = words(target) + ' words · Withheld during generation';
     get('metadata').textContent = JSON.stringify(sample.metadata, null, 2);
-    get('assessment').textContent = JSON.stringify(sample.evaluation, null, 2);
     if (data.run) {
       const response = data.run.responses[sample.metadata.id];
       get('response').textContent = response && response.response ? response.response : '';

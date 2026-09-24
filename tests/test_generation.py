@@ -155,7 +155,7 @@ def test_target_and_private_notes_cannot_change_tokenized_input(tokenizer):
     record = json.loads((FIXTURES / "validation.jsonl").read_text())
     before, _ = gen.prepare_prompt(record, tokenizer, 256, 4)
     record["messages"][-1]["content"] = "SECRET TARGET"
-    record["evaluation"]["expected_facts"] = ["SECRET CRITERIA"]
+    record["evaluation"]["sources"][0]["reference"] = "SECRET CRITERIA"
     after, _ = gen.prepare_prompt(record, tokenizer, 256, 4)
     assert before == after
     assert "SECRET" not in json.dumps(after)

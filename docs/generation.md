@@ -6,7 +6,7 @@ user message. The command never trains an adapter or calls an evaluator.
 
 The runner uses `evaluation_messages` from the [conversation contract](contracts.md). Profiles,
 lore, scene assumptions and earlier authored replies remain unchanged. The original final reply,
-sample metadata and private assessment fields are never passed to the tokenizer or model.
+sample metadata and evaluator source references are never passed to the tokenizer or model.
 Generation uses the checkpoint's native chat template with an assistant generation prompt.
 
 ## Run locally
