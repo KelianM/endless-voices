@@ -412,3 +412,49 @@ def test_recognition_and_reversed_trials_do_not_change_primary_denominator(datas
     assert result["results"][0]["recognized"]["correct"] == 1
     assert result["results"][0]["unrecognized"]["scheduled"] == 0
     assert len(result["position_checks"]) == 1
+
+
+def test_agent_collection_preserves_missing_invalid_and_unavailable_identity_metadata(tmp_path):
+    import importlib.util
+
+    script = Path(__file__).parents[1] / "scripts/agent_calibration.py"
+    spec = importlib.util.spec_from_file_location("agent_calibration", script)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    tasks = []
+    for i in range(3):
+        prompt = tmp_path / f"{i}.txt"
+        prompt.write_text("Simulated blinded prompt")
+        answer = tmp_path / f"{i}.json"
+        if i == 0:
+            answer.write_text(
+                json.dumps(
+                    {
+                        "choice": "A",
+                        "confidence": "low",
+                        "reason": "Simulated review",
+                        "recognized_source": False,
+                    }
+                )
+            )
+        elif i == 1:
+            answer.write_text("invalid simulated output")
+        tasks.append(
+            {
+                "trial_id": str(i),
+                "trial_sha256": "fixture-hash",
+                "agent_id": f"simulated-agent-{i}",
+                "prompt": str(prompt),
+                "prompt_sha256": a.file_hash(prompt),
+                "answer": str(answer),
+            }
+        )
+    a.write_json(tmp_path / "assignments.json", tasks)
+    module.collect(tmp_path, tmp_path / "collected.json")
+    result = a.read_json(tmp_path / "collected.json")
+    assert [r["status"] for r in result["reviews"]] == ["ok", "failed", "missing"]
+    assert result["judge_model_and_prompt"]["model_revision"] is None
+    assert result["judge_model_and_prompt"]["sampling_parameters"] is None
+    assert result["reviews"][0]["agent_id"] == "simulated-agent-0"
+    with pytest.raises(FileExistsError):
+        module.collect(tmp_path, tmp_path / "collected.json")

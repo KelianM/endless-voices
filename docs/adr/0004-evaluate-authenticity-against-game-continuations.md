@@ -1,6 +1,6 @@
 # 4. Judge authenticity against original game continuations
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR 6
 - **Date:** 2026-09-23
 - **Sources:** [Issue #6](https://github.com/KelianM/endless-voices/issues/6), [PR #13](https://github.com/KelianM/endless-voices/pull/13), [Li et al., 2017](https://aclanthology.org/D17-1230/)
 
