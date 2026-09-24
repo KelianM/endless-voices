@@ -1,0 +1,68 @@
+{
+  "seed": 20260924,
+  "manifest_sha256": "c012495445805b15ebdf20ef13e8e5ab45dc23276a0743a372c9b650aaba5b40",
+  "selection": "Seeded selection of one sample per conversation; prefer unused conversations",
+  "primary": [
+    {
+      "sample_id": "fw-greenrock-withdrawal-militia-captain-l867-fee898fc",
+      "identity": "human-free-worlds",
+      "conversation_id": "human-free-worlds-side-plots-l852",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "fw-katya-5b-katya-on-pirate-youth-l1928-a8df66c3",
+      "identity": "human-free-worlds",
+      "conversation_id": "human-free-worlds-0-prologue-l1912",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "fw-recon-3-jj-new-wales-base-l468-63b32cca",
+      "identity": "human-free-worlds",
+      "conversation_id": "human-free-worlds-0-prologue-l462",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "fw-northern-3-freya-and-alondo-fleet-status-l1006-3541bed2",
+      "identity": "human-free-worlds",
+      "conversation_id": "human-free-worlds-2-middle-l997",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "fw-northern-2c-freya-city-sensor-l950-90b1731c",
+      "identity": "human-free-worlds",
+      "conversation_id": "human-free-worlds-2-middle-l942",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "diana-howl-credit-return-l3086-d2ddde92",
+      "identity": "republic",
+      "conversation_id": "human-human-missions-l3084",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "commander-hines-harmony-talks-l1937-a6e8c8ac",
+      "identity": "republic",
+      "conversation_id": "human-free-worlds-1-start-l1919",
+      "conversation_previously_used": false
+    },
+    {
+      "sample_id": "hai-diner-maturity-tenets-l207-a621aa95",
+      "identity": "hai-mainstream",
+      "conversation_id": "hai-hai-culture-conversations-l187",
+      "conversation_previously_used": true
+    },
+    {
+      "sample_id": "first-contact-hai-l93-ba31c7ea",
+      "identity": "hai-mainstream",
+      "conversation_id": "hai-hai-missions-l20",
+      "conversation_previously_used": true
+    },
+    {
+      "sample_id": "quarg-first-contact-l27-074dc46f",
+      "identity": "quarg",
+      "conversation_id": "quarg-quarg-missions-l21",
+      "conversation_previously_used": true
+    }
+  ],
+  "limitations": "Hai and Quarg reuse conversations; unreviewed turns do not erase familiarity. Control donor is reused only within the control stage. This round does not validate subtle context errors comprehensively."
+}

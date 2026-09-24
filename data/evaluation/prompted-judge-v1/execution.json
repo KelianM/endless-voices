@@ -1,0 +1,51 @@
+{
+  "review_status": "human review pending; judge is provisional",
+  "smoke": {
+    "trial_count": 1,
+    "status": "ok",
+    "elapsed_seconds": 6.220611082972027,
+    "peak_memory_gb": 8.933804804,
+    "prompt_tokens": 1195,
+    "output_tokens": 111
+  },
+  "packages": {
+    "mlx": "0.32.2",
+    "mlx-lm": "0.31.1",
+    "tokenizers": "0.23.2",
+    "transformers": "5.17.0"
+  },
+  "model": {
+    "path": "data/local/hub/models--mlx-community--Qwen3-14B-4bit/snapshots/a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+    "quantization": "4-bit MLX conversion of Qwen/Qwen3-14B",
+    "revision": "a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4",
+    "source": "mlx-community/Qwen3-14B-4bit"
+  },
+  "notes": [
+    "Existing smoke example, not fresh calibration.",
+    "An earlier strict-JSON failure is preserved under outputs/judge-smoke-v1. The model included reviewer_type; the wrapper now clarifies that the runner records metadata.",
+    "The sandboxed first generation attempt terminated; preserved under outputs/qwen3-4b-judge-calibration-v1. The GPU-enabled run completed ten responses under v2."
+  ],
+  "calibration_execution": {
+    "primary": {
+      "scheduled": 10,
+      "completed": 10,
+      "failed": 0,
+      "total_trial_seconds": 56.2370817939518,
+      "peak_memory_gb": 9.030275592
+    },
+    "reversed": {
+      "scheduled": 10,
+      "completed": 10,
+      "failed": 0,
+      "total_trial_seconds": 56.463341666036285,
+      "peak_memory_gb": 9.030275584
+    },
+    "controls": {
+      "scheduled": 2,
+      "completed": 2,
+      "failed": 0,
+      "total_trial_seconds": 8.340473791118711,
+      "peak_memory_gb": 8.951777368
+    }
+  }
+}

@@ -135,7 +135,7 @@ sensitivity, and abstention. Document discrepancies and decide with the user whe
 is useful; this pack specifies no unsupported universal agreement threshold. Failed controls
 or dominant formatting cues block interpreting the judge's detection rate as authenticity.
 
-## Reporting rule for later implementation
+## Reporting rule
 
 Report original-identification accuracy among decided primary trials, together with counts of
 correct, incorrect, abstained, and failed trials and their denominators. Report abstention and
@@ -217,3 +217,11 @@ membership or the frozen release.
 Use the [generation command](../../README.md#generate-comparable-responses) to collect responses and explicit failures.
 The pinned Qwen3-4B-Instruct-2507 configuration is a replaceable smoke-run checkpoint. Judge
 validation still needs fresh scenes and actual model outputs under the protocol above.
+
+## Prompted local judge implementation
+
+The [assessment workflow](../../README.md#assess-saved-responses) verifies saved generation runs,
+exports isolated blinded trials, runs a local MLX judge, and produces reproducible reports.
+The [first prompted-judge round](prompted-judge-v1/README.md) records selection and execution.
+Human comparison and discussion remain pending; implementation does not establish judge reliability.
+A trained discriminator and adversarial generator training remain outside this workflow.
