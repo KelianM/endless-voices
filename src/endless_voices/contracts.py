@@ -1,4 +1,4 @@
-"""Validate version 1 conversation samples and split manifests offline."""
+"""Validate conversation samples and split manifests offline."""
 
 import argparse
 import hashlib
@@ -106,28 +106,9 @@ def validate_record(record: object, split: str | None = None) -> None:
     for message in record["messages"]:
         fields(message, {"role", "content"}, "message")
     evaluation = record["evaluation"]
-    fields(
-        evaluation,
-        {
-            "dimensions",
-            "expected_facts",
-            "expected_behaviours",
-            "expected_style",
-            "prohibited_contradictions",
-            "uncertainty_expectations",
-            "sources",
-        },
-        "evaluation",
-    )
-    texts(evaluation["dimensions"], "evaluation.dimensions")
-    for key in (
-        "expected_facts",
-        "expected_behaviours",
-        "expected_style",
-        "prohibited_contradictions",
-        "uncertainty_expectations",
-    ):
-        texts(evaluation[key], f"evaluation.{key}", allow_empty=True)
+    fields(evaluation, {"dimensions", "sources"}, "evaluation")
+    if evaluation["dimensions"] != ["authenticity"]:
+        raise ValueError("evaluation.dimensions must be ['authenticity']")
     sources(evaluation["sources"], "evaluation.sources")
 
 

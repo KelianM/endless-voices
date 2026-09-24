@@ -33,23 +33,6 @@
         ]
       },
       "alternative": "We came from a small moon, with air too thin for your people. The worlds you find comfortable are difficult for us, so we have little reason to quarrel over a home. We are old, and we have no taste for killing as a pastime. The Drak have given us the means to travel beyond the usual paths. We may settle among other peoples without fear, and we would rather make friends than enemies.",
-      "expectations": {
-        "expected_facts": [
-          "The speaker describes Quarg origins on a thin-atmosphere moon of a gas giant."
-        ],
-        "expected_behaviours": [
-          "Peaceful coexistence does not imply helplessness or unconditional pacifism."
-        ],
-        "expected_style": [
-          "Patient explanation; collective self-reference is permitted, not mandatory."
-        ],
-        "prohibited_contradictions": [
-          "Claim that Quarg want to conquer the habitable worlds desired by other species."
-        ],
-        "uncertainty_expectations": [
-          "Treat this as the speaker's account, not independent confirmation of every claim about the Drak."
-        ]
-      },
       "note": "An agent-authored paraphrase, written with access to the source; not an independently generated model response. Plausible fit is a hypothesis for review, not an authenticity label."
     },
     {
@@ -85,21 +68,6 @@
         ]
       },
       "alternative": "That began long before I was born. I know our northern neighbors as they are now, but I would not pretend to explain how they came to be that way. An older Hai could tell you more than I can.",
-      "expectations": {
-        "expected_facts": [],
-        "expected_behaviours": [
-          "The young resident refers the visitor to an older Hai for the history."
-        ],
-        "expected_style": [
-          "An approachable conversational answer is appropriate."
-        ],
-        "prohibited_contradictions": [
-          "Deliver the elder's detailed historical testimony as this young speaker's own knowledge."
-        ],
-        "uncertainty_expectations": [
-          "Acknowledge limited personal historical knowledge."
-        ]
-      },
       "note": "An agent-authored plausible alternative, written with access to the source. Whether it is recognizable as generated remains an unanswered calibration question."
     },
     {
@@ -131,23 +99,6 @@
         ]
       },
       "alternative": "Because a militia ship taking a close interest in a Navy cruiser could turn an already tense situation into a confrontation. We need to know what they are carrying, but we do not want to start something. A merchant can get that information without making it look like the Free Worlds are challenging the Navy.",
-      "expectations": {
-        "expected_facts": [
-          "The request concerns scanning a Republic ship through a sympathetic merchant."
-        ],
-        "expected_behaviours": [
-          "Explain the desire to obtain intelligence without provoking the Navy."
-        ],
-        "expected_style": [
-          "Practical operational explanation rather than a universal human or military stereotype."
-        ],
-        "prohibited_contradictions": [
-          "Claim the Republic's intentions are already known with certainty."
-        ],
-        "uncertainty_expectations": [
-          "Do not import later campaign outcomes."
-        ]
-      },
       "note": "An agent-authored plausible alternative, written with access to the source. The opening context is an authored summary of prior events, not an extracted full conversation."
     }
   ]

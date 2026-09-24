@@ -89,7 +89,6 @@ def samples_from_sources(recipe, inventory, source_root):
             },
             "evaluation": {
                 "dimensions": ["authenticity"],
-                **case["expectations"],
                 "sources": sources,
             },
         }

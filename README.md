@@ -19,10 +19,10 @@ These are experiment directions, not demonstrated results.
 ## What is here
 
 ```text
-src/endless_voices/         Training, chat, tokenization and dataset validation
+src/endless_voices/         Training, chat, generation and dataset validation
 scripts/                   Source fetching, preparation and dataset assembly
 tests/                     Offline tests and format fixtures
-configs/                   Training settings
+configs/                   Model and training settings
 docs/contracts.md          Conversation format and validator reference
 docs/adr/                  Architecture decisions
 data/README.md             Start here to reconstruct or annotate the dataset
@@ -32,7 +32,7 @@ data/evaluation/           Evaluation protocol and calibration evidence
 data/overview/             Upstream source inventory and statistics
 ```
 
-There is no frontend, general game-data ingestion, synthetic data generator, or evaluation runner.
+There is no frontend, general game-data ingestion, synthetic data generator, or scoring runner.
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
@@ -68,7 +68,7 @@ chat template that accepts your message roles, including `system` if used. No mo
 downloaded until you run a command. Model licenses, access requirements, and memory needs differ.
 For gated models, authenticate with Hugging Face first. Remote model code is not enabled.
 
-Both commands load the full base model in float32 for a simple CPU/MPS starting point. This is
+Training and interactive chat load the full base model in float32 for a simple CPU/MPS starting point. This is
 **LoRA, not quantized LoRA**: only adapter parameters train, but the base weights still occupy
 memory. Start with a small model, short sequences, and batch size one. CUDA is also supported.
 
@@ -114,7 +114,7 @@ limit within your model's supported context window.
 After selecting a model and supplying data:
 
 ```bash
-endless-train --config configs/train.toml
+train --config configs/train.toml
 ```
 
 The config exposes ordinary `TrainingArguments` settings and PEFT LoRA settings.
@@ -137,13 +137,13 @@ Use the same config for model identity in each comparison:
 
 ```bash
 # Starting checkpoint without an identity prompt
-endless-chat --config configs/train.toml
+chat --config configs/train.toml
 
 # Prompt-only condition
-endless-chat --config configs/train.toml --system "You are a cautious alien archivist."
+chat --config configs/train.toml --system "You are a cautious alien archivist."
 
 # Fine-tuned adapter, with an optional matching identity prompt
-endless-chat --config configs/train.toml --adapter outputs/example-adapter \
+chat --config configs/train.toml --adapter outputs/example-adapter \
   --system "You are a cautious alien archivist."
 ```
 
@@ -160,10 +160,96 @@ generates one answer. Entire conversations and known scenario variants stay in o
 The [authenticity protocol](data/evaluation/README.md) compares generated replies against original
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
-result is claimed. Generation and reporting
-commands remain future work. Fixed-history evaluation does not establish persistence through a
+result is claimed. The generation command below saves continuations; judging and comparison
+reports remain future work. Fixed-history evaluation does not establish persistence through a
 model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
+
+## Browse conversation samples
+
+Build a standalone reader for the 101 training samples:
+
+```bash
+python scripts/view_samples.py --output outputs/training-samples.html
+open outputs/training-samples.html
+```
+
+The HTML file works offline in a browser without a server or model download. Filter by identity,
+search sample IDs, roles or topics, and use Previous/Next or the left/right arrow keys outside
+form controls. Each sample shows authored history and the final target, with expandable model
+instructions, lore and source metadata.
+
+Use `--split validation` for validation samples. Held-out content is excluded from the default
+export; `--split test` or `--split all` explicitly includes it. The complete manifest is still
+validated across splits. Review of held-out content must not drive development or tuning.
+
+Add a saved generation run to compare available model replies with their targets:
+
+```bash
+python scripts/view_samples.py --split validation \
+  --run outputs/qwen3-4b-validation-cleaned-v1 \
+  --output outputs/validation-responses.html
+open outputs/validation-responses.html
+```
+
+Replace the run path with any compatible run directory. Missing responses, failures and samples
+not selected for the run remain distinct. The reader checks the dataset manifest and response
+hash when recorded. Choose a new output filename for each export; existing files are protected.
+The reader displays saved data and does not generate, score, edit or approve samples. It embeds
+the selected source text and target responses, so it is an organizer's reading copy,
+not a blinded judge input. Keep the [dataset attribution and licensing](NOTICE.md) with shared copies.
+
+## Generate comparable responses
+
+Generate one final reply per selected validation sample, retaining authored history:
+
+```bash
+generate --config configs/generate.toml \
+  --manifest data/pilot-v1/samples/manifest.json \
+  --sample-ids data/evaluation/smoke-sample-ids.json \
+  --device mps --dtype float16 --output outputs/qwen3-validation
+```
+
+The example downloads approximately 8 GB of pinned Qwen3-4B-Instruct-2507 weights into
+`data/local/hub/`. Add `--offline` to require cached weights. Change `[model]` in the config to
+use another checkpoint; Hub models require a full commit revision, while local directories are
+identified by file hashes. Inference fitting in memory does not establish that training will fit.
+
+Selection defaults to validation. `--sample-ids` accepts an ordered JSON list of IDs;
+`--limit N` limits the selection. Reserve the test split for the final comparison.
+Run `generate --help` for all options and defaults.
+
+For an adapted condition, repeat the command with `--adapter path/to/adapter` and a new output
+directory. Hub adapters also require `--adapter-revision`. Both conditions use the base tokenizer;
+conflicting adapter checkpoint or tokenizer declarations are rejected. An adapter with no recorded
+training revision is marked `revision_verified: false`. Compare dataset hashes, selected IDs,
+prompt/token hashes and generation settings before treating runs as paired.
+
+Generation retains authored history and withholds the final target and private metadata.
+The full templated prompt plus output budget must fit the requested and model context limits.
+Overlong inputs and templates that alter authored text fail without truncation. Defaults are greedy
+decoding, 4,096 total tokens and at most 512 output tokens. Seeds are stable per sample;
+identical outputs across hardware or library versions are not guaranteed.
+
+Each run requires a fresh output directory and saves:
+
+| File | Contents |
+| --- | --- |
+| `run.json` | Run status/counts, dataset hashes, model/tokenizer/adapter identities, effective generation settings, software/device/code provenance and artifact hashes |
+| `sample-ids.json` | Ordered selection, reusable with `--sample-ids` |
+| `prompts.jsonl` | Model-visible messages, prompt hashes and token IDs; no targets or evaluator metadata |
+| `responses.jsonl` | One result per selected ID, including explicit failures |
+| `tokenizer/` | Effective tokenizer and chat template |
+
+Response rows contain `sample_id`, `status` (`ok` or `failed`) and `response` (text or null).
+Attempted generations also record timing, seed, token IDs/counts and finish reason. Failures include
+an `error` with stage, type and message. Reaching the output cap is an `OutputLimit` failure;
+the partial response is retained. Targets remain in the dataset and can be joined by sample ID.
+
+Exit codes are 0 for all samples completed, 1 for failure and 130 for a caught interrupt.
+A hard process kill can leave a `running` manifest and missing rows; check the saved selection
+before using a run. Keep [source attribution](NOTICE.md) with shared outputs. Smoke runs check
+execution, not model quality. Generation performs no training or scoring.
 
 ## Development
 

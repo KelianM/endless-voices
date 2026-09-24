@@ -193,9 +193,7 @@ def assemble(batch, source_catalog, source_root, *, review_status="draft"):
                         "sources": sources, "authorship": "mixed", "review_status": review_status,
                     },
                     "evaluation": {
-                        "dimensions": ["authenticity"], "expected_facts": [],
-                        "expected_behaviours": [], "expected_style": [],
-                        "prohibited_contradictions": [], "uncertainty_expectations": [],
+                        "dimensions": ["authenticity"],
                         "sources": sources,
                     },
                 }

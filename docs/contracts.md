@@ -2,7 +2,7 @@
 
 Train, validation, and test files use the same sample format. Each sample contains a
 representative's identity and selected lore, authored conversation history, a final user
-message, one target response, and evaluator-only criteria. The first experiment compares
+message, one target response, and evaluator source references. The first experiment compares
 prompted and fine-tuned models given identical identity instructions, lore, and history.
 
 [ADR 3](adr/0003-use-one-conversation-format-across-splits.md) records the design.
@@ -46,11 +46,6 @@ Store one complete JSON object per line in UTF-8 JSONL. The example below is exp
   },
   "evaluation": {
     "dimensions": ["authenticity"],
-    "expected_facts": [],
-    "expected_behaviours": ["Acknowledge the clerk's knowledge limit."],
-    "expected_style": ["Use plain language."],
-    "prohibited_contradictions": ["Claiming the archive is currently open."],
-    "uncertainty_expectations": ["Do not invent opening hours."],
     "sources": [{
       "reference": "Invented fixture, not canon",
       "revision": "fixture-v1",
@@ -89,11 +84,11 @@ and `source_group` strings. References identify passages or curation evidence ID
 should pin immutable evidence: a full upstream commit for game text or a version for original
 material. Structural validation does not contact sources or verify their truth or immutability.
 
-`evaluation` contains private assessment notes in every split. `dimensions` is a nonempty list
-of names; the example names illustrate the intended concerns, not an implemented rubric.
-The five expectation lists are required and may be empty when inapplicable. List entries must
-be nonempty text. Evaluation sources use the same format as metadata sources and may identify
-different evidence. A target response is one acceptable answer, not an exact-match requirement.
+`evaluation` contains only `dimensions: ["authenticity"]` and `sources`. Source references use
+the same format as metadata and may identify additional evidence. Per-sample checklists and
+expectation lists are rejected. Authenticity uses blinded original-versus-generated
+pairs and free-text reasons, as chosen in [ADR 4](adr/0004-evaluate-authenticity-against-game-continuations.md).
+A target response is one acceptable answer, not an exact-match requirement.
 
 ## Training and evaluation use the same sample
 
@@ -111,8 +106,8 @@ prompt = evaluation_messages(record)
 ```
 
 `evaluation_messages` returns fresh message dictionaries containing `messages[:-1]`. The prompt
-ends with the final user message. The final target, metadata, and evaluation criteria are never
-copied. The helper works identically for train, validation, and test samples.
+ends with the final user message. The final target, metadata, and evaluation source references
+are never copied. The helper works identically for train, validation, and test samples.
 
 A multi-turn history remains fixed and authored. The helper evaluates one new response; it does
 not substitute generated replies into earlier turns or continue with prewritten follow-ups.
@@ -120,8 +115,8 @@ Fixed-history evaluation measures response quality in supplied context, not pers
 a model's own unfolding conversation. Free-running dialogue evaluation is a later design.
 
 Both model conditions receive identical system context, including selected lore. The evaluator
-can use the same lore and additional private criteria. Sharing canonical facts is intentional;
-exposing the withheld target or assessment notes is not. Authors must avoid copying private
+can use the same lore and source references. Sharing canonical facts is intentional;
+exposing the withheld target or origin label is not. Authors must avoid copying private
 answers into model-visible context; structure checks cannot detect that semantic mistake.
 
 The first format stores the exact profile and selected lore text in the system message, with
@@ -182,9 +177,7 @@ Those checks do not establish exhaustive semantic deduplication.
 From the repository root after installing `.[dev]`:
 
 ```sh
-endless-validate tests/fixtures/contracts/manifest.json
-# Equivalent invocation before refreshing installed entry points:
-python -m endless_voices.contracts tests/fixtures/contracts/manifest.json
+validate tests/fixtures/contracts/manifest.json
 ```
 
 Structural validation uses only the standard library and downloads nothing. The command checks
@@ -200,14 +193,14 @@ For an individual file, use `read_records(Path(...), "train")`; global checks re
 Optional token checks use a saved local tokenizer and the existing loader's length check:
 
 ```sh
-endless-validate data/local/curated/v1/manifest.json \
+validate data/local/curated/v1/manifest.json \
   --tokenizer /absolute/path/to/local-tokenizer --max-length 2048
 ```
 
 Both flags are required together. Tokenizer loading is local-only, with remote code disabled;
 no model weights are loaded. Every complete sample in every split must fit the limit and contain
-at least two tokens. Failures report file/line without truncation. The future generation runner
-must separately budget the prompt and generated output; an authored target's length does not
+at least two tokens. Failures report file/line without truncation. The generation runner
+separately budgets the prompt and generated output; an authored target's length does not
 bound the model's generated response.
 
 ## Evaluation and remaining work
@@ -216,7 +209,7 @@ The [authenticity protocol](../data/evaluation/README.md) uses the same sample f
 authenticity trial, the final target must be attributable original game speech, not an agent-written
 reference presented as original. The generator receives `messages[:-1]`; the blinded judge sees
 that context plus the original and generated continuations as unlabelled alternatives. The judge
-receives neither origin labels nor private assessment criteria. Training samples can still have
+receives neither origin labels nor per-sample checklists. Training samples can still have
 authored targets. This is an evaluation eligibility rule, not a schema change.
 
 The legacy calibration pack contains only draft validation samples, without invented train/test shards.

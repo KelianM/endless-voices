@@ -103,6 +103,10 @@ data/pilot-v1/
   release.json    Version, tokenizer specification and frozen hashes
 ```
 
+For a browser reading copy with identity filters and sample navigation, use the
+[sample reader](../README.md#browse-conversation-samples). The default export contains only the
+training split; including the held-out split requires an explicit option.
+
 ## Annotate additional conversations
 
 Reconstructing the committed release needs no agent calls. Expanding the release requires new

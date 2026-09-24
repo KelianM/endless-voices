@@ -90,7 +90,7 @@ def test_blinding_and_position_reversal(sources):
             assert a[ka["original"]] == sample["messages"][-1]["content"]
     changed = copy.deepcopy(records)
     for record in changed:
-        record["evaluation"]["expected_facts"] = ["PRIVATE ASSESSMENT"]
+        record["evaluation"]["sources"][0]["reference"] = "PRIVATE ASSESSMENT"
         record["metadata"]["sources"][0]["reference"] = "PRIVATE SOURCE"
     assert calibration.review_pack(changed, recipe, "a")[0] == first
 

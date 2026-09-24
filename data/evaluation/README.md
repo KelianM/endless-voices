@@ -204,3 +204,16 @@ The next dataset and evaluator work should read these findings before authoring 
 material. Preserve the primary insight—voice can disappear in an otherwise sensible paraphrase—
 without turning specific phrases into required catchphrases. Add new review records for fresh
 scenes and model outputs, retaining the earlier results for comparison.
+
+## Generation infrastructure smoke samples
+
+[smoke-sample-ids.json](smoke-sample-ids.json) selects four `pilot-v1` validation samples, one
+per identity. Selection takes the first multi-turn sample for each identity in file order,
+so the check exercises preserved authored history. These are infrastructure checks; the
+selection is neither a representative quality sample nor fresh judge-calibration evidence.
+No test samples are generated or inspected for tuning. The selection does not alter split
+membership or the frozen release.
+
+Use the [generation command](../../README.md#generate-comparable-responses) to collect responses and explicit failures.
+The pinned Qwen3-4B-Instruct-2507 configuration is a replaceable smoke-run checkpoint. Judge
+validation still needs fresh scenes and actual model outputs under the protocol above.

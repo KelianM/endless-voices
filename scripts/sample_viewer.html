@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endless Voices · Sample reader</title>
+<style>
+:root { color-scheme: light dark; --bg: light-dark(#fafaf8,#171918); --text: light-dark(#242c28,#e5eae6); --muted: light-dark(#58685f,#a9b7ae); --line: light-dark(#d5ddd7,#39453d); --panel: light-dark(#fff,#202722); --accent: light-dark(#265b40,#b5dbc3); }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, sans-serif; }
+main { max-width: 1080px; margin: auto; padding: 32px 24px 60px; }
+h1 { margin: 0; font-size: 28px; font-weight: 600; }
+h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+p { margin: 0 0 16px; }
+.muted { color: var(--muted); font-size: 14px; }
+.filters { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin: 24px 0 14px; }
+label { display: grid; gap: 5px; font-size: 14px; }
+select, input, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; max-width: 100%; }
+button { cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+nav { display: flex; gap: 10px; align-items: center; margin: 14px 0 28px; flex-wrap: wrap; }
+nav label { flex: 1; min-width: 180px; }
+#position { font-variant-numeric: tabular-nums; }
+section { margin-top: 24px; }
+.copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.turn { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--line); }
+.turn:last-child { border-color: var(--accent); }
+.role { color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; border-top: 1px solid var(--line); margin-top: 24px; }
+.comparison.solo { grid-template-columns: 1fr; }
+details { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; }
+summary { cursor: pointer; color: var(--accent); padding: 6px 0 12px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+#sample-id { overflow-wrap: anywhere; }
+#empty { padding: 32px 0; }
+[hidden] { display: none !important; }
+@media (max-width: 650px) { main { padding: 20px 16px 40px; } .filters, .comparison { grid-template-columns: 1fr; } nav label { flex-basis: 100%; order: -1; } }
+</style>
+</head>
+<body>
+<main>
+<header><h1>Endless Voices</h1><p class="muted" id="dataset"></p></header>
+<div class="filters">
+<label>Split<select id="split"></select></label>
+<label>Identity<select id="identity"></select></label>
+<label>Search ID, role or topic<input id="search" type="search" placeholder="e.g. quarg, diplomacy, barkeep"></label>
+</div>
+<nav aria-label="Sample navigation">
+<button id="previous" type="button">← Previous</button>
+<label>Sample<select id="sample"></select></label>
+<button id="next" type="button">Next →</button>
+<span class="muted" id="position" aria-live="polite"></span>
+</nav>
+<p id="empty" hidden>No samples match these filters.</p>
+<article id="reading">
+<h2 id="character"></h2><p class="muted" id="sample-id"></p>
+<details id="instructions"><summary>Model instructions, scene and selected lore</summary><div class="copy" id="system"></div></details>
+<section><h2>Authored conversation</h2><div id="history"></div></section>
+<div class="comparison" id="comparison">
+<section><h2>Target response</h2><p class="muted" id="target-info"></p><div class="copy" id="target"></div></section>
+<section id="model-panel"><h2>Model response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre></section>
+</div>
+<details><summary>Sample metadata and sources</summary><pre id="metadata"></pre></details>
+<details id="run-details" hidden><summary>Generation run</summary><pre id="run-info"></pre></details>
+</article>
+</main>
+<script id="samples-data" type="application/json">__SAMPLE_DATA__</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('samples-data').textContent);
+  const get = id => document.getElementById(id);
+  const split = get('split'), identity = get('identity'), search = get('search'), select = get('sample');
+  let filtered = [], index = 0;
+  const words = text => (text.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu) || []).length;
+  const addOption = (node, value, label) => {
+    const option = document.createElement('option'); option.value = value; option.textContent = label; node.append(option);
+  };
+  const splits = [...new Set(data.samples.map(s => s.metadata.split))];
+  if (splits.length > 1) addOption(split, 'all', 'All included splits');
+  splits.forEach(value => addOption(split, value, value === 'test' ? 'test · held out' : value));
+  addOption(identity, 'all', 'All identities');
+  [...new Set(data.samples.map(s => s.metadata.identity))].sort().forEach(value => addOption(identity, value, value));
+  get('dataset').textContent = data.dataset_version + ' · ' + data.samples.length + ' samples · Local reader';
+  get('model-panel').hidden = !data.run;
+  get('comparison').classList.toggle('solo', !data.run);
+  if (data.run) {
+    get('run-details').hidden = false;
+    const {responses, selected_ids, ...summary} = data.run;
+    get('run-info').textContent = JSON.stringify(summary, null, 2);
+  }
+  function render() {
+    const sample = filtered[index];
+    get('reading').hidden = !sample; get('empty').hidden = Boolean(sample);
+    get('previous').disabled = !sample || index === 0;
+    get('next').disabled = !sample || index === filtered.length - 1;
+    select.disabled = !sample;
+    get('position').textContent = sample ? (index + 1) + ' / ' + filtered.length : '0 / 0';
+    if (!sample) return;
+    select.value = sample.metadata.id;
+    get('character').textContent = sample.metadata.character_role;
+    get('sample-id').textContent = sample.metadata.identity + ' · ' + sample.metadata.split + ' · ' + sample.metadata.id;
+    get('system').textContent = sample.messages[0].content;
+    const history = get('history'); history.replaceChildren();
+    sample.messages.slice(1, -1).forEach((message, i, turns) => {
+      const turn = document.createElement('div'); turn.className = 'turn';
+      const role = document.createElement('div'); role.className = 'role';
+      role.textContent = message.role === 'assistant' ? 'Earlier assistant reply · authored' : (i === turns.length - 1 ? 'User · final prompt' : 'User');
+      const content = document.createElement('div'); content.className = 'copy'; content.textContent = message.content;
+      turn.append(role, content); history.append(turn);
+    });
+    const target = sample.messages[sample.messages.length - 1].content;
+    get('target').textContent = target;
+    get('target-info').textContent = words(target) + ' words · Withheld during generation';
+    get('metadata').textContent = JSON.stringify(sample.metadata, null, 2);
+    if (data.run) {
+      const response = data.run.responses[sample.metadata.id];
+      get('response').textContent = response && response.response ? response.response : '';
+      get('failure').hidden = !(response && response.error);
+      get('failure').textContent = response && response.error ? JSON.stringify(response.error, null, 2) : '';
+      if (!response) {
+        get('response-info').textContent = data.run.selected_ids.includes(sample.metadata.id) ? 'Selected for run · response record missing' : 'Not selected for this run';
+      } else {
+        const info = [response.status === 'ok' ? 'Completed' : 'Failed · partial text retained when available'];
+        if (response.response != null) info.push(words(response.response) + ' words');
+        if (response.elapsed_seconds != null) info.push(response.elapsed_seconds.toFixed(1) + ' seconds');
+        if (response.finish_reason) info.push('Stop: ' + response.finish_reason);
+        get('response-info').textContent = info.join(' · ');
+      }
+    }
+  }
+  function filter(preferredId) {
+    const query = search.value.trim().toLowerCase();
+    filtered = data.samples.filter(s => (split.value === 'all' || s.metadata.split === split.value) &&
+      (identity.value === 'all' || s.metadata.identity === identity.value) &&
+      [s.metadata.id, s.metadata.identity, s.metadata.character_role, ...s.metadata.topics].join(' ').toLowerCase().includes(query));
+    select.replaceChildren();
+    filtered.forEach(s => addOption(select, s.metadata.id, s.metadata.id));
+    index = Math.max(0, filtered.findIndex(s => s.metadata.id === preferredId)); render();
+  }
+  function navigate(next) { index = next; render(); }
+  split.addEventListener('change', () => filter(select.value));
+  identity.addEventListener('change', () => filter(select.value));
+  search.addEventListener('input', () => filter(select.value));
+  select.addEventListener('change', () => navigate(filtered.findIndex(s => s.metadata.id === select.value)));
+  get('previous').addEventListener('click', () => navigate(index - 1));
+  get('next').addEventListener('click', () => navigate(index + 1));
+  document.addEventListener('keydown', event => {
+    if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(event.target.tagName) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === 'ArrowLeft' && index > 0) { event.preventDefault(); navigate(index - 1); }
+    if (event.key === 'ArrowRight' && index + 1 < filtered.length) { event.preventDefault(); navigate(index + 1); }
+  });
+  filter();
+})();
+</script>
+</body>
+</html>
