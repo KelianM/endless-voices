@@ -63,7 +63,7 @@ no failures were retried or promoted to successful responses.
 
 Test dialogue and generated test text were not inspected or judged. The checks used hashes,
 identifiers, identity metadata and execution status only. These counts establish generation
-coverage, not model quality; the expanded agent calibration is still in progress.
+coverage, not model quality; the expanded calibration findings are reported separately.
 
 ## Change to agent-based calibration
 
@@ -72,4 +72,5 @@ as recorded in [ADR 6](../../../docs/adr/0006-calibrate-a-local-prompted-judge-w
 The earlier human pack and local judge outputs remain preserved; no human answers were submitted.
 The expanded round uses all 48 successful validation outputs, one fresh sub-agent invocation per
 primary trial, and two isolated control reviews. The local judge also evaluates all reversed pairs.
-These calls cover 15 conversations, not 48 independent scenes. The expanded comparison is pending.
+These calls cover 15 conversations, not 48 independent scenes. The expanded comparison is complete: agents identified 48/48 originals and the local judge 5/48.
+The local judge remains unsuitable for headline results; see [findings and evidence](agent-findings.md).

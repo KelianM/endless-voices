@@ -162,8 +162,10 @@ The [authenticity protocol](data/evaluation/README.md) compares generated replie
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
 result is claimed. The generation command below saves continuations; the assessment workflow prepares blinded
-trials and exploratory reports. The local prompted judge is being calibrated against isolated agent reviews. Fixed-history evaluation does not establish persistence through a
-model’s own unfolding conversation. See the
+trials and exploratory reports. The first local prompted judge remains unsuitable for headline
+results after comparison with isolated agent reviews; see
+[the findings](data/evaluation/prompted-judge-v1/agent-findings.md). Fixed-history evaluation does
+not establish persistence through a model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
 ## Browse conversation samples

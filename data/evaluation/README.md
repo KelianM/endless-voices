@@ -227,3 +227,8 @@ exports isolated blinded trials, runs a local MLX judge, and produces reproducib
 The [first prompted-judge round](prompted-judge-v1/README.md) records selection and execution.
 Agent comparison is underway under the revised protocol; implementation does not establish judge reliability.
 A trained discriminator and adversarial generator training remain outside this workflow.
+
+The [expanded validation findings](prompted-judge-v1/agent-findings.md) compare 50 isolated agent
+reviews with 98 local judge calls. The first local configuration remains unsuitable for headline
+results despite passing both easy controls. Full reasons, provenance and reproducible reports
+are preserved with the findings.
