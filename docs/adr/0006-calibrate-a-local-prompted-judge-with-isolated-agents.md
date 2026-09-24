@@ -1,6 +1,6 @@
 # 6. Calibrate a local prompted judge with isolated agents
 
-- **Status:** Accepted
+- **Status:** Superseded by ADR 7
 - **Date:** 2026-09-24
 - **Sources:** [Issue #9](https://github.com/KelianM/endless-voices/issues/9),
   [PR #16](https://github.com/KelianM/endless-voices/pull/16),

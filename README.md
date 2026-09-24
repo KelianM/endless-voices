@@ -336,6 +336,36 @@ loads the organizer key. Use the same reviewer ID and settings for separate prim
 and control invocations, each with a fresh output directory. A new configuration needs a distinct
 reviewer ID. An interruption preserves submitted rows; remaining trials count as missing.
 
+### Optional hosted judges
+
+[ADR 7](docs/adr/0007-allow-budgeted-hosted-judge-experiments.md) permits explicitly authorized
+hosted experiments. Put `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the gitignored `.env` file.
+The public trial text is sent to that provider. The runners need no additional SDK.
+
+```bash
+python -m endless_voices.openai_judge --public outputs/assessment/public \
+  --output outputs/openai-review --budget 5 --limit 196
+python -m endless_voices.anthropic_judge --public outputs/assessment/public \
+  --output outputs/sonnet-review --budget 5 --limit 98
+```
+
+OpenAI runs Luna then Sol; Anthropic runs Sonnet 5. Each uses medium effort, structured JSON,
+a 4,096-token output ceiling including reasoning, and independent requests. The $5 maximum
+applies separately to each command. `--limit` bounds new calls. Run one process per output
+directory. Requests and results are immutable; `review.json` updates after each result.
+`settings.json` records hashes and prices; `state.json` records completion or an error stop.
+Costs use returned usage and published prices, with conservative reservations for unknown
+outcomes. Costs are estimates rather than invoices.
+
+The same command can resume after a deliberate call limit or interruption if inputs and code
+match. Never resume an error stop without investigating it. Previously attempted requests are
+not resent. Use a new output directory for changed settings. Keep failed attempts as evidence.
+Pass each model's `review.json` to the report command below.
+
+[Hosted comparison findings](data/evaluation/hosted-judge-comparison-v1/README.md) preserve
+Luna, Sol and Sonnet results, the failed Sonnet schema attempt and the stopped Gemini round.
+No model has been automatically selected as the operational judge.
+
 ### Reports
 
 ```bash
