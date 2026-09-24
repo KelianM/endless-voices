@@ -258,7 +258,7 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
             "coverage": coverage,
             "trials": private,
             "instructions_sha256": digest(instructions.encode()),
-            "calibration_status": "provisional; human comparison and owner discussion required",
+            "calibration_status": "provisional; calibration and owner discussion required",
         },
     )
     for stage in ("primary", "reversed", "controls"):
