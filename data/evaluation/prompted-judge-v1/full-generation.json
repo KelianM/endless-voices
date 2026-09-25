@@ -1,0 +1,178 @@
+{
+  "dataset_version": "pilot-v1",
+  "manifest_sha256": "c012495445805b15ebdf20ef13e8e5ab45dc23276a0743a372c9b650aaba5b40",
+  "model": "Qwen/Qwen3-4B-Instruct-2507",
+  "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "adapter": null,
+  "settings": {
+    "device": "mps",
+    "dtype": "float16",
+    "temperature": 0.0,
+    "max_context_tokens": 4096,
+    "max_new_tokens": 512
+  },
+  "verification": "All recorded run artifacts and dataset file hashes verified. Ordered selections match each full split. Response IDs match selections exactly, with no duplicates or missing responses. Prompt IDs are unique and belong to the selection.",
+  "interpretation": "Generation coverage only; no model-quality conclusion. Test dialogue and outputs were not inspected or judged. Human judge calibration remains pending.",
+  "splits": {
+    "train": {
+      "directory": "outputs/qwen3-4b-full-train-v1",
+      "status": "completed_with_failures",
+      "started_at": "2026-09-24T16:11:18.835745+00:00",
+      "finished_at": "2026-09-24T16:27:01.383591+00:00",
+      "run_sha256": "3f37a18ce9e6f5ceeab233d491dd31a61b622ed1694d80e632dc62f588bb7355",
+      "artifacts_sha256": {
+        "prompts.jsonl": "cc51780b470f17a6b9776722067fada787558625cbf8cd3bdabb355f9433c800",
+        "responses.jsonl": "a649519320d820c62e4ef06370eebe2ed5453e58b76c97b38cb5fc0b6eb01e67",
+        "sample-ids.json": "5e249747a208c581edbc794617149f9c97d8bc1197b2aae74c78b3a11893db46",
+        "tokenizer/added_tokens.json": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680",
+        "tokenizer/chat_template.jinja": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326",
+        "tokenizer/merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        "tokenizer/special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+        "tokenizer/tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "tokenizer/tokenizer_config.json": "4b5f2f80f84faefe8420e1616671adb1dd3d7e632038d34b1f0e3a1363a51059",
+        "tokenizer/vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      },
+      "selected": 101,
+      "ok": 99,
+      "failed": 2,
+      "missing": 0,
+      "failure_types": {
+        "OutputLimit": 2
+      },
+      "by_identity": {
+        "hai-mainstream": {
+          "selected": 34,
+          "ok": 32,
+          "failed": 2,
+          "missing": 0
+        },
+        "human-free-worlds": {
+          "selected": 46,
+          "ok": 46,
+          "failed": 0,
+          "missing": 0
+        },
+        "quarg": {
+          "selected": 10,
+          "ok": 10,
+          "failed": 0,
+          "missing": 0
+        },
+        "republic": {
+          "selected": 11,
+          "ok": 11,
+          "failed": 0,
+          "missing": 0
+        }
+      }
+    },
+    "validation": {
+      "directory": "outputs/qwen3-4b-full-validation-v1",
+      "status": "complete",
+      "started_at": "2026-09-24T16:27:04.497728+00:00",
+      "finished_at": "2026-09-24T16:35:12.839520+00:00",
+      "run_sha256": "6002a784b52b9e939ca6c7a21ee00cc2c8a328b27ba589e2d63e129038a2da07",
+      "artifacts_sha256": {
+        "prompts.jsonl": "0dc5894ec68aa722e9eef7860b9c3bd2f29ebdd5cea0f2c2f537e7677af32b66",
+        "responses.jsonl": "6c6707aab5c97b8a4d9b8a9817c52e8af74ebe38d1d7b4a42a897259e1cf6dd9",
+        "sample-ids.json": "2785f0f921411e70a6789151c7a9af9f18c293a7252009f66e3f9fa60e7435b1",
+        "tokenizer/added_tokens.json": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680",
+        "tokenizer/chat_template.jinja": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326",
+        "tokenizer/merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        "tokenizer/special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+        "tokenizer/tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "tokenizer/tokenizer_config.json": "4b5f2f80f84faefe8420e1616671adb1dd3d7e632038d34b1f0e3a1363a51059",
+        "tokenizer/vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      },
+      "selected": 48,
+      "ok": 48,
+      "failed": 0,
+      "missing": 0,
+      "failure_types": {},
+      "by_identity": {
+        "hai-mainstream": {
+          "selected": 9,
+          "ok": 9,
+          "failed": 0,
+          "missing": 0
+        },
+        "human-free-worlds": {
+          "selected": 22,
+          "ok": 22,
+          "failed": 0,
+          "missing": 0
+        },
+        "quarg": {
+          "selected": 8,
+          "ok": 8,
+          "failed": 0,
+          "missing": 0
+        },
+        "republic": {
+          "selected": 9,
+          "ok": 9,
+          "failed": 0,
+          "missing": 0
+        }
+      }
+    },
+    "test": {
+      "directory": "outputs/qwen3-4b-full-test-v1",
+      "status": "completed_with_failures",
+      "started_at": "2026-09-24T16:35:16.308455+00:00",
+      "finished_at": "2026-09-24T16:40:29.271138+00:00",
+      "run_sha256": "d55921a9152f1ba1fbfc413e59625722f652f413204d4b6905d86196fc5eb464",
+      "artifacts_sha256": {
+        "prompts.jsonl": "b4c47152c9747f8f60a5f669be34b64b86da0f4a71ee2668a5ccdaddc98e307d",
+        "responses.jsonl": "fb1888077221cbaab2b39612d273375a4069bc11288dd7fdc594f99aef6f41d4",
+        "sample-ids.json": "7ca2fd2f1ead79887d191a6ccb82ae6538f2c8b571b74fed81623e71eb9f5e3c",
+        "tokenizer/added_tokens.json": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680",
+        "tokenizer/chat_template.jinja": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326",
+        "tokenizer/merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        "tokenizer/special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+        "tokenizer/tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "tokenizer/tokenizer_config.json": "4b5f2f80f84faefe8420e1616671adb1dd3d7e632038d34b1f0e3a1363a51059",
+        "tokenizer/vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      },
+      "selected": 27,
+      "ok": 26,
+      "failed": 1,
+      "missing": 0,
+      "failure_types": {
+        "OutputLimit": 1
+      },
+      "by_identity": {
+        "hai-mainstream": {
+          "selected": 13,
+          "ok": 12,
+          "failed": 1,
+          "missing": 0
+        },
+        "human-free-worlds": {
+          "selected": 6,
+          "ok": 6,
+          "failed": 0,
+          "missing": 0
+        },
+        "quarg": {
+          "selected": 3,
+          "ok": 3,
+          "failed": 0,
+          "missing": 0
+        },
+        "republic": {
+          "selected": 5,
+          "ok": 5,
+          "failed": 0,
+          "missing": 0
+        }
+      }
+    }
+  },
+  "totals": {
+    "selected": 176,
+    "ok": 173,
+    "failed": 3,
+    "missing": 0
+  }
+}

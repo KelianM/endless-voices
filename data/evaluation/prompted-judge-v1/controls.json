@@ -1,0 +1,11 @@
+[
+  {
+    "sample_id": "fw-conservatory-2-ijs-delayed-escort-l222-05ddcef1",
+    "kind": "identical"
+  },
+  {
+    "sample_id": "fw-liberate-kornephoros-tomek-parole-address-l140-0297ad31",
+    "kind": "wrong-context",
+    "donor_id": "fw-conservatory-2-ijs-delayed-escort-l222-05ddcef1"
+  }
+]

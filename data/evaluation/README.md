@@ -128,14 +128,16 @@ initial feedback; reviewer agreement needs at least two independent judgments on
 items. No human inter-reviewer agreement is available. The recorded human–subagent comparison
 covers only three cases. Preserve disagreements rather than replacing them with a consensus label.
 
-Before using an automated judge for headline results, compare its choices and reasons with
-independent human judgments on fresh validation examples, including subtle errors and outputs
-from the actual evaluated model conditions. Check recognition, position effects, context
-sensitivity, and abstention. Document discrepancies and decide with the user whether the judge
-is useful; this pack specifies no unsupported universal agreement threshold. Failed controls
-or dominant formatting cues block interpreting the judge's detection rate as authenticity.
+The original protocol required fresh human comparisons before automated headline results.
+The owner replaced that requirement for the current experiment with isolated agent review on
+2026-09-24, as recorded in [ADR 6](../../docs/adr/0006-calibrate-a-local-prompted-judge-with-isolated-agents.md).
+Compare the local judge's choices and reasons with fresh sub-agent calls on actual validation
+outputs. Check recognition, position effects, context sensitivity and abstention. Preserve and
+discuss discrepancies; no universal agreement threshold is specified. Agent agreement must not
+be described as human agreement. Failed controls or dominant formatting cues limit interpreting
+the detection rate as authenticity.
 
-## Reporting rule for later implementation
+## Reporting rule
 
 Report original-identification accuracy among decided primary trials, together with counts of
 correct, incorrect, abstained, and failed trials and their denominators. Report abstention and
@@ -185,8 +187,8 @@ with its original short contexts; the recorded judgments are not relabelled as r
   training decision, not implied by choosing authenticity evaluation.
 
 Primary and control judgments are recorded in [calibration findings](calibration-findings.md).
-The initial human calibration is complete. Validation of an automated judge on fresh examples
-and actual model outputs remains a prerequisite for using that judge in headline comparisons.
+The initial human calibration is complete. The current agent-based calibration on actual validation outputs remains separate evidence
+from that initial human review.
 
 ## Where review evidence lives
 
@@ -217,3 +219,16 @@ membership or the frozen release.
 Use the [generation command](../../README.md#generate-comparable-responses) to collect responses and explicit failures.
 The pinned Qwen3-4B-Instruct-2507 configuration is a replaceable smoke-run checkpoint. Judge
 validation still needs fresh scenes and actual model outputs under the protocol above.
+
+## Prompted local judge implementation
+
+The [assessment workflow](../../README.md#assess-saved-responses) verifies saved generation runs,
+exports isolated blinded trials, runs a local MLX judge, and produces reproducible reports.
+The [first prompted-judge round](prompted-judge-v1/README.md) records selection and execution.
+Agent comparison is underway under the revised protocol; implementation does not establish judge reliability.
+A trained discriminator and adversarial generator training remain outside this workflow.
+
+The [expanded validation findings](prompted-judge-v1/agent-findings.md) compare 50 isolated agent
+reviews with 98 local judge calls. The first local configuration remains unsuitable for headline
+results despite passing both easy controls. Full reasons, provenance and reproducible reports
+are preserved with the findings.

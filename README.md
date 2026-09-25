@@ -32,7 +32,8 @@ data/evaluation/           Evaluation protocol and calibration evidence
 data/overview/             Upstream source inventory and statistics
 ```
 
-There is no frontend, general game-data ingestion, synthetic data generator, or scoring runner.
+There is no general game-data ingestion or synthetic dataset generator.
+Blinded review pages and a local prompted judge assess saved generation runs.
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
@@ -160,9 +161,11 @@ generates one answer. Entire conversations and known scenario variants stay in o
 The [authenticity protocol](data/evaluation/README.md) compares generated replies against original
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
-result is claimed. The generation command below saves continuations; judging and comparison
-reports remain future work. Fixed-history evaluation does not establish persistence through a
-model’s own unfolding conversation. See the
+result is claimed. The generation command below saves continuations; the assessment workflow prepares blinded
+trials and exploratory reports. The first local prompted judge remains unsuitable for headline
+results after comparison with isolated agent reviews; see
+[the findings](data/evaluation/prompted-judge-v1/agent-findings.md). Fixed-history evaluation does
+not establish persistence through a model’s own unfolding conversation. See the
 [data contract](docs/contracts.md) and [sample-format decision](docs/adr/0003-use-one-conversation-format-across-splits.md).
 
 ## Browse conversation samples
@@ -251,6 +254,157 @@ A hard process kill can leave a `running` manifest and missing rows; check the s
 before using a run. Keep [source attribution](NOTICE.md) with shared outputs. Smoke runs check
 execution, not model quality. Generation performs no training or scoring.
 
+## Assess saved responses
+
+Prepare an organizer pack from compatible runs. This validates dataset and artifact hashes,
+selected IDs, authored context, and prompt/response provenance. Failed generations, including
+partial output at the token limit, are retained in coverage and never sent to the judge.
+
+```bash
+python -m endless_voices.assessment prepare \
+  --manifest data/pilot-v1/samples/manifest.json \
+  --run qwen3-4b=outputs/qwen3-4b-judge-calibration-v2 \
+  --controls data/evaluation/prompted-judge-v1/controls.json \
+  --reverse --output outputs/assessment
+```
+
+Repeat `--run NAME=DIRECTORY` for additional conditions. Each condition is compared against the
+original game continuation, never directly against the other model. The generator's authored
+context is identical for shared sample IDs. Model settings and tokenizer differences remain
+recorded in the organizer pack; paired arithmetic alone does not establish a controlled experiment.
+Validation is the default; `--split test` is an explicit final-evaluation choice.
+
+The pack separates `private.json` (answer mapping, random seed, run provenance and coverage)
+from `public/primary/`, `public/reversed/`, and `public/controls/`. Each public JSON/HTML file
+contains one opaque trial ID, the context, and anonymously ordered candidates. Keep the private
+file and run directories away from reviewers. The randomization seed is generated and stored
+privately unless supplied explicitly. Reversed trials are optional isolated LLM calls or separate
+human assignments; repeated positions are not extra independent scenes.
+
+Export a human review page for one condition:
+
+```bash
+python -m endless_voices.assessment human --pack outputs/assessment \
+  --condition qwen3-4b --output outputs/human-review.html
+```
+
+Open the HTML file in a browser. Enter a reviewer name, answer the examples, and download the
+judgments before closing. Brief reasons suffice. Saved answers cannot be replaced in the page;
+retain corrections as separate records. Unanswered examples remain missing. Restore a downloaded
+review into an empty page to continue. The export rejects repeated conversation/scenario groups;
+use separate assignments for those cases. Review primary examples before exporting controls with
+`--stage controls`. Never give one human multiple conditions that repeat the same original.
+
+### Local prompted judge
+
+The initial candidate is a pinned 4-bit MLX conversion of Qwen3-14B. It is **provisional**:
+compare the judge's answers and reasons with isolated agent reviews before interpreting
+results. The owner selected agent-based calibration in [ADR 6](docs/adr/0006-calibrate-a-local-prompted-judge-with-isolated-agents.md).
+The initial human review pack remains available; expanded calibration covers all validation samples;
+see [the calibration record](data/evaluation/prompted-judge-v1/README.md). No training is performed.
+
+Use one shared MLX environment for local judging and generator screening. The existing
+`data/local/screen-env` serves both tasks; a separate environment per experiment is unnecessary.
+MLX requires Transformers 5, so keep the current Transformers 4 training/generation environment
+separate until that dependency migration is validated. Earlier environment versions remain
+recorded in experiment evidence rather than maintained as active setups.
+
+```bash
+python3.14 -m venv data/local/screen-env
+data/local/screen-env/bin/python -m pip install 'mlx-lm==0.31.3' 'mlx==0.32.2'
+hf download mlx-community/Qwen3-14B-4bit \
+  --revision a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4 --cache-dir data/local/hub
+PYTHONPATH=src data/local/screen-env/bin/python -m endless_voices.judge \
+  --trials outputs/assessment/public/primary \
+  --instructions outputs/assessment/public/instructions.txt \
+  --model-config configs/judge-model.json --reviewer-id qwen3-14b-v1 \
+  --output outputs/judge-primary
+```
+
+The model download is about 8.3 GB. Run generation and judging sequentially so both models need
+not occupy memory together. Judging uses only downloaded files, greedy decoding, thinking disabled,
+a fresh conversation/cache per trial, an 8,192-token context budget and a 512-token output cap.
+The default 180-second trial budget is checked between generated tokens; it cannot interrupt a
+stalled model operation. No input is truncated. Invalid JSON, extra fields, context overflow,
+timeouts, and output-cap exhaustion become explicit failures without automatic retries.
+The opt-in `--allow-json-fence` accepts one enclosing Markdown JSON fence while retaining
+strict field validation and raw output. The setting is recorded; use a new reviewer ID when changing it.
+[The local model comparison](data/evaluation/local-judge-comparison-v1/README.md) records
+Qwen30B and Mistral24B results, memory use and the separate Mistral parsing attempt.
+
+Each new judge directory contains `review.json` (choices, reasons, recognition, raw output,
+failures, actual runtime/settings/model hashes), `prompts.jsonl` (complete messages, rendered
+prompts and token IDs), and `selection.json`. The runner receives public trials only and never
+loads the organizer key. Use the same reviewer ID and settings for separate primary, reversed,
+and control invocations, each with a fresh output directory. A new configuration needs a distinct
+reviewer ID. An interruption preserves submitted rows; remaining trials count as missing.
+
+### Optional hosted judges
+
+[ADR 7](docs/adr/0007-allow-budgeted-hosted-judge-experiments.md) permits explicitly authorized
+hosted experiments. Put `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the gitignored `.env` file.
+The public trial text is sent to that provider. The runners need no additional SDK.
+
+```bash
+python -m endless_voices.openai_judge --public outputs/assessment/public \
+  --output outputs/openai-review --budget 5 --limit 196
+python -m endless_voices.anthropic_judge --public outputs/assessment/public \
+  --output outputs/sonnet-review --budget 5 --limit 98
+```
+
+OpenAI runs Luna then Sol; Anthropic runs Sonnet 5. Each uses medium effort, structured JSON,
+a 4,096-token output ceiling including reasoning, and independent requests. The $5 maximum
+applies separately to each command. `--limit` bounds new calls. Run one process per output
+directory. Requests and results are immutable; `review.json` updates after each result.
+`settings.json` records hashes and prices; `state.json` records completion or an error stop.
+Costs use returned usage and published prices, with conservative reservations for unknown
+outcomes. Costs are estimates rather than invoices.
+
+The same command can resume after a deliberate call limit or interruption if inputs and code
+match. Never resume an error stop without investigating it. Previously attempted requests are
+not resent. Use a new output directory for changed settings. Keep failed attempts as evidence.
+Pass each model's `review.json` to the report command below.
+
+[Hosted comparison findings](data/evaluation/hosted-judge-comparison-v1/README.md) preserve
+Luna, Sol and Sonnet results, the failed Sonnet schema attempt and the stopped Gemini round.
+No model has been automatically selected as the operational judge.
+
+[The four-scene generator screen](data/evaluation/generator-screen-v1/README.md) compares ten
+local and hosted candidates qualitatively and records the shortlist for further benchmarking.
+
+### Reports
+
+```bash
+python -m endless_voices.assessment report --pack outputs/assessment \
+  --review outputs/judge-primary/review.json \
+  --review path/to/downloaded-human-review.json --output outputs/assessment-report
+```
+
+Repeat `--review` for controls, reversed trials, or additional reviewers. Reports treat every
+prepared trial as scheduled for each included reviewer. Duplicate submissions are rejected;
+combine disjoint stage files, not overlapping exports. Input review files are never modified.
+
+`report.md` is the reading copy; `report.json` preserves full records and calculations. Reports
+show correct/incorrect decisions, abstentions, failures and missing judgments, with explicit
+denominators; generation coverage by identity; recognized and unrecognized results; separate
+controls; reviewer disagreements; and all reasons. Accuracy is correct original identifications
+among A/B decisions. Abstention and failure rates use scheduled primary trials. Generation failures
+are counted separately against selected generation samples.
+
+Paired differences are right-condition minus left-condition detection accuracy on scenes decided
+for both conditions by the same reviewer. The report lists incomplete pairs, including generation
+failures and unequal selections. Reviewers are reported separately, without majority voting.
+Descriptive 95% intervals resample entire connected conversation/scenario groups with a saved
+seed, preserving dependent turns. Intervals are omitted with fewer than two contributing groups;
+undefined resamples are counted. Few groups can produce unstable or zero-width intervals, and
+these intervals do not capture uncertainty from judge choice or dataset selection. Shared mission
+chains and broad themes do not define groups.
+
+All report outputs remain exploratory. Lower detection is not automatically better writing;
+chance performance and failure to detect a difference do not establish equivalence. The test
+fixtures use invented dialogue and explicitly simulated judgments, not actual reviews. All
+commands refuse existing output destinations. Run each module with `--help` for options.
+
 ## Development
 
 ```bash
@@ -269,3 +423,13 @@ Implementation references: [Transformers chat templates](https://huggingface.co/
 ## Licensing
 
 [Dataset licensing notice](NOTICE.md) identifies the upstream license and attribution bundle.
+
+[The three-generator validation benchmark](data/evaluation/generator-benchmark-v1/README.md)
+compares Sol, Gemma 4 31B and Sonnet 5 with Sol as the blinded judge. All three had
+48/48 originals identified in the primary order; this score does not rank their quality.
+Use `--models gpt-6-sol` to restrict the OpenAI judge runner to Sol (the default remains Luna then Sol).
+
+To browse the earlier four-scene screen locally, run `python scripts/view_generator_screen.py`
+and open the generated `outputs/generator-screen-viewer/index.html`. Scene and model selectors,
+side-by-side comparison and optional qualitative notes expose condition labels and originals;
+this reader is not a blinded assessment interface.

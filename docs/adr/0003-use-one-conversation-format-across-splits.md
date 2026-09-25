@@ -19,7 +19,7 @@ split determine how that example is represented.
 
 Use one sample format across train, validation, and test. Each sample contains authored
 conversation history ending in a target assistant response. The system context supplies the
-identity and selected lore; provenance and assessment criteria remain outside the messages.
+identity and selected lore; provenance and evaluator source references remain outside the messages.
 
 Training reads the complete conversation. Evaluation input includes the same authored context
 and withholds only the final assistant response. Earlier assistant replies are not replaced by
@@ -38,7 +38,7 @@ unknown scenario relationships can remain unset.
   response in that context, not whether a model maintains its identity through its own unfolding
   conversation.
 - An earlier authored reply may contain useful facts. Those facts are intentionally visible;
-  the final target and private assessment criteria are withheld. A target is an example answer,
+  the final target and private source references are withheld. A target is an example answer,
   not a requirement to reproduce its wording.
 - Known conversation and scenario relationships prevent declared variants from crossing splits.
   The checks do not discover paraphrases, copied answers, or other semantic overlap.
