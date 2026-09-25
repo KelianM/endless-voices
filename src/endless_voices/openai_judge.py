@@ -99,6 +99,9 @@ def spent(root):
 
 
 def run(args):
+    models = getattr(args, "models", None) or list(RATES)
+    if not models or len(set(models)) != len(models) or set(models) - RATES.keys():
+        raise ValueError("Select unique supported judge models")
     key = load_key(args.env_file)
     instructions = (args.public / "instructions.txt").read_text()
     paths = [
@@ -111,7 +114,7 @@ def run(args):
     args.output.mkdir(parents=True, exist_ok=True)
     metadata = {
         "endpoint": API,
-        "models": list(RATES),
+        "models": models,
         "rates_per_million_usd": RATES,
         "budget_usd": args.budget,
         "instructions": instructions,
@@ -130,7 +133,7 @@ def run(args):
     else:
         write_json(settings, metadata)
     attempted = 0
-    for model in RATES:
+    for model in models:
         folder = args.output / model
         folder.mkdir(exist_ok=True)
         rows = []
@@ -229,6 +232,7 @@ def main():
     parser.add_argument("--public", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
+    parser.add_argument("--models", nargs="+", choices=list(RATES))
     parser.add_argument("--budget", type=float, default=5.0)
     parser.add_argument("--limit", type=int, default=196)
     args = parser.parse_args()

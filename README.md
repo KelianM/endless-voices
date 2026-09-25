@@ -423,3 +423,13 @@ Implementation references: [Transformers chat templates](https://huggingface.co/
 ## Licensing
 
 [Dataset licensing notice](NOTICE.md) identifies the upstream license and attribution bundle.
+
+[The three-generator validation benchmark](data/evaluation/generator-benchmark-v1/README.md)
+compares Sol, Gemma 4 31B and Sonnet 5 with Sol as the blinded judge. All three had
+48/48 originals identified in the primary order; this score does not rank their quality.
+Use `--models gpt-6-sol` to restrict the OpenAI judge runner to Sol (the default remains Luna then Sol).
+
+To browse the earlier four-scene screen locally, run `python scripts/view_generator_screen.py`
+and open the generated `outputs/generator-screen-viewer/index.html`. Scene and model selectors,
+side-by-side comparison and optional qualitative notes expose condition labels and originals;
+this reader is not a blinded assessment interface.
