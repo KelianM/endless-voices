@@ -150,7 +150,7 @@ def local(root, config):
             break
 
 
-def hosted(root):
+def hosted(root, models=None, budget=5):
     from endless_voices import anthropic_judge, openai_judge
 
     for model, provider in [
@@ -158,6 +158,8 @@ def hosted(root):
         ("gpt-6-sol", openai_judge),
         ("claude-sonnet-5", anthropic_judge),
     ]:
+        if models is not None and model not in models:
+            continue
         folder = root / model
         folder.mkdir(exist_ok=False)
         key = provider.load_key(Path(".env"))
@@ -170,7 +172,7 @@ def hosted(root):
                 "reasoning": "medium",
                 "max_output_tokens_including_thinking": 4096,
                 "endpoint": provider.API,
-                "budget_usd": 5,
+                "budget_usd": budget,
                 "rates_per_million_usd": provider.RATES[model],
             },
         )
@@ -195,10 +197,13 @@ def hosted(root):
                     "max_tokens": 4096,
                 }
                 headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
-            # Charge all prior attempts at a conservative maximum, including unknown outcomes.
-            reserved = sum(read(p)["reservation_usd"] for p in root.glob("*/*.request.json"))
+            reserved = 0.0
+            for path in root.glob("*/*.request.json"):
+                result = path.with_name(path.name.replace(".request.", ".result."))
+                cost = read(result).get("estimated_cost_usd") if result.exists() else None
+                reserved += read(path)["reservation_usd"] if cost is None else cost
             reserve = ((len(json.dumps(body).encode()) + 2048) * 2 + 4096 * 10) / 1e6
-            if reserved + reserve > 5:
+            if reserved + reserve > budget:
                 raise ValueError("Hosted screen budget exhausted")
             save(
                 folder / (prompt["sample_id"] + ".request.json"),

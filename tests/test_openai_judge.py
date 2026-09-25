@@ -51,7 +51,8 @@ def test_cost_counts_reasoning_output_and_cached_input():
     assert judge.charge("gpt-6-sol", {}) is None
 
 
-def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch):
+@pytest.mark.parametrize("models", [None, ["gpt-6-sol"]])
+def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch, models):
     public = tmp_path / "public"
     (public / "primary").mkdir(parents=True)
     (public / "instructions.txt").write_text("Choose the original")
@@ -59,7 +60,9 @@ def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch
     (public / "primary" / "opaque.json").write_text(json.dumps(trial))
     key = tmp_path / ".env"
     key.write_text("OPENAI_API_KEY=secret-test-value\n")
-    args = Namespace(public=public, output=tmp_path / "run", env_file=key, budget=5, limit=1)
+    args = Namespace(
+        public=public, output=tmp_path / "run", env_file=key, budget=5, limit=1, models=models
+    )
     calls = []
 
     class Handle:
@@ -80,14 +83,17 @@ def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch
     judge.run(args)
     judge.run(args)
     judge.run(args)
-    assert [c["model"] for c in calls] == ["gpt-6-luna", "gpt-6-sol"]
+    expected = models or ["gpt-6-luna", "gpt-6-sol"]
+    assert [c["model"] for c in calls] == expected
     assert all(c["store"] is False and "tools" not in c for c in calls)
     assert all("secret-test-value" not in p.read_text() for p in args.output.rglob("*.json"))
-    assert judge.spent(args.output) == pytest.approx(0.000191 + 0.00382)
+    assert judge.spent(args.output) == pytest.approx(
+        sum(judge.charge(model, response()) for model in expected)
+    )
     args.output = tmp_path / "tiny-budget"
     args.budget = 0.0000001
     judge.run(args)
-    assert len(calls) == 2
+    assert len(calls) == len(expected)
 
 
 def test_unknown_request_reserves_budget_and_is_not_retried(tmp_path, monkeypatch):

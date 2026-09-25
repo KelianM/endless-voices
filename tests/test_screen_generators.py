@@ -74,3 +74,33 @@ def test_hosted_screen_stops_before_exceeding_shared_budget(tmp_path, monkeypatc
     with patch.object(screen.urllib.request, "urlopen", side_effect=AssertionError("API called")):
         with pytest.raises(ValueError, match="budget exhausted"):
             screen.hosted(tmp_path)
+
+
+def test_hosted_selection_does_not_call_unselected_model(tmp_path, monkeypatch):
+    screen.save(
+        tmp_path / "prompts.json",
+        [{"sample_id": "x", "messages": [{"role": "system", "content": "Context"}]}],
+    )
+    monkeypatch.setattr(openai_judge, "load_key", lambda _: "fake-secret")
+    calls = []
+
+    def send(request, timeout):
+        calls.append(json.loads(request.data)["model"])
+        return io.StringIO(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "output": [
+                        {
+                            "type": "message",
+                            "content": [{"type": "output_text", "text": "A response"}],
+                        }
+                    ],
+                }
+            )
+        )
+
+    with patch.object(screen.urllib.request, "urlopen", send):
+        screen.hosted(tmp_path, models=["gpt-6-sol"], budget=3)
+    assert calls == ["gpt-6-sol"]
+    assert not (tmp_path / "gpt-6-luna").exists()
