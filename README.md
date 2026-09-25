@@ -303,15 +303,18 @@ results. The owner selected agent-based calibration in [ADR 6](docs/adr/0006-cal
 The initial human review pack remains available; expanded calibration covers all validation samples;
 see [the calibration record](data/evaluation/prompted-judge-v1/README.md). No training is performed.
 
-Install the judge in a separate environment. MLX uses Apple Silicon, and its Transformers 5
-requirement must not replace the generation environment's Transformers 4 dependencies.
+Use one shared MLX environment for local judging and generator screening. The existing
+`data/local/screen-env` serves both tasks; a separate environment per experiment is unnecessary.
+MLX requires Transformers 5, so keep the current Transformers 4 training/generation environment
+separate until that dependency migration is validated. Earlier environment versions remain
+recorded in experiment evidence rather than maintained as active setups.
 
 ```bash
-python3.12 -m venv data/local/judge-env
-data/local/judge-env/bin/python -m pip install 'mlx-lm==0.31.1'
+python3.14 -m venv data/local/screen-env
+data/local/screen-env/bin/python -m pip install 'mlx-lm==0.31.3' 'mlx==0.32.2'
 hf download mlx-community/Qwen3-14B-4bit \
   --revision a4d9b2df59d2c150bef02fcbe0d91046b7ca33a4 --cache-dir data/local/hub
-PYTHONPATH=src data/local/judge-env/bin/python -m endless_voices.judge \
+PYTHONPATH=src data/local/screen-env/bin/python -m endless_voices.judge \
   --trials outputs/assessment/public/primary \
   --instructions outputs/assessment/public/instructions.txt \
   --model-config configs/judge-model.json --reviewer-id qwen3-14b-v1 \
@@ -365,6 +368,9 @@ Pass each model's `review.json` to the report command below.
 [Hosted comparison findings](data/evaluation/hosted-judge-comparison-v1/README.md) preserve
 Luna, Sol and Sonnet results, the failed Sonnet schema attempt and the stopped Gemini round.
 No model has been automatically selected as the operational judge.
+
+[The four-scene generator screen](data/evaluation/generator-screen-v1/README.md) compares ten
+local and hosted candidates qualitatively and records the shortlist for further benchmarking.
 
 ### Reports
 
