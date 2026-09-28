@@ -160,26 +160,51 @@ def trial_page(trial, instructions):
 
 def prepare(manifest, runs, output, split="validation", seed=None, controls=None, reverse=False):
     """Write an immutable organizer pack and isolated public trial files."""
+    records = load_dataset(manifest, split)
+    loaded = {name: load_run(path, manifest, records, split) for name, path in runs.items()}
+    provenance = {
+        name: {"run": run, "run_sha256": file_hash(runs[name] / "run.json"),
+               "verified_hashes": bool(run.get("artifacts_sha256"))}
+        for name, (run, _, _) in loaded.items()
+    }
+    return prepare_trials(records, loaded, output, provenance, split=split, seed=seed,
+                          controls=controls, reverse=reverse,
+                          input_provenance={"manifest_sha256": file_hash(manifest)},
+                          licensing=manifest.parent.parent / "licensing")
+
+
+def prepare_trials(records, loaded, output, run_provenance, *, split="validation", seed=None,
+                   controls=None, reverse=False, input_provenance=None, licensing=None):
+    """Build isolated trials from verified records and normalized generation evidence."""
     if output.exists():
         raise ValueError("Output already exists")
-    records = load_dataset(manifest, split)
     groups = connected_groups(records)
-    loaded = {name: load_run(path, manifest, records, split) for name, path in runs.items()}
     if not loaded:
         raise ValueError("At least one condition is required")
     seed = secrets.randbits(64) if seed is None else seed
     rng = random.Random(seed)
     instructions = (ROOT / "data/evaluation/judge-instructions.md").read_text()
-    public, private, coverage, provenance = [], [], [], {}
+    public, private, coverage = [], [], []
     for name, (run, prompts, responses) in loaded.items():
         ids = run["dataset"]["sample_ids"]
         order = ["A", "B"] * (len(ids) // 2) + ([rng.choice(["A", "B"])] if len(ids) % 2 else [])
         rng.shuffle(order)
-        provenance[name] = {
-            "run": run,
-            "run_sha256": file_hash(runs[name] / "run.json"),
-            "verified_hashes": bool(run.get("artifacts_sha256")),
-        }
+        if not ids or len(set(ids)) != len(ids) or set(ids) - records.keys():
+            raise ValueError("Invalid selected sample IDs")
+        for sid, prompt in prompts.items():
+            if sid not in ids or prompt["messages"] != evaluation_messages(records[sid]):
+                raise ValueError("Generator and judge context differ")
+            if prompt["messages_sha256"] != digest(encoded(prompt["messages"])):
+                raise ValueError("Prompt message hash differs")
+        for sid, response in responses.items():
+            if sid not in ids or response["status"] not in {"ok", "failed"}:
+                raise ValueError("Invalid generation response")
+            if response["status"] == "ok" and (
+                sid not in prompts or response.get("finish_reason") != "eos"
+                or not response.get("response", "").strip() or response.get("error")
+                or response.get("messages_sha256") != prompts[sid]["messages_sha256"]
+            ):
+                raise ValueError("Successful response lacks complete generation evidence")
         for sid, pos in zip(ids, order, strict=True):
             response = responses.get(sid)
             status = response["status"] if response else "missing"
@@ -213,8 +238,7 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
         public.append((None, sid, kind, other, rng.choice(["A", "B"]), item))
     rng.shuffle(public)
     output.mkdir(parents=True)
-    licensing = manifest.parent.parent / "licensing"
-    if licensing.is_dir():
+    if licensing is not None and licensing.is_dir():
         shutil.copytree(licensing, output / "attribution")
     for stage in ("primary", "reversed", "controls"):
         (output / "public" / stage).mkdir(parents=True)
@@ -253,8 +277,9 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
             "schema_version": 1,
             "seed": seed,
             "split": split,
-            "manifest_sha256": file_hash(manifest),
-            "runs": provenance,
+            "manifest_sha256": (input_provenance or {}).get("manifest_sha256"),
+            "input_provenance": input_provenance or {},
+            "runs": run_provenance,
             "coverage": coverage,
             "trials": private,
             "instructions_sha256": digest(instructions.encode()),

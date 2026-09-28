@@ -1,6 +1,5 @@
-"""Generate a four-scene validation screen with preserved inputs and outputs."""
+"""Run local or hosted generation from saved benchmark prompts."""
 
-import argparse
 import hashlib
 import importlib.metadata
 import json
@@ -24,53 +23,12 @@ def save(path, data):
         handle.write("\n")
 
 
-def prepare(root):
-    source = Path("outputs/qwen3-4b-validation-cleaned-v1")
-    run = read(source / "run.json")
-    for name, digest in run["artifacts_sha256"].items():
-        assert sha(source / name) == digest
-    dataset = run["dataset"]
-    manifest = Path(dataset["manifest_path"])
-    assert sha(manifest) == dataset["manifest_sha256"]
-    rows = {}
-    for entry in read(manifest)["files"]["validation"]:
-        path = manifest.parent / entry["path"]
-        assert sha(path) == entry["sha256"]
-        for line in path.read_text().splitlines():
-            row = json.loads(line)
-            rows[row["metadata"]["id"]] = row
-    prompts = [json.loads(s) for s in (source / "prompts.jsonl").read_text().splitlines()]
-    ids = read(source / "sample-ids.json")
-    assert [p["sample_id"] for p in prompts] == ids and len(ids) == 4
-    from endless_voices.contracts import evaluation_messages
-
-    for prompt in prompts:
-        assert prompt["messages"] == evaluation_messages(rows[prompt["sample_id"]])
-    save(root / "prompts.json", prompts)
-    save(
-        root / "selection.json",
-        {
-            "ids": ids,
-            "split": "validation",
-            "manifest_sha256": sha(manifest),
-            "source_run_sha256": sha(source / "run.json"),
-            "selection": (
-                "Four existing smoke scenes, one per identity; selected before generation"
-            ),
-            "identities": {sid: rows[sid]["metadata"]["identity"] for sid in ids},
-        },
-    )
-    save(root / "originals.json", {sid: rows[sid] for sid in ids})
-    save(
-        root / "qwen4b-baseline.json",
-        {
-            "source_run": str(source),
-            "reused": True,
-            "responses": [
-                json.loads(s) for s in (source / "responses.jsonl").read_text().splitlines()
-            ],
-        },
-    )
+def quantize_full_history(caches, full_cache_type, *, bits=8, group_size=64):
+    """Convert full-history caches while preserving all other cache objects."""
+    return [
+        c.to_quantized(bits=bits, group_size=group_size) if type(c) is full_cache_type else c
+        for c in caches
+    ]
 
 
 def local(root, config):
@@ -82,14 +40,18 @@ def local(root, config):
     folder = root / cfg["label"]
     folder.mkdir(exist_ok=False)
     model_path = Path(cfg["path"])
+    context_limit = cfg.get("context_ceiling", 16384)
+    output_limit = cfg.get("max_output_tokens", 1024)
+    prefill_step_size = cfg.get("prefill_step_size", 256)
     save(
         folder / "settings.json",
         {
             **cfg,
             "code_sha256": sha(__file__),
             "prompts_sha256": sha(root / "prompts.json"),
-            "max_output_tokens": 512,
-            "context_ceiling": 4096,
+            "max_output_tokens": output_limit,
+            "context_ceiling": context_limit,
+            "prefill_step_size": prefill_step_size,
             "temperature": 0,
             "enable_thinking": False,
             "mlx_lm": importlib.metadata.version("mlx-lm"),
@@ -116,17 +78,32 @@ def local(root, config):
             {"messages": prompt["messages"], "rendered": rendered, "input_ids": ids},
         )
         try:
-            if len(ids) + 512 > 4096:
+            if len(ids) + output_limit > context_limit:
                 raise ValueError("Context overflow; no truncation")
             mx.random.seed(42)
             last = None
+            cache_options = {
+                "kv_bits": cfg.get("kv_bits"),
+                "kv_group_size": cfg.get("kv_group_size", 64),
+                "quantized_kv_start": cfg.get("quantized_kv_start", 0),
+            }
+            if cfg.get("kv_scope") == "full_history":
+                from mlx_lm.models.cache import KVCache, make_prompt_cache
+
+                caches = quantize_full_history(
+                    make_prompt_cache(model), KVCache,
+                    bits=cfg["kv_bits"], group_size=cfg.get("kv_group_size", 64),
+                )
+                cache_options = {"prompt_cache": caches}
+                row["cache_types"] = [type(c).__name__ for c in caches]
             for token in stream_generate(
                 model,
                 tokenizer,
                 prompt=ids,
-                max_tokens=512,
+                max_tokens=output_limit,
                 sampler=make_sampler(temp=0),
-                prefill_step_size=256,
+                prefill_step_size=prefill_step_size,
+                **cache_options,
             ):
                 row["response"] += token.text
                 last = token
@@ -146,7 +123,8 @@ def local(root, config):
         )
         save(folder / (prompt["sample_id"] + ".result.json"), row)
         print(cfg["label"], prompt["sample_id"], row["status"], flush=True)
-        if row.get("peak_memory_bytes", 0) > 20_000_000_000:
+        if (row.get("peak_memory_bytes", 0) > 20_000_000_000
+                or "Insufficient Memory" in row.get("error", "")):
             break
 
 
@@ -202,7 +180,7 @@ def hosted(root, models=None, budget=5):
                 result = path.with_name(path.name.replace(".request.", ".result."))
                 cost = read(result).get("estimated_cost_usd") if result.exists() else None
                 reserved += read(path)["reservation_usd"] if cost is None else cost
-            reserve = ((len(json.dumps(body).encode()) + 2048) * 2 + 4096 * 10) / 1e6
+            reserve = provider.reservation(body)
             if reserved + reserve > budget:
                 raise ValueError("Hosted screen budget exhausted")
             save(
@@ -249,17 +227,3 @@ def hosted(root, models=None, budget=5):
             print(model, prompt["sample_id"], row["status"], flush=True)
             if row["status"] != "ok":
                 break
-
-
-if __name__ == "__main__":
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("mode", choices=["prepare", "local", "hosted"])
-    p.add_argument("--root", type=Path, default=Path("outputs/generator-screen-v1"))
-    p.add_argument("--config", type=Path)
-    a = p.parse_args()
-    if a.mode == "prepare":
-        prepare(a.root)
-    elif a.mode == "local":
-        local(a.root, a.config)
-    else:
-        hosted(a.root)

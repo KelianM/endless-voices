@@ -265,7 +265,7 @@ python -m endless_voices.assessment prepare \
   --manifest data/pilot-v1/samples/manifest.json \
   --run qwen3-4b=outputs/qwen3-4b-judge-calibration-v2 \
   --controls data/evaluation/prompted-judge-v1/controls.json \
-  --reverse --output outputs/assessment
+  --output outputs/assessment
 ```
 
 Repeat `--run NAME=DIRECTORY` for additional conditions. Each condition is compared against the
@@ -352,7 +352,7 @@ python -m endless_voices.anthropic_judge --public outputs/assessment/public \
   --output outputs/sonnet-review --budget 5 --limit 98
 ```
 
-OpenAI runs Luna then Sol; Anthropic runs Sonnet 5. Each uses medium effort, structured JSON,
+OpenAI defaults to Luna only; Anthropic runs Sonnet 5. Each uses medium effort, structured JSON,
 a 4,096-token output ceiling including reasoning, and independent requests. The $5 maximum
 applies separately to each command. `--limit` bounds new calls. Run one process per output
 directory. Requests and results are immutable; `review.json` updates after each result.
@@ -424,10 +424,10 @@ Implementation references: [Transformers chat templates](https://huggingface.co/
 
 [Dataset licensing notice](NOTICE.md) identifies the upstream license and attribution bundle.
 
-[The three-generator validation benchmark](data/evaluation/generator-benchmark-v1/README.md)
-compares Sol, Gemma 4 31B and Sonnet 5 with Sol as the blinded judge. All three had
-48/48 originals identified in the primary order; this score does not rank their quality.
-Use `--models gpt-6-sol` to restrict the OpenAI judge runner to Sol (the default remains Luna then Sol).
+[The earlier three-generator benchmark](data/evaluation/generator-benchmark-v1/README.md)
+is historical evidence. Its original-first serialization leak invalidated those scores as blinded
+judge calibration; the correction below describes subsequent work. Routine benchmarks now use
+one randomized candidate order per scene, without reversed trials.
 
 To browse the earlier four-scene screen locally, run `python scripts/view_generator_screen.py`
 and open the generated `outputs/generator-screen-viewer/index.html`. Scene and model selectors,
@@ -436,8 +436,7 @@ this reader is not a blinded assessment interface.
 
 **Evaluation correction (2026-09-28):** an original-first JSON field-order leak affected the
 automated judge experiments, including isolated-agent prompts. The saved scores do not establish
-blinded detection reliability. The code is fixed; original evidence is preserved and no corrected
-rerun has been performed. See the [audit](data/evaluation/serialization-audit-v1/README.md).
+blinded detection reliability. The code is fixed; original evidence is preserved. See the [audit](data/evaluation/serialization-audit-v1/README.md).
 
 [The corrected Sol-on-Sol rerun](data/evaluation/sol-self-eval-v2/README.md) removed the known
 ordering leak and identified 47/48 originals in the primary order and 48/48 when reversed.
@@ -450,7 +449,7 @@ but lore summaries persisted and median responses grew longer. Corrected primary
 46/48 versus the baseline's 47/48; qualitative findings are reported separately from origin detection.
 
 The [earlier-dialogue context prototype](data/evaluation/context-prototype-v1/README.md)
-measures references for a proposed chronological dataset. The frozen pilot remains unchanged.
+measures references for a proposed chronological dataset. The existing dataset records remain unchanged.
 
 The [verbatim game context preview](data/evaluation/source-context-preview-v1/README.md)
 replaces lore summaries with source prose and restores the current encounter opening.
@@ -465,7 +464,13 @@ Existing previews are unchanged; use a new output directory to apply the config.
 
 Context selection is shared by dataset and benchmark preparation through
 `endless_voices.context`. Choose `configs/context-full.json` or
-`configs/context-mission-depth.json`; the latter records depth, older-history budget and seed.
+`configs/context-mission-depth.json`; the latter records depth, total input ceiling and seed.
+The default ceiling is 8,192 tokens for the fully rendered input, including chat formatting.
+The selector preserves lore, the current encounter and eligible missions through depth four,
+then samples whole older missions into the remaining space. A preserved core that exceeds the
+ceiling fails preparation instead of being truncated. Sparse eligible pools can produce shorter
+inputs. The 1,024-token local output allowance is separate from this input ceiling.
+See the [48-example verification](data/evaluation/context-total-budget-v1/README.md).
 The source assembler also writes `prerequisites.json` alongside its drafts.
 
 ```sh
@@ -484,7 +489,7 @@ and provenance with hashes. `load_selections()` verifies the bundle. Each select
 selected context and return copies. The target is supplied only after selection. Keep the
 selection bundle private and give judges only the context and anonymous candidates.
 The generation prompt format is also accepted by the existing screen runner. Curated dataset
-export still requires the existing release checks; preparation does not revise the frozen pilot.
+export still requires the existing release checks; preparation does not silently change the source records.
 
 The [mission-depth comparison](data/evaluation/context-depth-v1/README.md) measures automatic
 selection at depths 4, 8 and 12 with an 8,000-token budget for older history. The
@@ -493,3 +498,5 @@ campaign milestones responsible for the largest inputs.
 
 The [validation-wide source-context measurements](data/evaluation/validation-source-context-v1/README.md)
 cover all 48 validation points, with per-scene lengths and unresolved context requirements.
+
+[The 8,192-token benchmark](data/evaluation/generator-benchmark-8192-v1/README.md) completed all 48 generations for Gemma 4 31B and Qwen3-30B-A3B. API timeouts left Luna and Sonnet incomplete. The report preserves coverage, judging failures, shared-context checks and the production memory results.

@@ -83,7 +83,7 @@ def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch
     judge.run(args)
     judge.run(args)
     judge.run(args)
-    expected = models or ["gpt-6-luna", "gpt-6-sol"]
+    expected = models or ["gpt-6-luna"]
     assert [c["model"] for c in calls] == expected
     assert all(c["store"] is False and "tools" not in c for c in calls)
     assert all("secret-test-value" not in p.read_text() for p in args.output.rglob("*.json"))

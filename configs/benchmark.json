@@ -1,0 +1,11 @@
+{
+  "generators": ["gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5"],
+  "judge": "gpt-6-luna",
+  "generation_budget_usd": 3,
+  "judge_budget_usd": 2,
+  "judge_context_limit": 1050000,
+  "local_configs": {
+    "gemma31b": "configs/gemma4-31b-local.json",
+    "qwen30b": "configs/qwen3-30b-local.json"
+  }
+}

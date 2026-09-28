@@ -1,18 +1,11 @@
-import importlib.util
 import io
 import json
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from endless_voices import anthropic_judge, openai_judge
-
-spec = importlib.util.spec_from_file_location(
-    "screen_generators", Path("scripts/screen_generators.py")
-)
-screen = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(screen)
+from endless_voices import generation_backends as screen
 
 
 def test_hosted_screen_keeps_partial_outputs_and_never_overwrites(tmp_path, monkeypatch):
@@ -104,3 +97,21 @@ def test_hosted_selection_does_not_call_unselected_model(tmp_path, monkeypatch):
         screen.hosted(tmp_path, models=["gpt-6-sol"], budget=3)
     assert calls == ["gpt-6-sol"]
     assert not (tmp_path / "gpt-6-luna").exists()
+
+
+def test_selective_quantization_preserves_rotating_cache_and_window():
+    class FullCache:
+        def to_quantized(self, *, bits, group_size):
+            return (bits, group_size)
+
+    class RotatingCache(FullCache):
+        max_size = 1024
+
+        def to_quantized(self, **kwargs):
+            raise AssertionError("Sliding-window cache must not be quantized")
+
+    rotating = RotatingCache()
+    result = screen.quantize_full_history([FullCache(), rotating], FullCache)
+    assert result[0] == (8, 64)
+    assert result[1] is rotating
+    assert result[1].max_size == 1024

@@ -1,4 +1,4 @@
-"""Assess validation pairs with Luna then Sol under a shared dollar budget."""
+"""Assess isolated validation pairs with selected models under a dollar budget."""
 
 import argparse
 import json
@@ -99,7 +99,7 @@ def spent(root):
 
 
 def run(args):
-    models = getattr(args, "models", None) or list(RATES)
+    models = getattr(args, "models", None) or ["gpt-6-luna"]
     if not models or len(set(models)) != len(models) or set(models) - RATES.keys():
         raise ValueError("Select unique supported judge models")
     key = load_key(args.env_file)
@@ -232,7 +232,8 @@ def main():
     parser.add_argument("--public", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
-    parser.add_argument("--models", nargs="+", choices=list(RATES))
+    parser.add_argument("--models", nargs="+", choices=list(RATES),
+                        help="Judge models; defaults to gpt-6-luna only")
     parser.add_argument("--budget", type=float, default=5.0)
     parser.add_argument("--limit", type=int, default=196)
     args = parser.parse_args()
