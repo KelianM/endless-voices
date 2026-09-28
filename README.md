@@ -448,3 +448,6 @@ unverified under corrected blinding.
 blanket qualification instructions and permits fitting invention. Some characterization improved,
 but lore summaries persisted and median responses grew longer. Corrected primary detection was
 46/48 versus the baseline's 47/48; qualitative findings are reported separately from origin detection.
+
+The [earlier-dialogue context prototype](data/evaluation/context-prototype-v1/README.md)
+measures references for a proposed chronological dataset. The frozen pilot remains unchanged.
