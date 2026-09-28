@@ -438,3 +438,8 @@ this reader is not a blinded assessment interface.
 automated judge experiments, including isolated-agent prompts. The saved scores do not establish
 blinded detection reliability. The code is fixed; original evidence is preserved and no corrected
 rerun has been performed. See the [audit](data/evaluation/serialization-audit-v1/README.md).
+
+[The corrected Sol-on-Sol rerun](data/evaluation/sol-self-eval-v2/README.md) removed the known
+ordering leak and identified 47/48 originals in the primary order and 48/48 when reversed.
+This supports detection on those Sol responses; other generators and prior calibration remain
+unverified under corrected blinding.
