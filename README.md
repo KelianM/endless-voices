@@ -443,3 +443,8 @@ rerun has been performed. See the [audit](data/evaluation/serialization-audit-v1
 ordering leak and identified 47/48 originals in the primary order and 48/48 when reversed.
 This supports detection on those Sol responses; other generators and prior calibration remain
 unverified under corrected blinding.
+
+[The Sol storytelling prompt comparison](data/evaluation/sol-storytelling-v1/README.md) removes
+blanket qualification instructions and permits fitting invention. Some characterization improved,
+but lore summaries persisted and median responses grew longer. Corrected primary detection was
+46/48 versus the baseline's 47/48; qualitative findings are reported separately from origin detection.
