@@ -114,7 +114,7 @@ def test_pack_keeps_keys_conditions_and_source_metadata_outside_public_trials(da
     assert len(trials) == 6
     for trial in trials:
         public = a.read_json(pack / trial["path"])
-        assert set(public) == {"trial_id", "context", "A", "B"}
+        assert list(public) == ["trial_id", "context", "A", "B"]
         assert public["context"][-1]["role"] == "user"
         assert "PRIVATE-CONDITION" not in json.dumps(public)
         other = next(
@@ -477,3 +477,15 @@ def test_optional_json_fence_does_not_accept_prose_or_coerce_fields():
     answer["confidence"] = "null"
     with pytest.raises(ValueError):
         parse_answer("```json\n" + json.dumps(answer) + "\n```", allow_json_fence=True)
+
+
+def test_judge_serialization_cannot_leak_original_through_insertion_order():
+    fields = {"trial_id": "opaque", "context": [], "A": "Alpha", "B": "Beta"}
+    reversed_insertion = {key: fields[key] for key in ("trial_id", "context", "B", "A")}
+    assert judge_messages(fields, "Judge") == judge_messages(reversed_insertion, "Judge")
+    assert list(json.loads(judge_messages(reversed_insertion, "Judge")[1]["content"])) == [
+        "trial_id",
+        "context",
+        "A",
+        "B",
+    ]

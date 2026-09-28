@@ -225,8 +225,8 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
         trial = {
             "trial_id": trial_id,
             "context": evaluation_messages(record),
-            pos: original,
-            "B" if pos == "A" else "A": alternative,
+            "A": original if pos == "A" else alternative,
+            "B": original if pos == "B" else alternative,
         }
         stage = kind if kind in {"primary", "reversed"} else "controls"
         relative = f"public/{stage}/{trial_id}.json"

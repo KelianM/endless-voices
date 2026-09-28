@@ -30,9 +30,10 @@ Do not include reviewer_type, reviewer_id or any other fields in your answer.
 def judge_messages(trial, instructions):
     if set(trial) != {"trial_id", "context", "A", "B"}:
         raise ValueError("Trial must contain only public fields")
+    public = {key: trial[key] for key in ("trial_id", "context", "A", "B")}
     return [
         {"role": "system", "content": instructions + "\n" + WRAPPER},
-        {"role": "user", "content": json.dumps(trial, ensure_ascii=False)},
+        {"role": "user", "content": json.dumps(public, ensure_ascii=False)},
     ]
 
 

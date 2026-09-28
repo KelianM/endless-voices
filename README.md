@@ -433,3 +433,8 @@ To browse the earlier four-scene screen locally, run `python scripts/view_genera
 and open the generated `outputs/generator-screen-viewer/index.html`. Scene and model selectors,
 side-by-side comparison and optional qualitative notes expose condition labels and originals;
 this reader is not a blinded assessment interface.
+
+**Evaluation correction (2026-09-28):** an original-first JSON field-order leak affected the
+automated judge experiments, including isolated-agent prompts. The saved scores do not establish
+blinded detection reliability. The code is fixed; original evidence is preserved and no corrected
+rerun has been performed. See the [audit](data/evaluation/serialization-audit-v1/README.md).

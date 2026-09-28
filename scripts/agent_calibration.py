@@ -1,11 +1,10 @@
 """Prepare isolated agent assignments and collect actual returned judgments."""
 
 import argparse
-import json
 from pathlib import Path
 
 from endless_voices.assessment import file_hash, read_json, write_json
-from endless_voices.judge import WRAPPER, parse_answer
+from endless_voices.judge import WRAPPER, judge_messages, parse_answer
 
 
 def prepare(pack, output):
@@ -21,7 +20,7 @@ def prepare(pack, output):
             prompt_path = (output / "prompts" / f"{index:03}.txt").resolve()
             answer_path = (output / "answers" / f"{index:03}.json").resolve()
             prompt = instructions + "\n" + WRAPPER + "\nUse one short sentence for your reason.\n"
-            prompt += "\nTrial data:\n" + json.dumps(trial, ensure_ascii=False) + "\n"
+            prompt += "\nTrial data:\n" + judge_messages(trial, instructions)[1]["content"] + "\n"
             prompt_path.write_text(prompt)
             message = (
                 "Act as an isolated blinded reviewer. You have no earlier trial history. "
