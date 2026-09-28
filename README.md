@@ -454,3 +454,6 @@ measures references for a proposed chronological dataset. The frozen pilot remai
 
 The [verbatim game context preview](data/evaluation/source-context-preview-v1/README.md)
 replaces lore summaries with source prose and restores the current encounter opening.
+
+The [validation-wide source-context measurements](data/evaluation/validation-source-context-v1/README.md)
+cover all 48 validation points, with per-scene lengths and unresolved context requirements.

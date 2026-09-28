@@ -110,3 +110,11 @@ make a fresh independent holdout. The current test dialogue stays closed during 
 Future release construction must distinguish untouched evaluation material from reused development
 material and audit factual lore as well as dialogue for future information. Removing style
 instructions alone does not establish that a profile is temporally valid.
+
+## Validation-wide measurement
+
+The [validation source-context audit](../data/evaluation/validation-source-context-v1/README.md)
+assembles uncapped drafts for all 48 validation points and measures them with cached tokenizers.
+The drafts preserve source prose and current-encounter paths, but retain explicit gaps for optional
+prerequisites, alternative outcomes and game substitutions. The audit does not approve these drafts
+for benchmarking or replace the versioned release contract.
