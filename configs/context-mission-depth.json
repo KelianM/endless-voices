@@ -1,0 +1,6 @@
+{
+  "name": "mission-depth",
+  "depth": 4,
+  "older_history_tokens": 8000,
+  "seed": "context-depth-v1"
+}

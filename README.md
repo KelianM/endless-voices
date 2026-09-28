@@ -463,6 +463,29 @@ through the same map. Unknown markers remain visible. Substitutions affect rende
 only; source passages remain verbatim and output provenance records the config and its hash.
 Existing previews are unchanged; use a new output directory to apply the config.
 
+Context selection is shared by dataset and benchmark preparation through
+`endless_voices.context`. Choose `configs/context-full.json` or
+`configs/context-mission-depth.json`; the latter records depth, older-history budget and seed.
+The source assembler also writes `prerequisites.json` alongside its drafts.
+
+```sh
+python -m endless_voices.prepare_context \
+  --drafts /path/to/drafts/contexts.jsonl \
+  --graph /path/to/drafts/prerequisites.json \
+  --strategy configs/context-mission-depth.json \
+  --tokenizer /path/to/cached/tokenizer \
+  --output outputs/selected-context
+```
+
+Preparation is offline and refuses an existing output directory. The output contains
+`prompts.json` for generation, private `selections.json` with retained and omitted passages,
+and provenance with hashes. `load_selections()` verifies the bundle. Each selection provides
+`generation_prompt()`, `judge_context()` and `training_messages(target)`; these reuse identical
+selected context and return copies. The target is supplied only after selection. Keep the
+selection bundle private and give judges only the context and anonymous candidates.
+The generation prompt format is also accepted by the existing screen runner. Curated dataset
+export still requires the existing release checks; preparation does not revise the frozen pilot.
+
 The [mission-depth comparison](data/evaluation/context-depth-v1/README.md) measures automatic
 selection at depths 4, 8 and 12 with an 8,000-token budget for older history. The
 [prerequisite audit](data/evaluation/prerequisite-expansion-audit-v1/README.md) explains the

@@ -78,12 +78,19 @@ explicit reference-pool split assignment; absence from the current pilot does no
 freely available to training. Material sourced for a validation preview remains unavailable to
 training until the next release's split audit.
 
-Only reduce context when the measured request and output reserve approach the common operational
-limit. If reduction becomes necessary, declare the selection rule, preserve whole passages, and
-record what was omitted. Long-context capacity does not establish that every unrelated passage is
-useful. The earlier recency-limited prototype remains a size demonstration, not the desired default.
-The [verbatim source preview](../data/evaluation/source-context-preview-v1/README.md) includes the
-three preceding Recon missions and the current opening without a small reference cap.
+Context selection now has a shared strategy interface in `endless_voices.context`. `FullContext`
+retains every eligible passage. `MissionDepth` keeps nearby prerequisite missions in full and
+samples whole older missions within a token budget, preserving lore and the current encounter.
+The configuration records depth, budget and seed. These are configurable experiment settings,
+not hand-maintained story boundaries. The [depth comparison](../data/evaluation/context-depth-v1/README.md)
+measures the tradeoff. Source eligibility and chronological split checks precede selection; a
+strategy cannot make ineligible passages safe to include.
+
+Selection produces one saved result with messages, selected and omitted source blocks, counts
+and provenance. Dataset builders append the target to the saved messages. Benchmark consumers
+use those same messages for generation and judge context without selecting again. See
+[ADR 9](adr/0009-save-context-selection-once-for-all-consumers.md). Historical pilot runs and
+manifest checks remain unchanged; these adapters do not declare the draft pool a new release.
 
 Measure the fully rendered request with each model's tokenizer and reserve room for output and,
 where applicable, reasoning. Judge requests also need room for two candidates and judge instructions.

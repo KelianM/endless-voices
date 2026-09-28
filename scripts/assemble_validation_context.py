@@ -36,6 +36,42 @@ def dependency_terms(node):
     return terms
 
 
+
+def load_prerequisite_graph(source, inventory):
+    """Build mission edges from verified cached source without reading target records."""
+    missions, writers = {}, {}
+    for entry in inventory["files"]:
+        if not entry["path"].startswith(("data/human/", "data/hai/", "data/quarg/")):
+            continue
+        path = source / entry["path"]
+        if sha(path) != entry["sha256"]:
+            raise ValueError("Source hash mismatch")
+        for node in tree(path.read_text()):
+            if node["tokens"][:1] != ["mission"]:
+                continue
+            name = node["tokens"][1]
+            missions[name] = node
+            for item, parents in walk(node["children"]):
+                if item["tokens"][:1] not in (["set"], ["event"]):
+                    continue
+                phase = next((p["tokens"][1] for p in parents
+                              if p["tokens"][:1] == ["on"]), None)
+                if phase in ("offer", "complete"):
+                    term = ("event: " if item["tokens"][0] == "event" else "") + item["tokens"][1]
+                    writers.setdefault(term, set()).add(name)
+    graph = {}
+    for name, node in missions.items():
+        parents = set()
+        for term in dependency_terms(node):
+            if term.endswith(": done"):
+                parents.add(term[:-6])
+            elif term.endswith(": offered"):
+                parents.add(term[:-9])
+            else:
+                parents.update(writers.get(term, set()))
+        graph[name] = sorted(parents)
+    return graph
+
 def route_prefix(conversation, anchors, target_line):
     """Find a structural path through recorded dialogue anchors, stopping before the target."""
     graph = flow_graph(conversation)["links"]
@@ -462,6 +498,9 @@ def main():
             if p.is_file()
         },
     }
+    (args.output / "prerequisites.json").write_text(
+        json.dumps(load_prerequisite_graph(args.source, inv), indent=2) + "\n"
+    )
     (args.output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     counts = sorted(r["input_tokens_qwen"] for r in summary)
     print(
