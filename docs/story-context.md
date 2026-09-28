@@ -62,18 +62,36 @@ to choose references. Save the selected references and their hashes once; supply
 to the generator and the judge. The judge additionally receives the two anonymous continuations
 and the judging instructions. Run conditions and source links stay private.
 
-The prototype selects whole earlier exchanges by recency, then presents the retained exchanges in
-chronological order. Recency is a measurement baseline, not a conclusion about the best retrieval
-method. A production selector may prioritize the current speaker and relevant commitments, but
-must preserve the same eligibility rules and record omissions. Summaries need their own evidence
-and knowledge boundaries; the prototype creates no summaries.
+Use the game's own prose for lore and earlier conversations. Keep narration and the complete
+current-scene lead-in where available, rather than replacing them with agent-written summaries or
+extracting only the last player question. Preserve factual wording, speaker attribution and source
+provenance. Include introductory game passages that explain the relevant institutions and factions,
+not only passages that assume the reader already knows them. A navigation glossary can index names
+and source passages; agent-written definitions should not replace the original exposition.
+Record missing context explicitly instead of supplying an agent-written explanation. This keeps
+summarizer interpretation out of the experimental input. Minimal identity and task instructions are still needed; prose describing how a
+character should speak is not a substitute for the character's dialogue.
+
+Start with all relevant, causally eligible source material. Do not impose a small excerpt count or
+reference-token cap before measuring the complete context. Additional source material needs an
+explicit reference-pool split assignment; absence from the current pilot does not make a passage
+freely available to training. Material sourced for a validation preview remains unavailable to
+training until the next release's split audit.
+
+Only reduce context when the measured request and output reserve approach the common operational
+limit. If reduction becomes necessary, declare the selection rule, preserve whole passages, and
+record what was omitted. Long-context capacity does not establish that every unrelated passage is
+useful. The earlier recency-limited prototype remains a size demonstration, not the desired default.
+The [verbatim source preview](../data/evaluation/source-context-preview-v1/README.md) includes the
+three preceding Recon missions and the current opening without a small reference cap.
 
 Measure the fully rendered request with each model's tokenizer and reserve room for output and,
 where applicable, reasoning. Judge requests also need room for two candidates and judge instructions.
 Use one common selected reference set for compared conditions. Do not silently truncate a different
 history for each model. A scene that cannot fit the common contract needs an explicit failure or a
-predeclared common selection change. The prototype measures JSON text with a local tokenizer;
-those measurements exclude chat wrappers, judge candidates and output reserves.
+predeclared common selection change. The earlier prototype measures JSON text without chat wrappers. The verbatim source preview
+measures rendered generation messages including chat wrappers with cached tokenizers; judge
+candidates and output reserves still need separate allowances.
 
 ## What the comparison can establish
 

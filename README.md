@@ -451,3 +451,6 @@ but lore summaries persisted and median responses grew longer. Corrected primary
 
 The [earlier-dialogue context prototype](data/evaluation/context-prototype-v1/README.md)
 measures references for a proposed chronological dataset. The frozen pilot remains unchanged.
+
+The [verbatim game context preview](data/evaluation/source-context-preview-v1/README.md)
+replaces lore summaries with source prose and restores the current encounter opening.

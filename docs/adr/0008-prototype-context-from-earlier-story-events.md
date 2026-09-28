@@ -28,7 +28,10 @@ chronological design for the next dataset. The frozen pilot is unchanged.
 `scripts/prepare_context_prototype.py` validates declared path split order and consistent
 conversation/scenario assignments, then measures bounded whole-exchange references without opening
 test dialogue. The prototype does not execute game state or establish that a declared path was
-played. The [context contract](../story-context.md) separates the proposed release rules from the
+played. `scripts/prepare_source_context.py` adds a verbatim source preview with earlier mission
+dialogue, narration and the current opening, without a small reference cap. Agent-written lore
+summaries are replaced by original game prose in this preview; broader release changes remain
+proposed. The [context contract](../story-context.md) separates the proposed release rules from the
 small measurement implementation.
 
 ## Consequences
