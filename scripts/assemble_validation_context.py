@@ -17,6 +17,11 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def substitute_variables(text, values):
+    """Replace configured game markers once, preserving unknown markers."""
+    return re.sub(r"<[^>]+>", lambda match: values.get(match[0], match[0]), text)
+
+
 def dependency_terms(node):
     """Return positive offer requirements, excluding optional OR and negative branches."""
     terms = []
@@ -99,9 +104,20 @@ def main():
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--game-vars", type=Path,
+        help="JSON file containing a values map, such as configs/game-variables.dummy.json",
+    )
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output exists; choose a new directory")
+    variable_config = json.loads(args.game_vars.read_text()) if args.game_vars else None
+    values = variable_config["values"] if variable_config is not None else {}
+    if not isinstance(values, dict) or any(
+        not isinstance(k, str) or re.fullmatch(r"<[^>]+>", k) is None
+        or not isinstance(v, str) for k, v in values.items()
+    ):
+        parser.error("Game variables must map <marker> strings to string values")
     invpath = ROOT / "data/overview/source-statistics.json"
     inv = json.loads(invpath.read_text())
     revision = inv["revision"]
@@ -389,6 +405,11 @@ def main():
         text = json.dumps(messages, ensure_ascii=False)
         if record["messages"][-1]["content"] in text:
             raise ValueError("Current target copied into context")
+        source_placeholders = sorted(set(re.findall(r"<[^>]+>", text)))
+        messages = [
+            {**m, "content": substitute_variables(m["content"], values)} for m in messages
+        ]
+        text = json.dumps(messages, ensure_ascii=False)
         count = len(
             tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True)
         )
@@ -406,6 +427,7 @@ def main():
             "test_exclusions": omitted,
             "review_issues": issues,
             "placeholders": sorted(set(re.findall(r"<[^>]+>", text))),
+            "substituted_variables": {k: values[k] for k in source_placeholders if k in values},
             "status": "draft_requires_path_and_variable_review",
         }
         outputs.append(
@@ -430,6 +452,10 @@ def main():
         "pilot_manifest_sha256": sha(sample_root / "manifest.json"),
         "pilot_provenance_sha256": sha(provenance_path),
         "reference_pool": "Validation-only drafts; unassigned passages are not training data",
+        "game_variables": (
+            {"config": variable_config, "sha256": sha(args.game_vars)}
+            if args.game_vars else None
+        ),
         "tokenizer_hashes": {
             str(p.relative_to(args.tokenizer)): sha(p)
             for p in args.tokenizer.rglob("*")

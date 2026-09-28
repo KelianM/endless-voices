@@ -455,5 +455,13 @@ measures references for a proposed chronological dataset. The frozen pilot remai
 The [verbatim game context preview](data/evaluation/source-context-preview-v1/README.md)
 replaces lore summaries with source prose and restores the current encounter opening.
 
+Context previews can substitute game placeholders using
+`--game-vars configs/game-variables.dummy.json` with `scripts/assemble_validation_context.py`.
+Edit the file's `values` map to change the dummy names, locations and amounts.
+The values are synthetic, not game facts; a future game integration can supply real values
+through the same map. Unknown markers remain visible. Substitutions affect rendered context
+only; source passages remain verbatim and output provenance records the config and its hash.
+Existing previews are unchanged; use a new output directory to apply the config.
+
 The [validation-wide source-context measurements](data/evaluation/validation-source-context-v1/README.md)
 cover all 48 validation points, with per-scene lengths and unresolved context requirements.

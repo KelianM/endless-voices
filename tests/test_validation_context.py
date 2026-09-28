@@ -4,7 +4,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from assemble_validation_context import dependency_terms, route_prefix, source_spans  # noqa: E402
+from assemble_validation_context import (  # noqa: E402
+    dependency_terms,
+    route_prefix,
+    source_spans,
+    substitute_variables,
+)
 from prepare_conversations import tree  # noqa: E402
 
 
@@ -32,3 +37,9 @@ def test_held_out_ranges_use_source_metadata_without_dialogue():
     metadata = [{"sources": [{"source_group": "mission / Held out", "reference":
                 "https://example.org/blob/rev/data/a%20b.txt#L12-L23"}]}]
     assert source_spans(metadata, "rev") == [("data/a b.txt", 12, 23)]
+
+
+def test_variable_replacement_preserves_unknown_markers_and_does_not_cascade():
+    text = "<first> <last>: <destination>; <unknown>."
+    values = {"<first>": "Alex", "<last>": "Morgan", "<destination>": "<first>"}
+    assert substitute_variables(text, values) == "Alex Morgan: <first>; <unknown>."
