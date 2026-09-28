@@ -10,16 +10,13 @@ from urllib.parse import unquote
 
 from prepare_conversations import flow_graph, tree, walk
 
+from endless_voices.context import substitute_variables, variable_values
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def substitute_variables(text, values):
-    """Replace configured game markers once, preserving unknown markers."""
-    return re.sub(r"<[^>]+>", lambda match: values.get(match[0], match[0]), text)
 
 
 def dependency_terms(node):
@@ -148,12 +145,7 @@ def main():
     if args.output.exists():
         parser.error("Output exists; choose a new directory")
     variable_config = json.loads(args.game_vars.read_text()) if args.game_vars else None
-    values = variable_config["values"] if variable_config is not None else {}
-    if not isinstance(values, dict) or any(
-        not isinstance(k, str) or re.fullmatch(r"<[^>]+>", k) is None
-        or not isinstance(v, str) for k, v in values.items()
-    ):
-        parser.error("Game variables must map <marker> strings to string values")
+    values = variable_values(variable_config) if variable_config is not None else {}
     invpath = ROOT / "data/overview/source-statistics.json"
     inv = json.loads(invpath.read_text())
     revision = inv["revision"]

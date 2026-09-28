@@ -22,7 +22,10 @@ read the same selected messages. Loading a saved bundle verifies artifact and me
 `endless_voices.context` defines the strategy interface and implements full-context and
 mission-depth selection. The source-draft adapter preserves fixed lore and the current encounter.
 Mission-depth selection retains nearby missions and samples whole older missions using a recorded
-seed and caller-supplied tokenizer. Depth and token budgets are configuration, not architectural
+seed and caller-supplied tokenizer. The mission-depth budget applies to the complete rendered
+input, including fixed lore, the current encounter, nearby history and chat formatting. Older
+missions fill the remaining space. Preparation rejects a preserved core that exceeds the budget.
+Depth and token budgets are configuration, not architectural
 constants. `endless_voices.prepare_context` writes reusable bundles without model inference.
 
 ## Consequences
@@ -37,5 +40,4 @@ Mission distance approximates relevance, and whole-mission sampling can omit use
 history. Saved omitted blocks make those omissions inspectable. Full context remains available
 for comparisons without a plugin registry or a separate implementation in each consumer.
 
-The frozen pilot and historical benchmark exporters keep their existing manifest checks. A saved
-context bundle is an input-preparation artifact, not approval of a new curated dataset release.
+A saved context bundle is an input-preparation artifact, not approval of a new curated dataset release.

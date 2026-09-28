@@ -42,12 +42,12 @@ def test_shared_ancestor_uses_shortest_distance_and_cycles_terminate():
 
 def test_sampling_keeps_whole_missions_within_budget_and_preserves_fixed_context():
     source = pool()
-    strategy = MissionDepth(1, 15, "seed")
+    strategy = MissionDepth(1, 45, "seed")
     selected = strategy.select(source, Counter())
     assert selected == strategy.select(source, Counter())
     assert [b["mission"] for b in selected.selected] == ["recent", "old"]
     assert [b["mission"] for b in selected.omitted] == ["huge"]
-    assert selected.token_counts["sampled_history"] <= 15
+    assert selected.token_counts["input"] <= 45
     assert selected.messages[0]["content"].startswith(source.system_prefix)
     assert selected.messages[1:] == source.encounter
     source.blocks.reverse()
@@ -66,7 +66,7 @@ def test_full_strategy_retains_all_history_without_needing_graph_edges():
 
 
 def test_saved_selection_drives_training_generation_and_isolated_judge(tmp_path):
-    selected = MissionDepth(1, 15, "seed").select(pool(), Counter())
+    selected = MissionDepth(1, 45, "seed").select(pool(), Counter())
     output = tmp_path / "bundle"
     save_selections(output, [selected], {"test_fixture": True})
     loaded = load_selections(output)[0]
@@ -86,8 +86,8 @@ def test_saved_selection_drives_training_generation_and_isolated_judge(tmp_path)
 
 @pytest.mark.parametrize("config", [
     {"name": "full", "depth": 4},
-    {"name": "mission-depth", "depth": -1, "older_history_tokens": 8, "seed": "x"},
-    {"name": "mission-depth", "depth": 4, "older_history_tokens": True, "seed": "x"},
+    {"name": "mission-depth", "depth": -1, "max_input_tokens": 8, "seed": "x"},
+    {"name": "mission-depth", "depth": 4, "max_input_tokens": True, "seed": "x"},
 ])
 def test_bad_strategy_configuration_cannot_silently_change_selection(config):
     with pytest.raises(ValueError):
@@ -100,3 +100,56 @@ def test_draft_adapter_rejects_mismatched_source_and_rendered_context():
                                                  {"role": "user", "content": "Question"}]}
     with pytest.raises(ValueError, match="does not match"):
         pool_from_draft(draft, {})
+
+
+def test_game_variables_apply_to_all_visible_context_without_changing_source():
+    source = pool()
+    source.system_prefix = "Hello <last>\n"
+    source.encounter[0]["content"] = "Visit <planet>"
+    source.blocks[0]["passages"][0]["text"] = "Captain <last>"
+    source.variables = {"<last>": "Morgan", "<planet>": "Example World"}
+    selection = FullContext().select(source, Counter())
+    assert "<last>" not in json.dumps(selection.messages)
+    assert "<planet>" not in json.dumps(selection.messages)
+    assert "Morgan" in selection.messages[0]["content"]
+    assert selection.selected[0]["passages"][0]["text"] == "Captain <last>"
+    assert selection.provenance["game_variables"] == source.variables
+
+
+def test_longer_preserved_context_reduces_older_history_allowance():
+    source = pool()
+    strategy = MissionDepth(1, 45, "seed")
+    assert "old" in strategy.select(source, Counter()).provenance["sampled_missions"]
+    source.encounter[0]["content"] += " longer"
+    selection = strategy.select(source, Counter())
+    assert selection.provenance["sampled_missions"] == []
+    assert selection.messages[1:] == source.encounter
+    assert selection.token_counts["input"] <= 45
+
+
+def test_preserved_context_overflow_fails_instead_of_truncating():
+    source = pool()
+    with pytest.raises(ValueError, match="sample: preserved context.*no context was truncated"):
+        MissionDepth(1, 5, "seed").select(source, Counter())
+    assert source.encounter[0]["content"] == "Question"
+
+
+def test_input_budget_counts_chat_wrappers_and_variable_substitutions():
+    class WrappedCounter(Counter):
+        def messages(self, messages):
+            return super().messages(messages) + 20
+
+    source = pool()
+    source.encounter[0]["content"] = "<name>"
+    source.variables = {"<name>": "A substantially longer name"}
+    core = WrappedCounter().messages(source.messages({"recent"}))
+    selection = MissionDepth(1, core, "seed").select(source, WrappedCounter())
+    assert selection.provenance["sampled_missions"] == []
+    assert selection.token_counts["input"] == core
+    assert selection.token_counts["remaining_input_budget"] == 0
+
+
+def test_obsolete_separate_history_budget_is_rejected():
+    with pytest.raises(ValueError):
+        strategy_from_config({"name": "mission-depth", "depth": 4,
+                              "older_history_tokens": 8000, "seed": "seed"})

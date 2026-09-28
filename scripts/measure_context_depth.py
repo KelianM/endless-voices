@@ -21,14 +21,14 @@ def main():
                         default=ROOT / "data/local/endless-sky-7140eb2a29ce")
     parser.add_argument("--tokenizer", type=Path, required=True, help="Cached tokenizer directory")
     parser.add_argument("--depths", type=int, nargs="+", default=[4, 8, 12])
-    parser.add_argument("--older-history-tokens", type=int, default=8000)
+    parser.add_argument("--max-input-tokens", type=int, default=12288)
     parser.add_argument("--seed", default="context-depth-v1")
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output exists; choose a new directory")
     if len(args.depths) != len(set(args.depths)):
         parser.error("Depths must be unique")
-    strategies = [MissionDepth(d, args.older_history_tokens, args.seed) for d in args.depths]
+    strategies = [MissionDepth(d, args.max_input_tokens, args.seed) for d in args.depths]
     inventory_path = ROOT / "data/overview/source-statistics.json"
     inventory = json.loads(inventory_path.read_text())
     graph = load_prerequisite_graph(args.source, inventory)

@@ -80,7 +80,11 @@ training until the next release's split audit.
 
 Context selection now has a shared strategy interface in `endless_voices.context`. `FullContext`
 retains every eligible passage. `MissionDepth` keeps nearby prerequisite missions in full and
-samples whole older missions within a token budget, preserving lore and the current encounter.
+samples whole older missions into the space remaining below a total rendered-input ceiling.
+Lore and the current encounter remain intact. Chat formatting and substituted game variables
+count toward the ceiling. Preparation fails if the preserved core alone exceeds the ceiling;
+it does not truncate that core. Sparse eligible pools and whole-mission boundaries can leave
+unused space. Output tokens are reserved separately.
 The configuration records depth, budget and seed. These are configurable experiment settings,
 not hand-maintained story boundaries. The [depth comparison](../data/evaluation/context-depth-v1/README.md)
 measures the tradeoff. Source eligibility and chronological split checks precede selection; a

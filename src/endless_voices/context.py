@@ -2,9 +2,10 @@
 
 import hashlib
 import json
+import re
 from collections import deque
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from endless_voices.messages import validate_messages
@@ -14,6 +15,22 @@ def digest(value):
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False).encode()
     return hashlib.sha256(encoded).hexdigest()
 
+
+
+def substitute_variables(text, values):
+    """Replace configured markers once while leaving unknown markers visible."""
+    return re.sub(r"<[^>]+>", lambda match: values.get(match[0], match[0]), text)
+
+
+def variable_values(config):
+    """Validate and return configured game placeholder values."""
+    values = config["values"]
+    if not isinstance(values, dict) or any(
+        not isinstance(k, str) or re.fullmatch(r"<[^>]+>", k) is None
+        or not isinstance(v, str) for k, v in values.items()
+    ):
+        raise ValueError("Game variables must map <marker> strings to string values")
+    return dict(values)
 
 def distances(graph, start):
     """Return shortest prerequisite distances, counting one edge per mission."""
@@ -73,13 +90,17 @@ class ContextPool:
     encounter: list[dict]
     blocks: list[dict]
     graph: dict[str, list[str]]
+    variables: dict[str, str] = field(default_factory=dict)
 
     def history(self, missions):
-        return "\n\n".join(render(b) for b in self.blocks if b["mission"] in missions)
+        text = "\n\n".join(render(b) for b in self.blocks if b["mission"] in missions)
+        return substitute_variables(text, self.variables)
 
     def messages(self, missions):
-        return [{"role": "system", "content": self.system_prefix + self.history(missions)},
-                *deepcopy(self.encounter)]
+        return [{"role": "system", "content": substitute_variables(
+            self.system_prefix, self.variables) + self.history(missions)},
+                *[{**m, "content": substitute_variables(m["content"], self.variables)}
+                  for m in self.encounter]]
 
 
 @dataclass
@@ -123,7 +144,8 @@ def result(pool, counter, config, full, sampled, ds):
          "sampled_history": counter.text(pool.history(sampled))},
         {"strategy": config, "pool_sha256": digest(pool.__dict__),
          "messages_sha256": digest(messages), "mission_distances": ds,
-         "full_missions": sorted(full), "sampled_missions": sorted(sampled)},
+         "full_missions": sorted(full), "sampled_missions": sorted(sampled),
+         "game_variables": dict(pool.variables)},
     )
 
 
@@ -138,17 +160,17 @@ class FullContext:
 
 @dataclass(frozen=True)
 class MissionDepth:
-    """Retain nearby missions and sample whole older missions within a token budget."""
+    """Preserve nearby missions and fill the remaining complete-input budget."""
 
     depth: int
-    older_history_tokens: int
+    max_input_tokens: int
     seed: str
 
     def __post_init__(self):
         if type(self.depth) is not int or self.depth < 0:
             raise ValueError("depth must be a nonnegative integer")
-        if type(self.older_history_tokens) is not int or self.older_history_tokens < 0:
-            raise ValueError("older_history_tokens must be a nonnegative integer")
+        if type(self.max_input_tokens) is not int or self.max_input_tokens <= 0:
+            raise ValueError("max_input_tokens must be a positive integer")
         if not isinstance(self.seed, str) or not self.seed:
             raise ValueError("seed must be a nonempty string")
 
@@ -158,27 +180,40 @@ class MissionDepth:
         if names - ds.keys():
             raise ValueError("Context mission is absent from prerequisite graph")
         near = {name for name in names if ds[name] <= self.depth}
+        core_tokens = counter.messages(pool.messages(near))
+        if core_tokens > self.max_input_tokens:
+            raise ValueError(
+                f"{pool.sample_id}: preserved context requires {core_tokens} input tokens; "
+                f"ceiling is {self.max_input_tokens}; no context was truncated"
+            )
         order = sorted(names - near, key=lambda m: hashlib.sha256(
             f"{self.seed}:{pool.conversation_id}:{m}".encode()).hexdigest())
         chosen = set()
         for mission in order:
             candidate = chosen | {mission}
-            if counter.text(pool.history(candidate)) <= self.older_history_tokens:
+            if counter.messages(pool.messages(near | candidate)) <= self.max_input_tokens:
                 chosen = candidate
-        return result(pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds)
+        selection = result(
+            pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds
+        )
+        selection.token_counts.update(
+            preserved_input=core_tokens,
+            remaining_input_budget=self.max_input_tokens - selection.token_counts["input"],
+        )
+        return selection
 
 
 def strategy_from_config(config) -> ContextStrategy:
     """Build a supported strategy, rejecting misspelled or irrelevant settings."""
     if config == {"name": "full"}:
         return FullContext()
-    if set(config) == {"name", "depth", "older_history_tokens", "seed"}:
+    if set(config) == {"name", "depth", "max_input_tokens", "seed"}:
         if config["name"] == "mission-depth":
-            return MissionDepth(config["depth"], config["older_history_tokens"], config["seed"])
+            return MissionDepth(config["depth"], config["max_input_tokens"], config["seed"])
     raise ValueError("Invalid context strategy configuration")
 
 
-def pool_from_draft(draft, graph):
+def pool_from_draft(draft, graph, variables=None):
     """Adapt source-context drafts while preserving fixed lore and encounter messages."""
     blocks = [deepcopy(b) for b in draft["source_blocks"] if b["kind"] == "earlier-source-examples"]
     for block in blocks:
@@ -193,4 +228,4 @@ def pool_from_draft(draft, graph):
     system = messages[0]["content"]
     return ContextPool(draft["sample_id"], draft["conversation_id"], draft["mission"],
                        system[:-len(history)] if history else system,
-                       deepcopy(messages[1:]), blocks, deepcopy(graph))
+                       deepcopy(messages[1:]), blocks, deepcopy(graph), dict(variables or {}))

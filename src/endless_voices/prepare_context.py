@@ -12,6 +12,7 @@ from endless_voices.context import (
     digest,
     pool_from_draft,
     strategy_from_config,
+    variable_values,
 )
 
 
@@ -64,21 +65,26 @@ def main():
     parser.add_argument("--strategy", type=Path, required=True, help="Context strategy JSON config")
     parser.add_argument("--tokenizer", type=Path, required=True, help="Cached tokenizer directory")
     parser.add_argument("--output", type=Path, required=True, help="New organizer bundle directory")
+    parser.add_argument("--game-vars", type=Path, help="Optional game variable JSON config")
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output exists; choose a new directory")
     strategy = strategy_from_config(json.loads(args.strategy.read_text()))
     graph = json.loads(args.graph.read_text())
+    variables = variable_values(json.loads(args.game_vars.read_text())) if args.game_vars else {}
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, local_files_only=True)
     counter = TokenizerCounter(tokenizer)
-    selections = [strategy.select(pool_from_draft(json.loads(line), graph), counter)
+    selections = [strategy.select(pool_from_draft(json.loads(line), graph, variables), counter)
                   for line in args.drafts.read_text().splitlines() if line.strip()]
     import endless_voices.context as context_module
 
+    inputs = [args.drafts, args.graph, args.strategy]
+    if args.game_vars:
+        inputs.append(args.game_vars)
     save_selections(args.output, selections, {
-        "inputs": {str(p): file_hash(p) for p in (args.drafts, args.graph, args.strategy)},
+        "inputs": {str(p): file_hash(p) for p in inputs},
         "tokenizer_files": {str(p.relative_to(args.tokenizer)): file_hash(p)
                             for p in args.tokenizer.rglob("*") if p.is_file()},
         "code": {"context.py": file_hash(context_module.__file__),
