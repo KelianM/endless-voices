@@ -463,5 +463,10 @@ through the same map. Unknown markers remain visible. Substitutions affect rende
 only; source passages remain verbatim and output provenance records the config and its hash.
 Existing previews are unchanged; use a new output directory to apply the config.
 
+The [mission-depth comparison](data/evaluation/context-depth-v1/README.md) measures automatic
+selection at depths 4, 8 and 12 with an 8,000-token budget for older history. The
+[prerequisite audit](data/evaluation/prerequisite-expansion-audit-v1/README.md) explains the
+campaign milestones responsible for the largest inputs.
+
 The [validation-wide source-context measurements](data/evaluation/validation-source-context-v1/README.md)
 cover all 48 validation points, with per-scene lengths and unresolved context requirements.
