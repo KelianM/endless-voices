@@ -504,3 +504,5 @@ cover all 48 validation points, with per-scene lengths and unresolved context re
 API generation and judging default to a 30-minute network-operation timeout. Set `api_timeout_seconds` in `configs/benchmark.json` for benchmark runs, or `--timeout-seconds` for the standalone OpenAI and Anthropic judges. The timeout is recorded in run settings; it is not a strict total request deadline.
 
 [Sonnet 5.5 versus Luna](data/evaluation/sonnet55-luna-judge-v1/README.md): both judges identified 10/10 originals and passed two controls. Luna cost about 29 times less on this sample and remains the default judge. Sonnet 5.5 replaces Sonnet 5 in new benchmark generation runs.
+
+New benchmark references use [complete authored continuations](data/benchmark-continuations-v1/README.md), including narration, actions and quotation marks. Preparation follows the recorded route to the next choice or response boundary and rejects restored target paragraphs already present in the input. The model's loose authenticity instruction is unchanged; older speech-only results remain historical evidence.

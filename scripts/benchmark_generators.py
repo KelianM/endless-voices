@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
 from endless_voices import openai_judge
-from endless_voices.context import substitute_variables
+from endless_voices.continuations import load_targets, target_text
 from endless_voices.prepare_context import load_selections
 
 
@@ -31,6 +31,14 @@ def checked_inputs(root):
     for s in contexts:
         if assess.evaluation_messages(records[s.sample_id]) != s.judge_context():
             raise ValueError("Dataset and judge context differ")
+    targets = load_targets(root / "targets")
+    if set(targets) != set(records):
+        raise ValueError("Source continuation IDs differ")
+    for item in contexts:
+        target = target_text(targets[item.sample_id], item.messages,
+                             item.provenance.get("game_variables", {}))
+        if records[item.sample_id]["messages"][-1]["content"] != target:
+            raise ValueError("Reference differs from source continuation")
     return selection, records, prompts
 
 
@@ -58,11 +66,15 @@ def prepare(root, context, manifest, config):
     locals_ = {name: screen.read(path) for name, path in plan["local_configs"].items()}
     if any(cfg["label"] != name for name, cfg in locals_.items()):
         raise ValueError("Local model label differs from configuration")
+    targets_path = Path(plan["targets"])
+    targets = load_targets(targets_path)
+    if set(targets) != set(records):
+        raise ValueError("Source continuation IDs differ")
     prepared = {}
     for s in selections:
         original = records[s.sample_id]
         values = s.provenance.get("game_variables", {})
-        target = substitute_variables(original["messages"][-1]["content"], values)
+        target = target_text(targets[s.sample_id], s.messages, values)
         if any(target in m["content"] for m in s.messages):
             raise ValueError("Original target appears in generation context")
         if re.search(r"<[^>]+>", json.dumps(s.messages) + target):
@@ -70,6 +82,7 @@ def prepare(root, context, manifest, config):
         prepared[s.sample_id] = {**deepcopy(original), "messages": s.training_messages(target)}
     root.mkdir(parents=True)
     shutil.copytree(context, root / "context")
+    shutil.copytree(targets_path, root / "targets")
     licensing = manifest.parent.parent / "licensing"
     if licensing.is_dir():
         shutil.copytree(licensing, root / "attribution")
@@ -84,7 +97,8 @@ def prepare(root, context, manifest, config):
     screen.save(root / "selection.json", {
         "ids": ids, "split": "validation", "manifest_sha256": screen.sha(manifest),
         "context_sha256": screen.sha(root / "context/provenance.json"),
-        "target_source": str(manifest), "models": plan["generators"],
+        "target_source": str(targets_path), "sample_metadata_source": str(manifest),
+        "models": plan["generators"],
         "context": "Selected game-source context replaces the earlier dataset prompts",
         "candidate_order": "one balanced randomized assignment per condition; no reversed trials",
         "artifacts_sha256": {str(p.relative_to(root)): screen.sha(p) for p in files},

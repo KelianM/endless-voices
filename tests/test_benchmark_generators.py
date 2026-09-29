@@ -60,11 +60,22 @@ def recorded(tmp_path, monkeypatch, request):
         qwen = tmp_path / "qwen.json"
         screen.save(qwen, {"label": "qwen30b"})
         locals_["qwen30b"] = str(qwen)
+    targets = tmp_path / "targets"
+    targets.mkdir()
+    screen.save(targets / "targets.json", [
+        {"sample_id": sid, "paragraphs": [{"line": 1,
+          "text": 'She nods. "A complete source reply for ' + sid + '."'}]}
+        for sid in records
+    ])
+    screen.save(targets / "manifest.json", {
+        "sample_ids": list(records), "targets_sha256": screen.sha(targets / "targets.json")
+    })
     config = tmp_path / "config.json"
     screen.save(
         config,
         {
             "generators": models,
+            "targets": str(targets),
             "judge": "gpt-6-luna",
             "local_configs": locals_,
             "judge_context_limit": 1050000,
@@ -133,6 +144,9 @@ def test_export_uses_saved_context_once_and_reports_failures_and_missing(recorde
         trial = screen.read(pack / r["path"])
         assert list(trial) == ["trial_id", "context", "A", "B"]
         assert trial["context"] == expected
+    primary = next(r for r in private["trials"] if r["kind"] == "primary")
+    trial = screen.read(pack / primary["path"])
+    assert trial[primary["original"]] == 'She nods. "A complete source reply for one."'
     assert screen.read(recorded / "gpt-6-luna/two.result.json")["response"] == "Partial"
     with pytest.raises(ValueError, match="exists"):
         benchmark.export(recorded)
