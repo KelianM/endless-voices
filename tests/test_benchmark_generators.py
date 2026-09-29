@@ -93,7 +93,7 @@ def recorded(tmp_path, monkeypatch, request):
             else:
                 body = (
                     {"model": model, "system": messages[0]["content"], "messages": messages[1:]}
-                    if model == "claude-sonnet-5"
+                    if model == "claude-sonnet-5-5"
                     else {"model": model, "input": messages}
                 )
                 screen.save(folder / f"{sid}.request.json", {"body": body})
@@ -173,11 +173,11 @@ def test_judge_rechecks_public_trials_before_sending_requests(recorded):
 
 
 @pytest.mark.parametrize(
-    "recorded", [["gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5"]], indirect=True
+    "recorded", [["gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"]], indirect=True
 )
 def test_four_model_lineup_accepts_both_provider_completion_formats(recorded):
     benchmark.export(recorded)
     private = screen.read(recorded / "assessment/private.json")
     assert len(private["coverage"]) == 12
     assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 4
-    assert set(private["runs"]) == {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5"}
+    assert set(private["runs"]) == {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}

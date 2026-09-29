@@ -500,3 +500,7 @@ The [validation-wide source-context measurements](data/evaluation/validation-sou
 cover all 48 validation points, with per-scene lengths and unresolved context requirements.
 
 [The 8,192-token benchmark](data/evaluation/generator-benchmark-8192-v1/README.md) completed all 48 generations for Gemma 4 31B and Qwen3-30B-A3B. API timeouts left Luna and Sonnet incomplete. The report preserves coverage, judging failures, shared-context checks and the production memory results.
+
+API generation and judging default to a 30-minute network-operation timeout. Set `api_timeout_seconds` in `configs/benchmark.json` for benchmark runs, or `--timeout-seconds` for the standalone OpenAI and Anthropic judges. The timeout is recorded in run settings; it is not a strict total request deadline.
+
+[Sonnet 5.5 versus Luna](data/evaluation/sonnet55-luna-judge-v1/README.md): both judges identified 10/10 originals and passed two controls. Luna cost about 29 times less on this sample and remains the default judge. Sonnet 5.5 replaces Sonnet 5 in new benchmark generation runs.

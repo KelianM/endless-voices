@@ -128,13 +128,16 @@ def local(root, config):
             break
 
 
-def hosted(root, models=None, budget=5):
+def hosted(root, models=None, budget=5, timeout_seconds=1800):
     from endless_voices import anthropic_judge, openai_judge
+
+    if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be a positive integer")
 
     for model, provider in [
         ("gpt-6-luna", openai_judge),
         ("gpt-6-sol", openai_judge),
-        ("claude-sonnet-5", anthropic_judge),
+        ("claude-sonnet-5-5", anthropic_judge),
     ]:
         if models is not None and model not in models:
             continue
@@ -151,6 +154,7 @@ def hosted(root, models=None, budget=5):
                 "max_output_tokens_including_thinking": 4096,
                 "endpoint": provider.API,
                 "budget_usd": budget,
+                "timeout_seconds": timeout_seconds,
                 "rates_per_million_usd": provider.RATES[model],
             },
         )
@@ -195,7 +199,7 @@ def hosted(root, models=None, budget=5):
                     data=json.dumps(body).encode(),
                     headers={**headers, "Content-Type": "application/json"},
                 )
-                with urllib.request.urlopen(request, timeout=180) as h:
+                with urllib.request.urlopen(request, timeout=timeout_seconds) as h:
                     response = json.load(h)
                 row["api_response"] = response
                 row["estimated_cost_usd"] = provider.charge(model, response)

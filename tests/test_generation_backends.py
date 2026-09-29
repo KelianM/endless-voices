@@ -24,6 +24,7 @@ def test_hosted_screen_keeps_partial_outputs_and_never_overwrites(tmp_path, monk
     calls = []
 
     def send(request, timeout):
+        assert timeout == 2400
         body = json.loads(request.data)
         calls.append(body)
         if "input" in body:
@@ -47,8 +48,10 @@ def test_hosted_screen_keeps_partial_outputs_and_never_overwrites(tmp_path, monk
         return io.StringIO(json.dumps(result))
 
     with patch.object(screen.urllib.request, "urlopen", send):
-        screen.hosted(tmp_path)
+        screen.hosted(tmp_path, timeout_seconds=2400)
         assert len(calls) == 3
+        for p in tmp_path.glob("*/settings.json"):
+            assert screen.read(p)["timeout_seconds"] == 2400
         for p in tmp_path.glob("*/*.result.json"):
             result = screen.read(p)
             assert result["status"] == "failed" and result["response"] == "Partial dialogue"

@@ -75,6 +75,7 @@ def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch
             pass
 
     def send(request, timeout):
+        assert timeout == 1800
         calls.append(json.loads(request.data))
         return Handle()
 

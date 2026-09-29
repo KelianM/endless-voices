@@ -1,4 +1,4 @@
-"""Assess validation pairs with Sonnet 5 under a dollar budget."""
+"""Assess validation pairs with Sonnet 5.5 under a dollar budget."""
 
 import argparse
 import json
@@ -11,7 +11,7 @@ from endless_voices.assessment import file_hash, read_json, write_json
 from endless_voices.judge import judge_messages, parse_answer, save_progress
 
 API = "https://api.anthropic.com/v1/messages"
-RATES = {"claude-sonnet-5": (2.0, 0.20, 10.0)}
+RATES = {"claude-sonnet-5-5": (2.0, 0.20, 10.0)}
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -100,6 +100,9 @@ def spent(root):
 
 
 def run(args):
+    timeout_seconds = getattr(args, "timeout_seconds", 1800)
+    if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be a positive integer")
     key = load_key(args.env_file)
     instructions = (args.public / "instructions.txt").read_text()
     paths = [
@@ -121,7 +124,7 @@ def run(args):
         "trial_hashes": {p.stem: file_hash(p) for p in paths},
         "isolation": "stateless request per trial; no tools or conversation history",
         "model_revision": "returned model recorded per response; aliases may change",
-        "timeout_seconds": 180,
+        "timeout_seconds": timeout_seconds,
     }
     metadata = json.loads(json.dumps(metadata))
     settings = args.output / "settings.json"
@@ -181,7 +184,7 @@ def run(args):
                 )
                 row["started_at"] = time.time()
                 try:
-                    with urllib.request.urlopen(request, timeout=180) as handle:
+                    with urllib.request.urlopen(request, timeout=timeout_seconds) as handle:
                         response = json.load(handle)
                     row["api_response"] = response
                     row["estimated_cost_usd"] = charge(model, response)
@@ -236,6 +239,8 @@ def main():
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
     parser.add_argument("--budget", type=float, default=5.0)
     parser.add_argument("--limit", type=int, default=98)
+    parser.add_argument("--timeout-seconds", type=int, default=1800,
+                        help="Network operation timeout in seconds (default: 1800)")
     args = parser.parse_args()
     if not 0 < args.budget <= 5 or args.limit < 1:
         parser.error("budget must be positive and at most $5; limit must be positive")

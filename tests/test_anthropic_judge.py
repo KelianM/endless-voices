@@ -36,8 +36,8 @@ def test_incomplete_and_refused_responses_are_not_judgments():
 
 
 def test_cost_counts_reasoning_output_and_cached_input():
-    assert judge.charge("claude-sonnet-5", response()) == pytest.approx(0.00402)
-    assert judge.charge("claude-sonnet-5", {}) is None
+    assert judge.charge("claude-sonnet-5-5", response()) == pytest.approx(0.00402)
+    assert judge.charge("claude-sonnet-5-5", {}) is None
 
 
 def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch):
@@ -61,6 +61,7 @@ def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch
             pass
 
     def send(request, timeout):
+        assert timeout == 1800
         calls.append(json.loads(request.data))
         return Handle()
 
@@ -69,7 +70,7 @@ def test_budget_and_resume_never_resend_submitted_requests(tmp_path, monkeypatch
     judge.run(args)
     judge.run(args)
     judge.run(args)
-    assert [c["model"] for c in calls] == ["claude-sonnet-5"]
+    assert [c["model"] for c in calls] == ["claude-sonnet-5-5"]
     assert all("tools" not in c and len(c["messages"]) == 1 for c in calls)
     assert all("secret-test-value" not in p.read_text() for p in args.output.rglob("*.json"))
     assert judge.spent(args.output) == pytest.approx(0.00402)
@@ -85,9 +86,9 @@ def test_unknown_request_reserves_budget_and_is_not_retried(tmp_path, monkeypatc
     (public / "instructions.txt").write_text("Choose")
     trial = {"trial_id": "opaque", "context": [], "A": "First", "B": "Second"}
     (public / "primary" / "opaque.json").write_text(json.dumps(trial))
-    folder = tmp_path / "run" / "claude-sonnet-5"
+    folder = tmp_path / "run" / "claude-sonnet-5-5"
     folder.mkdir(parents=True)
-    body = judge.payload("claude-sonnet-5", trial, "Choose")
+    body = judge.payload("claude-sonnet-5-5", trial, "Choose")
     (folder / "opaque.request.json").write_text(json.dumps(body))
     assert judge.spent(tmp_path / "run") == judge.reservation(body)
     key = tmp_path / ".env"

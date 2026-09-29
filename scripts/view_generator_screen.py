@@ -21,6 +21,7 @@ labels = {
     "gpt-6-luna": "GPT-6 Luna",
     "gpt-6-sol": "GPT-6 Sol",
     "claude-sonnet-5": "Claude Sonnet 5",
+    "claude-sonnet-5-5": "Claude Sonnet 5.5",
 }
 key = {v: k for k, v in read(root / "review-key.json").items()}
 notes = read(root / "qualitative-notes-blind.json")

@@ -44,7 +44,7 @@ def prepare(root, context, manifest, config):
     if set(ids) != set(records):
         raise ValueError("Expected all validation samples, without test or extra samples")
     plan = screen.read(config)
-    supported = {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5"}
+    supported = {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
     if (not plan["generators"] or set(plan["generators"]) - supported
             or len(set(plan["generators"])) != len(plan["generators"])
             or plan["judge"] != "gpt-6-luna"):
@@ -175,7 +175,7 @@ def export(root):
                     raise ValueError("Hosted request differs")
                 prompt.update(input_ids_sha256=None, input_tokens=None)
                 api = raw.get("api_response", {})
-                complete = (api.get("stop_reason") == "end_turn" if model == "claude-sonnet-5"
+                complete = (api.get("stop_reason") == "end_turn" if model == "claude-sonnet-5-5"
                             else api.get("status") == "completed")
             if raw["status"] == "ok" and not complete:
                 raise ValueError("Success without provider completion")
@@ -280,7 +280,8 @@ def main():
     elif args.stage == "hosted":
         screen.hosted(root, models=[m for m in plan["generators"]
                                     if m not in plan["local_configs"]],
-                      budget=plan["generation_budget_usd"])
+                      budget=plan["generation_budget_usd"],
+                      timeout_seconds=plan.get("api_timeout_seconds", 1800))
     elif args.stage == "export":
         export(root)
     elif args.stage == "judge":
@@ -289,7 +290,8 @@ def main():
         verify_trials(root, save=False)
         openai_judge.run(SimpleNamespace(public=root / "assessment/public", output=root / "judge",
                                         env_file=Path(".env"), models=[plan["judge"]],
-                                        budget=plan["judge_budget_usd"], limit=1000))
+                                        budget=plan["judge_budget_usd"], limit=1000,
+                                        timeout_seconds=plan.get("api_timeout_seconds", 1800)))
     else:
         assess.report(root / "assessment", [root / "judge" / plan["judge"] / "review.json"],
                       root / "report")
