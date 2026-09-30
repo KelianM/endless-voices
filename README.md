@@ -104,8 +104,8 @@ reviewed dataset spanning different situations. Keep provenance and permissions 
 text or generated examples; this repository includes the curated dialogue release, but not the raw upstream corpus or game assets.
 
 The tokenizer's native chat template formats each conversation. This first implementation uses
-causal language-modelling loss on **all non-padding tokens**, including system and user text;
-it does not implement assistant-only loss. Padding is masked by attention position so real EOS
+loss on the **final assistant continuation**, excluding supplied system and user text.
+The optional `data.loss = "all"` setting restores full-conversation loss. Padding is masked by attention position so real EOS
 tokens remain training targets, even when EOS doubles as PAD. Conversations exceeding
 `data.max_length` raise an error instead of silently discarding the desired response. Set that
 limit within your model's supported context window.
@@ -454,13 +454,11 @@ measures references for a proposed chronological dataset. The existing dataset r
 The [verbatim game context preview](data/evaluation/source-context-preview-v1/README.md)
 replaces lore summaries with source prose and restores the current encounter opening.
 
-Context previews can substitute game placeholders using
-`--game-vars configs/game-variables.dummy.json` with `scripts/assemble_validation_context.py`.
-Edit the file's `values` map to change the dummy names, locations and amounts.
-The values are synthetic, not game facts; a future game integration can supply real values
-through the same map. Unknown markers remain visible. Substitutions affect rendered context
-only; source passages remain verbatim and output provenance records the config and its hash.
-Existing previews are unchanged; use a new output directory to apply the config.
+Context preparation uses `configs/game-variables.player.json` for synthetic player identity.
+Mission locations come from the owning mission's cached source, including in historical passages.
+Unknown runtime values remain explicit markers and are recorded for review; no global dummy
+locations or payment amounts are supplied. See [ADR 12](docs/adr/0012-resolve-game-variables-within-their-mission.md).
+Historical previews and benchmark results retain their original substitutions.
 
 Context selection is shared by dataset and benchmark preparation through
 `endless_voices.context`. Choose `configs/context-full.json` or
@@ -512,3 +510,7 @@ New benchmark references use [complete authored continuations](data/benchmark-co
 [The complete narrative benchmark](data/evaluation/generator-benchmark-narrative-v1/README.md) has 48 responses per model and 194 successful Luna judgments. All originals were identified; the report explains why this does not rank storytelling quality.
 
 The task instruction is shared in `src/endless_voices/instructions.py`. [Four matched Luna responses](data/evaluation/scene-instruction-v1/README.md) show how scene-continuation wording changes the output. Historical saved prompts remain unchanged; the training prompt draft still needs target and split migration.
+
+The shared minimal scene instruction and the preliminary writing objective are recorded in [ADR 11](docs/adr/0011-use-a-shared-scene-continuation-instruction.md). Training defaults to loss on the final assistant continuation only; `data.loss = "all"` explicitly restores the earlier full-conversation objective.
+
+The [preliminary scene training release](data/scene-training-v1/README.md) replaces the old speech-only training input for the next experiment: 92 examples, full authored targets, source context and mission-scoped variables. Its exclusions and token measurements are recorded. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.

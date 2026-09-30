@@ -92,14 +92,17 @@ class ContextPool:
     graph: dict[str, list[str]]
     variables: dict[str, str] = field(default_factory=dict)
 
+    variables_resolved: bool = False
+
     def history(self, missions):
         text = "\n\n".join(render(b) for b in self.blocks if b["mission"] in missions)
-        return substitute_variables(text, self.variables)
+        return text if self.variables_resolved else substitute_variables(text, self.variables)
 
     def messages(self, missions):
+        values = {} if self.variables_resolved else self.variables
         return [{"role": "system", "content": substitute_variables(
-            self.system_prefix, self.variables) + self.history(missions)},
-                *[{**m, "content": substitute_variables(m["content"], self.variables)}
+            self.system_prefix, values) + self.history(missions)},
+                *[{**m, "content": substitute_variables(m["content"], values)}
                   for m in self.encounter]]
 
 
@@ -145,7 +148,8 @@ def result(pool, counter, config, full, sampled, ds):
         {"strategy": config, "pool_sha256": digest(pool.__dict__),
          "messages_sha256": digest(messages), "mission_distances": ds,
          "full_missions": sorted(full), "sampled_missions": sorted(sampled),
-         "game_variables": dict(pool.variables)},
+         "game_variables": dict(pool.variables),
+         "variable_policy": "mission-scoped" if pool.variables_resolved else "legacy-global"},
     )
 
 
@@ -215,6 +219,7 @@ def strategy_from_config(config) -> ContextStrategy:
 
 def pool_from_draft(draft, graph, variables=None):
     """Adapt source-context drafts while preserving fixed lore and encounter messages."""
+    variables = draft.get("game_variables", variables)
     blocks = [deepcopy(b) for b in draft["source_blocks"] if b["kind"] == "earlier-source-examples"]
     for block in blocks:
         block["mission"] = block["heading"].rsplit(" / ", 1)[0]
@@ -228,4 +233,5 @@ def pool_from_draft(draft, graph, variables=None):
     system = messages[0]["content"]
     return ContextPool(draft["sample_id"], draft["conversation_id"], draft["mission"],
                        system[:-len(history)] if history else system,
-                       deepcopy(messages[1:]), blocks, deepcopy(graph), dict(variables or {}))
+                       deepcopy(messages[1:]), blocks, deepcopy(graph), dict(variables or {}),
+                       "game_variables" in draft)

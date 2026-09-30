@@ -6,11 +6,15 @@ import json
 import re
 from collections import deque
 from pathlib import Path
+from statistics import median
 from urllib.parse import unquote
 
 from prepare_conversations import flow_graph, tree, walk
 
-from endless_voices.context import substitute_variables, variable_values
+from endless_voices.context import TokenizerCounter
+from endless_voices.continuations import load_targets
+from endless_voices.game_variables import mission_values, player_values
+from endless_voices.game_variables import render as render_variables
 from endless_voices.instructions import CONTINUATION_INSTRUCTION, character_reference
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,15 +142,17 @@ def main():
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--targets", type=Path, help="Select only verified continuation IDs")
+    parser.add_argument("--split", choices=["train", "validation"], default="validation")
     parser.add_argument(
-        "--game-vars", type=Path,
-        help="JSON file containing a values map, such as configs/game-variables.dummy.json",
+        "--game-vars", type=Path, default=Path("configs/game-variables.player.json"),
+        help="Player identity only; mission variables are resolved from source",
     )
     args = parser.parse_args()
     if args.output.exists():
         parser.error("Output exists; choose a new directory")
     variable_config = json.loads(args.game_vars.read_text()) if args.game_vars else None
-    values = variable_values(variable_config) if variable_config is not None else {}
+    player = player_values(variable_config)
     invpath = ROOT / "data/overview/source-statistics.json"
     inv = json.loads(invpath.read_text())
     revision = inv["revision"]
@@ -155,7 +161,7 @@ def main():
         path = entry["path"]
         if (
             not path.startswith(("data/human/", "data/hai/", "data/quarg/"))
-            and path != "data/map planets.txt"
+            and path not in {"data/map planets.txt", "data/map systems.txt"}
         ):
             continue
         file = args.source / path
@@ -190,12 +196,27 @@ def main():
                 raise ValueError("Pilot hash mismatch")
             for line in file.read_text().splitlines():
                 r = json.loads(line)
-                if split == "test":
+                if split == "test" or (args.split == "train" and split == "validation"):
                     test_metadata.append(r["metadata"])
                 else:
                     records[r["metadata"]["id"]] = r
     blocked = source_spans(test_metadata, revision)
-    validation = {k: v for k, v in records.items() if v["metadata"]["split"] == "validation"}
+    held_out_missions = {source["source_group"].removeprefix("mission / ")
+                         for meta in test_metadata for source in meta["sources"]
+                         if source["source_group"].startswith("mission / ")}
+    validation = {k: v for k, v in records.items() if v["metadata"]["split"] == args.split}
+    if args.targets:
+        selected_ids = set(load_targets(args.targets))
+        if not selected_ids <= set(validation):
+            raise ValueError("Target IDs do not belong to the selected split")
+        validation = {k: v for k, v in validation.items() if k in selected_ids}
+    excluded_groups = []
+    for key, record in list(validation.items()):
+        groups = {s["source_group"].removeprefix("mission / ")
+                  for s in record["metadata"]["sources"]}
+        if groups & held_out_missions:
+            excluded_groups.append({"sample_id": key, "reason": "Mission overlaps held-out split"})
+            del validation[key]
     provenance_path = ROOT / "data/pilot-v1/evidence/provenance.json"
     provenance = {
         p["id"]: p for p in json.loads(provenance_path.read_text()) if p["id"] in validation
@@ -249,6 +270,12 @@ def main():
     def permitted(path, line):
         return not any(p == path and lo <= line <= hi for p, lo, hi in blocked)
 
+    planet_systems = {}
+    for system in index["data/map systems.txt"]:
+        if system["tokens"][:1] == ["system"]:
+            for item, _ in walk(system["children"]):
+                if item["tokens"][:1] == ["object"] and len(item["tokens"]) == 2:
+                    planet_systems[item["tokens"][1]] = system["tokens"][1]
     planet_nodes = index["data/map planets.txt"]
     source_docs = {}
     for node in planet_nodes:
@@ -279,6 +306,7 @@ def main():
         meta, origin = record["metadata"], provenance[sample_id]
         path = origin["source_path"]
         mission = meta["sources"][0]["source_group"].removeprefix("mission / ")
+        values = mission_values(missions[mission][1], planet_systems, player)
         current = next(
             n
             for n, _ in walk(index[path])
@@ -290,6 +318,9 @@ def main():
         issues, omitted, chunks = [], [], []
         ancestors, gaps, alternatives = closure(mission)
         for previous, phase in ancestors:
+            if previous in held_out_missions:
+                omitted.append({"mission": previous, "reason": "Held-out mission"})
+                continue
             previous_path, node = missions[previous]
             passages = []
             for event in node["children"]:
@@ -417,6 +448,25 @@ def main():
                 )
             )
 
+        variable_issues = []
+        for block in [*lore, *chunks]:
+            owner = block["heading"].rsplit(" / ", 1)[0]
+            scoped = (mission_values(missions[owner][1], planet_systems, player)
+                      if owner in missions else player)
+            block["variable_values"] = scoped
+            for passage in block["passages"]:
+                passage["source_text"] = passage["text"]
+                passage["text"], unresolved = render_variables(passage["text"], scoped)
+                if unresolved:
+                    variable_issues.append({"block": block["heading"], "line": passage["line"],
+                                            "markers": unresolved})
+        for passage in current_passages:
+            passage["source_text"] = passage["text"]
+            passage["text"], unresolved = render_variables(passage["text"], values)
+            if unresolved:
+                variable_issues.append({"block": "current", "line": passage["line"],
+                                        "markers": unresolved})
+
         system = (
             character_reference(meta["character_role"]) + ".\n" + CONTINUATION_INSTRUCTION
             + "\n\nWorld reference:\n\n"
@@ -435,13 +485,9 @@ def main():
         if record["messages"][-1]["content"] in text:
             raise ValueError("Current target copied into context")
         source_placeholders = sorted(set(re.findall(r"<[^>]+>", text)))
-        messages = [
-            {**m, "content": substitute_variables(m["content"], values)} for m in messages
-        ]
+
         text = json.dumps(messages, ensure_ascii=False)
-        count = len(
-            tokenizer.apply_chat_template(messages, tokenize=True, add_generation_prompt=True)
-        )
+        count = TokenizerCounter(tokenizer).messages(messages)
         row = {
             "sample_id": sample_id,
             "identity": identity,
@@ -458,6 +504,8 @@ def main():
             "placeholders": sorted(set(re.findall(r"<[^>]+>", text))),
             "substituted_variables": {k: values[k] for k in source_placeholders if k in values},
             "status": "draft_requires_path_and_variable_review",
+            "game_variables": values, "variable_issues": variable_issues,
+            "split": args.split,
         }
         outputs.append(
             {
@@ -480,7 +528,10 @@ def main():
         "script_sha256": sha(Path(__file__)),
         "pilot_manifest_sha256": sha(sample_root / "manifest.json"),
         "pilot_provenance_sha256": sha(provenance_path),
-        "reference_pool": "Validation-only drafts; unassigned passages are not training data",
+        "reference_pool": "Source drafts with held-out mission and passage exclusions",
+        "excluded_groups": excluded_groups,
+        "held_out_missions": sorted(held_out_missions),
+        "split": args.split,
         "game_variables": (
             {"config": variable_config, "sha256": sha(args.game_vars)}
             if args.game_vars else None
@@ -501,7 +552,7 @@ def main():
             {
                 "samples": len(summary),
                 "min": min(counts),
-                "median": (counts[23] + counts[24]) / 2,
+                "median": median(counts),
                 "max": max(counts),
                 "over_4096": sum(c > 4096 for c in counts),
             }

@@ -153,3 +153,12 @@ def test_obsolete_separate_history_budget_is_rejected():
     with pytest.raises(ValueError):
         strategy_from_config({"name": "mission-depth", "depth": 4,
                               "older_history_tokens": 8000, "seed": "seed"})
+
+
+def test_resolved_history_never_uses_the_current_missions_destination():
+    source = pool()
+    source.variables = {"<planet>": "Current destination"}
+    source.variables_resolved = True
+    source.blocks[0]["passages"][0]["text"] = "Visit <planet>."
+    assert "Visit <planet>." in source.history({"recent"})
+    assert "Current destination" not in source.messages({"recent"})[0]["content"]

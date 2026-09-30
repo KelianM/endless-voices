@@ -177,3 +177,27 @@ def test_contract_cli_local_tokenizer(tmp_path: Path, tokenizer: PreTrainedToken
     assert result.returncode == 1
     assert "train.jsonl:1:" in result.stderr
     assert "Shorten the conversation" in result.stderr
+
+
+def test_continuation_loss_excludes_lore_and_preserves_target_eos(tmp_path, tokenizer):
+    path = tmp_path / "sample.jsonl"
+    path.write_text(json.dumps({"messages": [
+        {"role": "system", "content": "hello"},
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "friend"}]}))
+    examples = tokenize_conversations(str(path), tokenizer, 32)
+    batch = ConversationCollator(tokenizer)(examples)
+    assert batch["labels"].tolist() == [[-100, -100, -100, -100, 3, 1]]
+
+
+def test_mapping_tokenizer_output_keeps_ids_and_loss_boundary(tmp_path, tokenizer, monkeypatch):
+    original = tokenizer.apply_chat_template
+    monkeypatch.setattr(tokenizer, "apply_chat_template",
+                        lambda *a, **kw: {"input_ids": original(*a, **kw)})
+    path = tmp_path / "sample.jsonl"
+    path.write_text(json.dumps({"messages": [
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "friend"}]}))
+    row = tokenize_conversations(str(path), tokenizer, 16)[0]
+    assert row["input_ids"] == [2, 1, 3, 1]
+    assert row["labels"] == [-100, -100, 3, 1]

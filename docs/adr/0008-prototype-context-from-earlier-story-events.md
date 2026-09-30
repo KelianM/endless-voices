@@ -1,6 +1,6 @@
 # 8. Prototype context from earlier story events
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR 11
 - **Date:** 2026-09-28
 - **Sources:** [Issue #9](https://github.com/KelianM/endless-voices/issues/9),
   [PR #16](https://github.com/KelianM/endless-voices/pull/16), owner discussion on chronological context

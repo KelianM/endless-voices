@@ -71,14 +71,18 @@ def prepare(root, context, manifest, config):
     if set(targets) != set(records):
         raise ValueError("Source continuation IDs differ")
     prepared = {}
+    unresolved_variables = {}
     for s in selections:
         original = records[s.sample_id]
         values = s.provenance.get("game_variables", {})
         target = target_text(targets[s.sample_id], s.messages, values)
         if any(target in m["content"] for m in s.messages):
             raise ValueError("Original target appears in generation context")
-        if re.search(r"<[^>]+>", json.dumps(s.messages) + target):
+        markers = sorted(set(re.findall(r"<[^>]+>", json.dumps(s.messages) + target)))
+        if markers and s.provenance.get("variable_policy") != "mission-scoped":
             raise ValueError("Unresolved game variable in final input or target")
+        if markers:
+            unresolved_variables[s.sample_id] = markers
         prepared[s.sample_id] = {**deepcopy(original), "messages": s.training_messages(target)}
     root.mkdir(parents=True)
     shutil.copytree(context, root / "context")
@@ -86,6 +90,7 @@ def prepare(root, context, manifest, config):
     licensing = manifest.parent.parent / "licensing"
     if licensing.is_dir():
         shutil.copytree(licensing, root / "attribution")
+    screen.save(root / "variables.json", unresolved_variables)
     screen.save(root / "records.json", prepared)
     screen.save(root / "prompts.json", [s.generation_prompt() for s in selections])
     for name, cfg in locals_.items():
@@ -140,7 +145,7 @@ def preflight(root, tokenizers):
             for name in tokenizers},
         "method": "Exact local prompt tokens; Luna UTF-8 input upper bound plus 4096 candidate "
                   "tokens and 4096 judge output tokens. Actual candidates checked at export.",
-        "no_api_calls": True, "unresolved_variables": 0,
+        "no_api_calls": True, "unresolved_variables": screen.read(root / "variables.json"),
     })
 
 

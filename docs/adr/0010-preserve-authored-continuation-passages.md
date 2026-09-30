@@ -12,7 +12,7 @@ The annotated dataset described in [ADR 5](0005-build-datasets-from-reviewed-con
 
 New benchmark preparation uses complete source paragraphs from a verified continuation bundle. The selected route starts at the first annotated target paragraph and ends before the next player choice, recorded response boundary or route end. Existing anchors resolve branches; distinct unresolved outcomes cause preparation to fail. Narration from other characters can remain within the continuation.
 
-The shared implementation in `src/endless_voices/continuations.py` preserves authored text. Only source syntax delimiters are removed and configured game variables are substituted. Dataset consumers can use the same target with the saved context. Benchmark preparation checks each target paragraph for input overlap. The initial bundle contains validation scenes only.
+The shared implementation in `src/endless_voices/continuations.py` preserves authored text. Only source syntax delimiters are removed and configured game variables are substituted. Dataset consumers can use the same target with the saved context. Benchmark preparation checks each target paragraph for input overlap. The initial bundle contains validation scenes. Training preparation now applies the same extraction and records ambiguous examples as exclusions.
 
 ## Consequences
 

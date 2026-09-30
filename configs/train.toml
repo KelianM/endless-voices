@@ -8,6 +8,7 @@ revision = "main"
 # Paths are relative to the working directory, not this config file.
 path = "data/example.jsonl"
 max_length = 512
+loss = "continuation"
 
 [lora]
 r = 8

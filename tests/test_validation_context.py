@@ -8,9 +8,10 @@ from assemble_validation_context import (  # noqa: E402
     dependency_terms,
     route_prefix,
     source_spans,
-    substitute_variables,
 )
 from prepare_conversations import tree  # noqa: E402
+
+from endless_voices.context import substitute_variables  # noqa: E402
 
 
 def test_optional_mission_is_not_mistaken_for_required_earlier_history():

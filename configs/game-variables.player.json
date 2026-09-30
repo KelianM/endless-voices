@@ -1,0 +1,8 @@
+{
+  "description": "Fixed synthetic player identity. Mission variables come from each source mission, never this map.",
+  "values": {
+    "<first>": "Alex",
+    "<last>": "Morgan",
+    "<ship>": "Copper Finch"
+  }
+}

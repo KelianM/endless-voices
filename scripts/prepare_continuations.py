@@ -12,9 +12,9 @@ from endless_voices.assessment import load_dataset
 from endless_voices.continuations import continuation
 
 
-def prepare(manifest, provenance, source, output):
+def prepare(manifest, provenance, source, output, split="validation", exclude_ambiguous=False):
     """Save complete validation targets and source coordinates without model calls."""
-    records = load_dataset(manifest, 'validation')
+    records = load_dataset(manifest, split)
     ledger = {r['id']: r for r in json.loads(provenance.read_text()) if r['id'] in records}
     boundaries = {}
     for sid, record in records.items():
@@ -22,7 +22,7 @@ def prepare(manifest, provenance, source, output):
         boundaries.setdefault(key, set()).update(
             s['line'] for m in ledger[sid]['messages'] if m['role'] == 'user'
             for s in m.get('spans', []))
-    rows, parsed = [], {}
+    rows, parsed, excluded = [], {}, []
     for sid, record in records.items():
         origin = ledger[sid]
         relative = Path(origin['source_path'])
@@ -41,7 +41,10 @@ def prepare(manifest, provenance, source, output):
             result = continuation(conversation, flow_graph(conversation), anchors,
                                   boundaries[record['metadata']['conversation_id']])
         except ValueError as error:
-            raise ValueError(f'{sid}: {error}') from error
+            if not exclude_ambiguous:
+                raise ValueError(f'{sid}: {error}') from error
+            excluded.append({'sample_id': sid, 'reason': str(error)})
+            continue
         rows.append({'sample_id': sid, 'source_path': str(relative),
                      'source_revision': origin['source_revision'],
                      'source_sha256': origin['source_sha256'], **result})
@@ -49,8 +52,9 @@ def prepare(manifest, provenance, source, output):
     raw = (json.dumps(rows, ensure_ascii=False, indent=2) + '\n').encode()
     (output / 'targets.json').write_bytes(raw)
     (output / 'manifest.json').write_text(json.dumps({
-        'format': 'source-continuation-v1', 'split': 'validation',
-        'sample_ids': list(records), 'targets_sha256': hashlib.sha256(raw).hexdigest(),
+        'format': 'source-continuation-v1', 'split': split,
+        'sample_ids': [r['sample_id'] for r in rows], 'excluded': excluded,
+        'targets_sha256': hashlib.sha256(raw).hexdigest(),
         'source_manifest_sha256': hashlib.sha256(manifest.read_bytes()).hexdigest(),
         'annotation_provenance_sha256': hashlib.sha256(provenance.read_bytes()).hexdigest(),
         'boundary': 'First target paragraph through selected route to next choice or route end',
@@ -65,7 +69,7 @@ def prepare(manifest, provenance, source, output):
         'Unlike the historical speech-only dataset, these targets preserve complete authored '
         'paragraphs, including narration, actions and quotation marks. Source delimiters are '
         'removed; runtime variables remain for consumer substitution. No prose is generated.\n')
-    print(f'Saved {len(rows)} validation continuations')
+    print(f'Saved {len(rows)} {split} continuations; excluded {len(excluded)}')
 
 
 def main():
@@ -76,8 +80,11 @@ def main():
                         default=Path('data/pilot-v1/evidence/provenance.json'))
     parser.add_argument('--source', type=Path, default=DEFAULT_SOURCES)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--split', choices=['train', 'validation'], default='validation')
+    parser.add_argument('--exclude-ambiguous', action='store_true')
     args = parser.parse_args()
-    prepare(args.manifest, args.provenance, args.source, args.output)
+    prepare(args.manifest, args.provenance, args.source, args.output,
+            args.split, args.exclude_ambiguous)
 
 
 if __name__ == '__main__':
