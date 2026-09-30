@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 from endless_voices.messages import validate_messages
+from endless_voices.splits import mission_key
 
 SPLITS = {"train", "validation", "test"}
 SLUG = re.compile(r"[a-z0-9]+(?:[-_][a-z0-9]+)*")
@@ -142,7 +143,9 @@ def validate_manifest(path: Path, *, tokenizer=None, max_length: int | None = No
         raise ValueError("tokenizer and max_length must be supplied together")
     try:
         manifest = json.loads(path.read_text(encoding="utf-8"))
-        fields(manifest, {"schema_version", "dataset_version", "files"}, "manifest")
+        fields(manifest, {"schema_version", "dataset_version", "files", "split_unit"}, "manifest")
+        if manifest['split_unit'] != 'mission':
+            raise ValueError("Unsupported split_unit")
         version(manifest["schema_version"])
         text(manifest["dataset_version"], "dataset_version")
         fields(manifest["files"], SPLITS, "manifest.files")
@@ -193,6 +196,10 @@ def validate_manifest(path: Path, *, tokenizer=None, max_length: int | None = No
                             f"first at {groups[key][1]}"
                         )
                     groups.setdefault(key, (split, location))
+                key = ("mission", mission_key(meta))
+                if key in groups and groups[key][0] != split:
+                    raise ValueError(f"{location}: mission {key[1]!r} crosses splits")
+                groups.setdefault(key, (split, location))
                 if tokenizer is not None:
                     from endless_voices.data import tokenize_messages
 

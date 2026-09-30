@@ -139,6 +139,10 @@ def prose(node):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--manifest", type=Path,
+                        default=ROOT / "data/scene-training-v2/split-manifest.json")
+    parser.add_argument("--provenance", type=Path,
+                        default=ROOT / "data/scene-training-v2/provenance.json")
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -186,8 +190,8 @@ def main():
                     writers.setdefault(term, []).append(
                         (name, "done" if action == "complete" else "offered")
                     )
-    sample_root = ROOT / "data/pilot-v1/samples"
-    manifest = json.loads((sample_root / "manifest.json").read_text())
+    sample_root = args.manifest.parent
+    manifest = json.loads(args.manifest.read_text())
     records, test_metadata = {}, []
     for split in ("train", "validation", "test"):
         for entry in manifest["files"][split]:
@@ -217,7 +221,7 @@ def main():
         if groups & held_out_missions:
             excluded_groups.append({"sample_id": key, "reason": "Mission overlaps held-out split"})
             del validation[key]
-    provenance_path = ROOT / "data/pilot-v1/evidence/provenance.json"
+    provenance_path = args.provenance
     provenance = {
         p["id"]: p for p in json.loads(provenance_path.read_text()) if p["id"] in validation
     }
@@ -526,7 +530,7 @@ def main():
         "revision": revision,
         "source_hashes": files,
         "script_sha256": sha(Path(__file__)),
-        "pilot_manifest_sha256": sha(sample_root / "manifest.json"),
+        "pilot_manifest_sha256": sha(args.manifest),
         "pilot_provenance_sha256": sha(provenance_path),
         "reference_pool": "Source drafts with held-out mission and passage exclusions",
         "excluded_groups": excluded_groups,

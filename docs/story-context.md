@@ -4,7 +4,7 @@ The objective is to learn the game's writing and characters. Dataset and benchma
 
 ## Split and target boundaries
 
-The existing conversation split assignments remain the starting point. Training preparation excludes examples belonging to missions represented in validation or test, and excludes those missions from historical references. Unannotated prerequisite passages remain eligible unless they belong to a held-out mission. Ambiguous continuation boundaries are recorded as exclusions.
+Whole source missions form the split unit, as recorded in [ADR 13](adr/0013-split-datasets-by-source-mission.md). Existing held-out assignments take precedence when migrating conversation-level assignments. Training preparation excludes examples belonging to missions represented in validation or test, and excludes those missions from historical references. Unannotated prerequisite passages remain eligible unless they belong to a held-out mission. Ambiguous continuation boundaries are recorded as exclusions.
 
 The target preserves complete authored paragraphs, including narration and other speakers. Preparation rejects target paragraphs already present in the current input. The current encounter ends before the target; subsequent scene text is not supplied as its lead-in.
 
@@ -22,4 +22,4 @@ The saved selection records depth, token budget, seed, source coordinates, retai
 
 Player identity is configurable. Static mission values are resolved separately for each passage's owning mission, under [ADR 12](adr/0012-resolve-game-variables-within-their-mission.md). Unknown runtime values remain literal markers. Source text, substitutions and unresolved markers are retained for review. Historical passages are never substituted again using the current mission's destination.
 
-The [preliminary training release](../data/scene-training-v1/README.md) records exclusions, token measurements and remaining markers. The release does not claim that every optional branch occurred in one playthrough, that the game state machine has been reconstructed, or that adapter training fits the local machine.
+The [preliminary training release](../data/scene-training-v2/README.md) records exclusions, token measurements and remaining markers. The release does not claim that every optional branch occurred in one playthrough, that the game state machine has been reconstructed, or that adapter training fits the local machine.

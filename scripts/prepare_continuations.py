@@ -61,7 +61,7 @@ def prepare(manifest, provenance, source, output, split="validation", exclude_am
         'normalization': 'Remove game source delimiters only; preserve paragraph text. '
                          'Game variables are substituted by the consumer.',
     }, indent=2) + '\n')
-    shutil.copytree(manifest.parent.parent / 'licensing', output / 'licensing')
+    shutil.copytree(manifest.parent / 'licensing', output / 'licensing')
     (output / 'licensing/ATTRIBUTION.md').write_text(
         '# Attribution\n\nThese source continuations derive from Endless Sky at revision '
         + rows[0]['source_revision']
@@ -75,9 +75,9 @@ def prepare(manifest, provenance, source, output, split="validation", exclude_am
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', type=Path,
-                        default=Path('data/pilot-v1/samples/manifest.json'))
+                        default=Path('data/scene-training-v2/split-manifest.json'))
     parser.add_argument('--provenance', type=Path,
-                        default=Path('data/pilot-v1/evidence/provenance.json'))
+                        default=Path('data/scene-training-v2/provenance.json'))
     parser.add_argument('--source', type=Path, default=DEFAULT_SOURCES)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--split', choices=['train', 'validation'], default='validation')

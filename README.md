@@ -157,7 +157,7 @@ saved alongside the adapter, as the training command does.
 
 The first comparison uses the same identity instructions, selected lore, and authored history
 for the base model and adapted model. Evaluation withholds the final assistant response and
-generates one answer. Entire conversations and known scenario variants stay in one split.
+generates one answer. Entire source missions, conversations and known scenario variants stay in one split.
 The [authenticity protocol](data/evaluation/README.md) compares generated replies against original
 game continuations in blinded pairs. Its small development calibration pack has a
 completed initial human review, including controls; no evaluator reliability or model-quality
@@ -208,7 +208,7 @@ Generate one final reply per selected validation sample, retaining authored hist
 
 ```bash
 generate --config configs/generate.toml \
-  --manifest data/pilot-v1/samples/manifest.json \
+  --manifest data/scene-training-v2/split-manifest.json \
   --sample-ids data/evaluation/smoke-sample-ids.json \
   --device mps --dtype float16 --output outputs/qwen3-validation
 ```
@@ -262,7 +262,7 @@ partial output at the token limit, are retained in coverage and never sent to th
 
 ```bash
 python -m endless_voices.assessment prepare \
-  --manifest data/pilot-v1/samples/manifest.json \
+  --manifest data/scene-training-v2/split-manifest.json \
   --run qwen3-4b=outputs/qwen3-4b-judge-calibration-v2 \
   --controls data/evaluation/prompted-judge-v1/controls.json \
   --output outputs/assessment
@@ -513,4 +513,4 @@ The task instruction is shared in `src/endless_voices/instructions.py`. [Four ma
 
 The shared minimal scene instruction and the preliminary writing objective are recorded in [ADR 11](docs/adr/0011-use-a-shared-scene-continuation-instruction.md). Training defaults to loss on the final assistant continuation only; `data.loss = "all"` explicitly restores the earlier full-conversation objective.
 
-The [preliminary scene training release](data/scene-training-v1/README.md) replaces the old speech-only training input for the next experiment: 92 examples, full authored targets, source context and mission-scoped variables. Its exclusions and token measurements are recorded. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.
+The [preliminary scene training release](data/scene-training-v2/README.md) replaces the old speech-only training input for the next experiment: 101 examples, full authored targets, source context and mission-scoped variables. Its exclusions and token measurements are recorded. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.

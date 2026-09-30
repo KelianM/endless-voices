@@ -148,6 +148,7 @@ data/local/curated/v1/
 {
   "schema_version": 1,
   "dataset_version": "v1",
+  "split_unit": "mission",
   "files": {
     "train": [{"path": "train.jsonl", "sha256": "<64 lowercase hex digits>"}],
     "validation": [{"path": "validation.jsonl", "sha256": "<64 lowercase hex digits>"}],
@@ -162,7 +163,9 @@ inside the manifest directory. Reusing a file, including through symlinks or har
 validation. New dataset releases should retain earlier manifests and use new dataset versions.
 Schema versions identify the format; dataset versions identify the content snapshot.
 
-Complete conversations stay in one split. Samples at different points in a conversation share
+New releases keep complete source missions in one split, using the first source entry as the primary owner; supplementary lore does not determine ownership. The manifest declares `split_unit: mission`, and validation rejects a mission crossing splits. Manifests without this declaration or requesting conversation-level splitting are rejected.
+
+Complete conversations also stay in one split. Samples at different points in a conversation share
 `conversation_id`. Explicit paraphrases, branch alternatives, or shared-template variants also
 share `scenario_group`. Repeated versions of one actual encounter belong together, but a shared mission chain or
 theme alone does not require a shared scenario group. Record known relationships; do not invent similarity classes for unrelated examples.

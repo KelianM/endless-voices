@@ -13,6 +13,7 @@ from prepare_conversations import DEFAULT_SOURCES, ROOT, SOURCE_MANIFEST, catalo
 
 from endless_voices.contracts import slug, text, validate_manifest, validate_record
 from endless_voices.instructions import CONTINUATION_INSTRUCTION, character_reference
+from endless_voices.splits import assign_mission_splits
 
 ANNOTATIONS = ROOT / "data/pilot-v1/annotations"
 BATCHES = ("free-worlds.json", "hai.json", "republic.json", "quarg.json")
@@ -285,6 +286,7 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
                                      review_status=status)
         all_records.extend(records)
         ledger.extend(evidence)
+    all_records = assign_mission_splits(all_records)
     check_overlap(all_records)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".pilot-", dir=output.parent) as temporary:
@@ -300,10 +302,11 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
             if source.exists():
                 shutil.copyfile(source, evidence / name)
         if specification_file.exists():
-            shutil.copyfile(specification_file, staged / "release.json")
+            dump(staged / "release.json", {**specification, "split_unit": "mission"})
         manifest = {"schema_version": 1,
                     "dataset_version": specification.get("dataset_version", release_root.name),
                     "files": {}}
+        manifest["split_unit"] = "mission"
         for split in ("train", "validation", "test"):
             rows = sorted((r for r in all_records if r["metadata"]["split"] == split),
                           key=lambda r: r["metadata"]["id"])
@@ -386,7 +389,7 @@ def main():
     parser.add_argument("--tokenizer", type=Path)
     parser.add_argument("--max-length", type=int)
     parser.add_argument("--verify-release", type=Path,
-                        help="check frozen artifact hashes after reconstruction")
+                        help="check expected artifact hashes after preparation")
     args = parser.parse_args()
     try:
         tokenizer = None

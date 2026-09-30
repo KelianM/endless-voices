@@ -219,6 +219,7 @@ def test_release_layout_preserves_inputs_and_reconstructs_all_artifact_hashes(
         names.append(name)
         candidate = copy.deepcopy(source_catalog["conversations"][0])
         candidate["id"] = f"{split}-conversation"
+        candidate["owner"] = ["mission", f"{split} mission"]
         candidates.append(candidate)
         selected = copy.deepcopy(batch)
         selected["conversations"][0].update(
@@ -239,7 +240,8 @@ def test_release_layout_preserves_inputs_and_reconstructs_all_artifact_hashes(
         assert (first / "annotations" / name).read_bytes() == (annotations / name).read_bytes()
     assert (first / "evidence/findings.md").read_bytes() == (
         dataset / "evidence/findings.md").read_bytes()
-    frozen = {"artifact_sha256": {str(p.relative_to(first)): pilot.digest(p)
+    frozen = {"split_unit": "mission",
+              "artifact_sha256": {str(p.relative_to(first)): pilot.digest(p)
                                   for p in first.rglob("*") if p.is_file()}}
     pilot.build(source_root, annotations, second, expected_release=frozen)
     assert all(pilot.digest(second / name) == expected
