@@ -4,8 +4,3 @@ data/** filter=lfs diff=lfs merge=lfs -text
 data/README.md !filter !diff !merge text
 data/overview/README.md !filter !diff !merge text
 data/dataset/README.md !filter !diff !merge text
-data/README.md !text -filter -merge -diff
-data/overview/README.md !text -filter -merge -diff
-data/dataset/README.md !text -filter -merge -diff
-data/scene-training-*/README.md !text -filter -merge -diff
-data/benchmark-continuations-v1/README.md !text -filter -merge -diff
