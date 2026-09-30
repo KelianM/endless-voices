@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
-from endless_voices import openai_judge
+from endless_voices import hosted_judge, providers
 from endless_voices.dataset.storage import SceneDataset
 from endless_voices.dataset.targets import load_targets, target_text
 from endless_voices.prepare_context import load_selections
@@ -101,7 +101,7 @@ def prepare(root, dataset, config):
     for name, cfg in locals_.items():
         screen.save(root / f"{name}-config.json", cfg)
     screen.save(root / "plan.json", plan)
-    for p in (Path(__file__), Path(screen.__file__)):
+    for p in (Path(__file__), Path(screen.__file__), Path(providers.__file__)):
         shutil.copy2(p, root / p.name)
     files = [p for p in root.rglob("*") if p.is_file()]
     screen.save(root / "selection.json", {
@@ -138,7 +138,7 @@ def preflight(root, tokenizers):
         original = records[sid]["messages"][-1]["content"]
         trial = {"trial_id": "0" * 32, "context": prompt["messages"],
                  "A": original, "B": "Preflight placeholder; no judgment requested."}
-        body = openai_judge.payload(plan["judge"], trial, instructions)
+        body = hosted_judge.payload(plan["judge"], trial, instructions)
         bound = len(json.dumps(body).encode()) + 2048 + 4096 + body["max_output_tokens"]
         if bound > plan["judge_context_limit"]:
             raise ValueError("Judge request bound exceeds context limit")
@@ -178,6 +178,9 @@ def export(root):
             raise ValueError("Generation input hash changed")
         if settings["code_sha256"] != screen.sha(root / "generation_backends.py"):
             raise ValueError("Generation implementation changed")
+        if (model not in plan["local_configs"]
+                and settings["provider_code_sha256"] != screen.sha(root / "providers.py")):
+            raise ValueError("Provider implementation changed")
         raw_results = assess.indexed([screen.read(p) for p in source.glob("*.result.json")], ids)
         prompts, responses = {}, {}
         for sid, raw in raw_results.items():
@@ -251,7 +254,7 @@ def verify_trials(root, save=True):
                 raise ValueError("Answer mapping differs")
         elif row["kind"] not in {"identical", "wrong-context"}:
             raise ValueError("Reversed trials are not part of this benchmark")
-        body = openai_judge.payload(plan["judge"], trial, instructions)
+        body = hosted_judge.payload(plan["judge"], trial, instructions)
         bound = len(json.dumps(body).encode()) + 2048 + body["max_output_tokens"]
         if bound > plan["judge_context_limit"]:
             raise ValueError("Actual judge request exceeds context limit")
@@ -310,7 +313,7 @@ def main():
         if not (root / "trial-verification.json").exists():
             raise ValueError("Verified trials are required")
         verify_trials(root, save=False)
-        openai_judge.run(SimpleNamespace(public=root / "assessment/public", output=root / "judge",
+        hosted_judge.run(SimpleNamespace(public=root / "assessment/public", output=root / "judge",
                                         env_file=Path(".env"), models=[plan["judge"]],
                                         budget=plan["judge_budget_usd"], limit=1000,
                                         timeout_seconds=plan.get("api_timeout_seconds", 1800)))

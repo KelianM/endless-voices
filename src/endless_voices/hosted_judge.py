@@ -1,17 +1,16 @@
-"""Assess validation pairs with Sonnet 5.5 under a dollar budget."""
+"""Assess isolated validation pairs with selected models under a dollar budget."""
 
 import argparse
 import json
 import time
 import urllib.error
-import urllib.request
 from pathlib import Path
 
+from endless_voices import providers
 from endless_voices.assessment import file_hash, read_json, write_json
 from endless_voices.judge import judge_messages, parse_answer, save_progress
+from endless_voices.providers import RATES, charge, reservation
 
-API = "https://api.anthropic.com/v1/messages"
-RATES = {"claude-sonnet-5-5": (2.0, 0.20, 10.0)}
 SCHEMA = {
     "type": "object",
     "properties": {
@@ -30,63 +29,14 @@ SCHEMA = {
 }
 
 
-def load_key(path):
-    for line in path.read_text().splitlines():
-        if line.startswith("ANTHROPIC_API_KEY="):
-            key = line.split("=", 1)[1].strip().strip("\"'")
-            if key:
-                return key
-    raise ValueError("ANTHROPIC_API_KEY is empty or missing")
-
-
 def payload(model, trial, instructions):
-    messages = judge_messages(trial, instructions)
-    return {
-        "model": model,
-        "system": messages[0]["content"],
-        "messages": [messages[1]],
-        "thinking": {"type": "adaptive"},
-        "output_config": {
-            "effort": "medium",
-            "format": {
-                "type": "json_schema",
-                "schema": SCHEMA,
-            },
-        },
-        "max_tokens": 4096,
-    }
+    return providers.payload(model, judge_messages(trial, instructions), SCHEMA)
 
 
-def assessment(response):
-    if response.get("stop_reason") != "end_turn":
-        raise ValueError("Response did not end normally")
-    parts = response.get("content", [])
-    if any(p.get("type") not in {"text", "thinking", "redacted_thinking"} for p in parts):
-        raise ValueError("Unexpected content block")
-    raw = "".join(p["text"] for p in parts if p.get("type") == "text")
+def assessment(model, response):
+    providers.validate(model, response)
+    raw = providers.text(model, response)
     return {"raw_output": raw, **parse_answer(raw)}
-
-
-def reservation(request):
-    # UTF-8 bytes plus overhead conservatively bound text and schema input tokens.
-    input_rate, _, output_rate = RATES[request["model"]]
-    return (
-        (len(json.dumps(request).encode()) + 2048) * input_rate
-        + request["max_tokens"] * output_rate
-    ) / 1_000_000
-
-
-def charge(model, response):
-    usage = response.get("usage")
-    if not usage or not all(k in usage for k in ("input_tokens", "output_tokens")):
-        return None
-    incoming, cache, outgoing = RATES[model]
-    return (
-        usage["input_tokens"] * incoming
-        + usage.get("cache_read_input_tokens", 0) * cache
-        + usage.get("cache_creation_input_tokens", 0) * 4.0
-        + usage["output_tokens"] * outgoing
-    ) / 1_000_000
 
 
 def spent(root):
@@ -103,7 +53,9 @@ def run(args):
     timeout_seconds = getattr(args, "timeout_seconds", 1800)
     if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be a positive integer")
-    key = load_key(args.env_file)
+    models = getattr(args, "models", None) or ["gpt-6-luna"]
+    if not models or len(set(models)) != len(models) or set(models) - RATES.keys():
+        raise ValueError("Select unique supported judge models")
     instructions = (args.public / "instructions.txt").read_text()
     paths = [
         p
@@ -114,8 +66,9 @@ def run(args):
         raise ValueError("Expected unique public trials")
     args.output.mkdir(parents=True, exist_ok=True)
     metadata = {
-        "endpoint": API,
-        "models": list(RATES),
+        "endpoints": {m: providers.endpoint(m) for m in models},
+        "provider_code_sha256": file_hash(Path(providers.__file__)),
+        "models": models,
         "rates_per_million_usd": RATES,
         "budget_usd": args.budget,
         "instructions": instructions,
@@ -134,7 +87,8 @@ def run(args):
     else:
         write_json(settings, metadata)
     attempted = 0
-    for model in RATES:
+    for model in models:
+        key = providers.load_key(args.env_file, model)
         folder = args.output / model
         folder.mkdir(exist_ok=True)
         rows = []
@@ -173,22 +127,12 @@ def run(args):
                     save_progress(args.output / "state.json", {"stop": "budget limit"})
                     return
                 write_json(request_path, body)
-                request = urllib.request.Request(
-                    API,
-                    data=json.dumps(body).encode(),
-                    headers={
-                        "Content-Type": "application/json",
-                        "x-api-key": key,
-                        "anthropic-version": "2023-06-01",
-                    },
-                )
                 row["started_at"] = time.time()
                 try:
-                    with urllib.request.urlopen(request, timeout=timeout_seconds) as handle:
-                        response = json.load(handle)
+                    response = providers.send(body, key, timeout_seconds)
                     row["api_response"] = response
                     row["estimated_cost_usd"] = charge(model, response)
-                    row.update(assessment(response), status="ok")
+                    row.update(assessment(model, response), status="ok")
                 except urllib.error.HTTPError as error:
                     row["error"] = f"HTTP {error.code}"
                     row["http_status"] = error.code
@@ -205,7 +149,7 @@ def run(args):
             save_progress(
                 folder / "review.json",
                 {
-                    "reviewer_id": model + "-medium-validation-v2",
+                    "reviewer_id": model + "-medium-validation-v1",
                     "reviewer_type": "llm",
                     "judge_model_and_prompt": {
                         **metadata,
@@ -237,10 +181,17 @@ def main():
     parser.add_argument("--public", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--env-file", type=Path, default=Path(".env"))
+    parser.add_argument(
+        "--models", nargs="+", choices=list(RATES), help="Judge models; defaults to gpt-6-luna only"
+    )
     parser.add_argument("--budget", type=float, default=5.0)
-    parser.add_argument("--limit", type=int, default=98)
-    parser.add_argument("--timeout-seconds", type=int, default=1800,
-                        help="Network operation timeout in seconds (default: 1800)")
+    parser.add_argument("--limit", type=int, default=196)
+    parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=1800,
+        help="Network operation timeout in seconds (default: 1800)",
+    )
     args = parser.parse_args()
     if not 0 < args.budget <= 5 or args.limit < 1:
         parser.error("budget must be positive and at most $5; limit must be positive")

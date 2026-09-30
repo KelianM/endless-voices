@@ -19,6 +19,10 @@ Generation and judge runners preserve settings, requests, responses and usage. F
 requests are retained rather than silently retried. Hosted execution requires explicit provider
 configuration and a budget. Evaluation does not initiate training.
 
+`hosted_judge` runs either provider through one budget and resume loop. Generation and judging
+share `providers` for native request formats, response validation, credentials and usage costs.
+OpenAI uses Responses; Anthropic uses Messages. The benchmark selects models in its configuration.
+
 Historical evidence predating the A-then-B serialization fix contains an original-first leak and
 must not be pooled with corrected results. Validation has been used for development. A model judging
 its own generations can introduce self-preference. Neither a low detection rate nor failure to find

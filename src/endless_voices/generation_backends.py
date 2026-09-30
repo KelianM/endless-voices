@@ -5,7 +5,6 @@ import importlib.metadata
 import json
 import time
 import urllib.error
-import urllib.request
 from pathlib import Path
 
 
@@ -129,62 +128,40 @@ def local(root, config):
 
 
 def hosted(root, models=None, budget=5, timeout_seconds=1800):
-    from endless_voices import anthropic_judge, openai_judge
+    from endless_voices import providers
 
     if not isinstance(timeout_seconds, int) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be a positive integer")
 
-    for model, provider in [
-        ("gpt-6-luna", openai_judge),
-        ("gpt-6-sol", openai_judge),
-        ("claude-sonnet-5-5", anthropic_judge),
-    ]:
+    for model in providers.RATES:
         if models is not None and model not in models:
             continue
         folder = root / model
         folder.mkdir(exist_ok=False)
-        key = provider.load_key(Path(".env"))
+        key = providers.load_key(Path(".env"), model)
         save(
             folder / "settings.json",
             {
                 "model": model,
                 "code_sha256": sha(__file__),
+                "provider_code_sha256": sha(providers.__file__),
                 "prompts_sha256": sha(root / "prompts.json"),
                 "reasoning": "medium",
                 "max_output_tokens_including_thinking": 4096,
-                "endpoint": provider.API,
+                "endpoint": providers.endpoint(model),
                 "budget_usd": budget,
                 "timeout_seconds": timeout_seconds,
-                "rates_per_million_usd": provider.RATES[model],
+                "rates_per_million_usd": providers.RATES[model],
             },
         )
         for prompt in read(root / "prompts.json"):
-            if provider is openai_judge:
-                body = {
-                    "model": model,
-                    "input": prompt["messages"],
-                    "reasoning": {"effort": "medium"},
-                    "max_output_tokens": 4096,
-                    "store": False,
-                    "service_tier": "default",
-                }
-                headers = {"Authorization": "Bearer " + key}
-            else:
-                body = {
-                    "model": model,
-                    "system": prompt["messages"][0]["content"],
-                    "messages": prompt["messages"][1:],
-                    "thinking": {"type": "adaptive"},
-                    "output_config": {"effort": "medium"},
-                    "max_tokens": 4096,
-                }
-                headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
+            body = providers.payload(model, prompt["messages"])
             reserved = 0.0
             for path in root.glob("*/*.request.json"):
                 result = path.with_name(path.name.replace(".request.", ".result."))
                 cost = read(result).get("estimated_cost_usd") if result.exists() else None
                 reserved += read(path)["reservation_usd"] if cost is None else cost
-            reserve = provider.reservation(body)
+            reserve = providers.reservation(body)
             if reserved + reserve > budget:
                 raise ValueError("Hosted screen budget exhausted")
             save(
@@ -194,33 +171,11 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
             row = {"sample_id": prompt["sample_id"], "status": "failed", "response": ""}
             started = time.monotonic()
             try:
-                request = urllib.request.Request(
-                    provider.API,
-                    data=json.dumps(body).encode(),
-                    headers={**headers, "Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(request, timeout=timeout_seconds) as h:
-                    response = json.load(h)
+                response = providers.send(body, key, timeout_seconds)
                 row["api_response"] = response
-                row["estimated_cost_usd"] = provider.charge(model, response)
-                if provider is openai_judge:
-                    row["response"] = "".join(
-                        p.get("text", "")
-                        for item in response.get("output", [])
-                        if item.get("type") == "message"
-                        for p in item.get("content", [])
-                        if p.get("type") == "output_text"
-                    )
-                    complete = response.get("status") == "completed"
-                else:
-                    row["response"] = "".join(
-                        p.get("text", "")
-                        for p in response.get("content", [])
-                        if p.get("type") == "text"
-                    )
-                    complete = response.get("stop_reason") == "end_turn"
-                if not complete or not row["response"]:
-                    raise ValueError("Incomplete or refused response")
+                row["estimated_cost_usd"] = providers.charge(model, response)
+                row["response"] = providers.text(model, response)
+                providers.validate(model, response)
                 row["status"] = "ok"
             except urllib.error.HTTPError as error:
                 row["error"] = f"HTTP {error.code}"

@@ -102,6 +102,7 @@ def recorded(tmp_path, monkeypatch, request):
             {
                 "prompts_sha256": screen.sha(root / "prompts.json"),
                 "code_sha256": screen.sha(root / "generation_backends.py"),
+                "provider_code_sha256": screen.sha(root / "providers.py"),
             },
         )
         for sid in ["one", "two"]:

@@ -63,7 +63,7 @@ python scripts/benchmark_generators.py prepare \
 The same command exposes `preflight`, `local-smoke`, `local`, `hosted`, `export`, `judge` and
 `report` stages. Inspect `--help` and the configuration before running model stages. Local MLX
 inference uses a separately installed MLX runtime; ordinary offline tests do not require it.
-Hosted runners read provider keys from the environment or ignored `.env`, preserve requests and
+Hosted runners read provider keys from ignored `.env`, preserve requests and
 results, enforce configured budgets and retain failures without silently retrying them.
 
 [Evaluation behavior](docs/evaluation.md) describes blinding and reporting. The judge instruction

@@ -6,13 +6,13 @@ The maintained preparation entry point is `endless_voices.dataset`. `DatasetBuil
 python -m endless_voices.dataset \
   --source data/local/endless-sky-7140eb2a29ce \
   --inventory data/overview/source-statistics.json \
-  --config configs/scene-dataset.json \
+  --config data/dataset/config.json \
   --tokenizer /path/to/cached/tokenizer \
   --splits train \
   --output outputs/prepared-scenes
 ```
 
-`configs/scene-dataset.json` records the existing reviewed mission/conversation scope and split assignments. The configuration contains no quote selectors or per-branch routes. Omitting a mission's conversation list selects all supported inline conversations in that mission. Broader corpus extraction is not enabled by default.
+`data/dataset/config.json` records the existing reviewed mission/conversation scope and split assignments. The configuration contains no quote selectors or per-branch routes. Omitting a mission's conversation list selects all supported inline conversations in that mission. Broader corpus extraction is not enabled by default.
 
 A successful build writes split JSONL files, per-split context and target bundles, state provenance, configuration, code snapshots, hashes and licensing. `SceneDataset.load(output, split)` verifies the saved artifacts and provides stable indexed records. No API calls or model weights are involved; the tokenizer is loaded locally.
 
