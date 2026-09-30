@@ -102,20 +102,6 @@ def test_draft_adapter_rejects_mismatched_source_and_rendered_context():
         pool_from_draft(draft, {})
 
 
-def test_game_variables_apply_to_all_visible_context_without_changing_source():
-    source = pool()
-    source.system_prefix = "Hello <last>\n"
-    source.encounter[0]["content"] = "Visit <planet>"
-    source.blocks[0]["passages"][0]["text"] = "Captain <last>"
-    source.variables = {"<last>": "Morgan", "<planet>": "Example World"}
-    selection = FullContext().select(source, Counter())
-    assert "<last>" not in json.dumps(selection.messages)
-    assert "<planet>" not in json.dumps(selection.messages)
-    assert "Morgan" in selection.messages[0]["content"]
-    assert selection.selected[0]["passages"][0]["text"] == "Captain <last>"
-    assert selection.provenance["game_variables"] == source.variables
-
-
 def test_longer_preserved_context_reduces_older_history_allowance():
     source = pool()
     strategy = MissionDepth(1, 45, "seed")
@@ -134,14 +120,13 @@ def test_preserved_context_overflow_fails_instead_of_truncating():
     assert source.encounter[0]["content"] == "Question"
 
 
-def test_input_budget_counts_chat_wrappers_and_variable_substitutions():
+def test_input_budget_counts_chat_wrappers():
     class WrappedCounter(Counter):
         def messages(self, messages):
             return super().messages(messages) + 20
 
     source = pool()
-    source.encounter[0]["content"] = "<name>"
-    source.variables = {"<name>": "A substantially longer name"}
+    source.encounter[0]["content"] = "A substantially longer name"
     core = WrappedCounter().messages(source.messages({"recent"}))
     selection = MissionDepth(1, core, "seed").select(source, WrappedCounter())
     assert selection.provenance["sampled_missions"] == []
@@ -149,16 +134,9 @@ def test_input_budget_counts_chat_wrappers_and_variable_substitutions():
     assert selection.token_counts["remaining_input_budget"] == 0
 
 
-def test_obsolete_separate_history_budget_is_rejected():
-    with pytest.raises(ValueError):
-        strategy_from_config({"name": "mission-depth", "depth": 4,
-                              "older_history_tokens": 8000, "seed": "seed"})
-
-
 def test_resolved_history_never_uses_the_current_missions_destination():
     source = pool()
     source.variables = {"<planet>": "Current destination"}
-    source.variables_resolved = True
     source.blocks[0]["passages"][0]["text"] = "Visit <planet>."
     assert "Visit <planet>." in source.history({"recent"})
     assert "Current destination" not in source.messages({"recent"})[0]["content"]

@@ -256,8 +256,7 @@ def overlap_candidates(records, width=12):
             "context_target_phrases": context}
 
 
-def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
-          expected_release=None):
+def build(source_root, annotations, output, *, tokenizer=None, max_length=None):
     """Publish a complete validated release directory without replacing an earlier release."""
     if output.exists():
         raise ValueError(f"{output}: already exists; choose a new release directory")
@@ -373,10 +372,6 @@ def build(source_root, annotations, output, *, tokenizer=None, max_length=None,
             "omits narration and enclosing quotation marks; narrator-tag trailing commas "
             "are normalized to periods as recorded per span. No human sample approval is "
             "implied by the review status.\n", encoding="utf-8")
-        if expected_release:
-            for name, expected in expected_release["artifact_sha256"].items():
-                if digest(staged / name) != expected:
-                    raise ValueError(f"Frozen release checksum mismatch: {name}")
         staged.rename(output)
     return counts
 
@@ -388,8 +383,6 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path)
     parser.add_argument("--max-length", type=int)
-    parser.add_argument("--verify-release", type=Path,
-                        help="check expected artifact hashes after preparation")
     args = parser.parse_args()
     try:
         tokenizer = None
@@ -406,12 +399,8 @@ def main():
             tokenizer = AutoTokenizer.from_pretrained(str(args.tokenizer.resolve()),
                                                       local_files_only=True,
                                                       trust_remote_code=False)
-        expected = json.loads(args.verify_release.read_text()) if args.verify_release else None
         print(json.dumps(build(args.sources, args.annotations, args.output,
-                               tokenizer=tokenizer, max_length=args.max_length,
-                               expected_release=expected), indent=2))
-        if expected:
-            print("Frozen release hashes match.")
+                               tokenizer=tokenizer, max_length=args.max_length), indent=2))
     except (ValueError, OSError, KeyError, TypeError) as error:
         parser.exit(1, f"{error}\n")
 

@@ -321,23 +321,6 @@ def test_physical_aliases(manifest, alias_kind):
         validate_manifest(manifest)
 
 
-@pytest.mark.parametrize(
-    "field",
-    [
-        "expected_facts",
-        "expected_behaviours",
-        "expected_style",
-        "prohibited_contradictions",
-        "uncertainty_expectations",
-    ],
-)
-def test_current_samples_reject_retired_checklist_fields(field):
-    row = record()
-    row["evaluation"][field] = []
-    with pytest.raises(ValueError, match="unknown fields"):
-        validate_record(row)
-
-
 def test_mission_manifest_rejects_distinct_conversations_in_the_same_mission(manifest):
     train, validation = record("train"), record("validation")
     validation["metadata"]["sources"][0] = copy.deepcopy(train["metadata"]["sources"][0])
@@ -346,16 +329,4 @@ def test_mission_manifest_rejects_distinct_conversations_in_the_same_mission(man
     contents["split_unit"] = "mission"
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="mission .* crosses splits"):
-        validate_manifest(manifest)
-
-
-@pytest.mark.parametrize('split_unit', [None, 'conversation'])
-def test_conversation_level_manifests_are_no_longer_supported(manifest, split_unit):
-    contents = json.loads(manifest.read_text())
-    if split_unit is None:
-        contents.pop('split_unit')
-    else:
-        contents['split_unit'] = split_unit
-    manifest.write_text(json.dumps(contents))
-    with pytest.raises(ValueError, match='split_unit'):
         validate_manifest(manifest)

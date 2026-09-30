@@ -22,16 +22,6 @@ def substitute_variables(text, values):
     return re.sub(r"<[^>]+>", lambda match: values.get(match[0], match[0]), text)
 
 
-def variable_values(config):
-    """Validate and return configured game placeholder values."""
-    values = config["values"]
-    if not isinstance(values, dict) or any(
-        not isinstance(k, str) or re.fullmatch(r"<[^>]+>", k) is None
-        or not isinstance(v, str) for k, v in values.items()
-    ):
-        raise ValueError("Game variables must map <marker> strings to string values")
-    return dict(values)
-
 def distances(graph, start):
     """Return shortest prerequisite distances, counting one edge per mission."""
     result = {start: 0}
@@ -92,18 +82,13 @@ class ContextPool:
     graph: dict[str, list[str]]
     variables: dict[str, str] = field(default_factory=dict)
 
-    variables_resolved: bool = False
-
     def history(self, missions):
         text = "\n\n".join(render(b) for b in self.blocks if b["mission"] in missions)
-        return text if self.variables_resolved else substitute_variables(text, self.variables)
+        return text
 
     def messages(self, missions):
-        values = {} if self.variables_resolved else self.variables
-        return [{"role": "system", "content": substitute_variables(
-            self.system_prefix, values) + self.history(missions)},
-                *[{**m, "content": substitute_variables(m["content"], values)}
-                  for m in self.encounter]]
+        return [{"role": "system", "content": self.system_prefix + self.history(missions)},
+                *deepcopy(self.encounter)]
 
 
 @dataclass
@@ -149,7 +134,7 @@ def result(pool, counter, config, full, sampled, ds):
          "messages_sha256": digest(messages), "mission_distances": ds,
          "full_missions": sorted(full), "sampled_missions": sorted(sampled),
          "game_variables": dict(pool.variables),
-         "variable_policy": "mission-scoped" if pool.variables_resolved else "legacy-global"},
+         "variable_policy": "mission-scoped"},
     )
 
 
@@ -217,9 +202,8 @@ def strategy_from_config(config) -> ContextStrategy:
     raise ValueError("Invalid context strategy configuration")
 
 
-def pool_from_draft(draft, graph, variables=None):
+def pool_from_draft(draft, graph):
     """Adapt source-context drafts while preserving fixed lore and encounter messages."""
-    variables = draft.get("game_variables", variables)
     blocks = [deepcopy(b) for b in draft["source_blocks"] if b["kind"] == "earlier-source-examples"]
     for block in blocks:
         block["mission"] = block["heading"].rsplit(" / ", 1)[0]
@@ -233,5 +217,5 @@ def pool_from_draft(draft, graph, variables=None):
     system = messages[0]["content"]
     return ContextPool(draft["sample_id"], draft["conversation_id"], draft["mission"],
                        system[:-len(history)] if history else system,
-                       deepcopy(messages[1:]), blocks, deepcopy(graph), dict(variables or {}),
-                       "game_variables" in draft)
+                       deepcopy(messages[1:]), blocks, deepcopy(graph),
+                       dict(draft["game_variables"]))

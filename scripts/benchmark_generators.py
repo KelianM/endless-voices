@@ -171,11 +171,7 @@ def export(root):
         settings = screen.read(source / "settings.json")
         if settings["prompts_sha256"] != screen.sha(root / "prompts.json"):
             raise ValueError("Generation input hash changed")
-        reused = selection.get("reused_generations", {}).get(model)
-        code_path = reused["code_path"] if reused else "generation_backends.py"
-        if reused and code_path not in selection["artifacts_sha256"]:
-            raise ValueError("Reused generation code is not in the verified inventory")
-        if settings["code_sha256"] != screen.sha(root / code_path):
+        if settings["code_sha256"] != screen.sha(root / "generation_backends.py"):
             raise ValueError("Generation implementation changed")
         raw_results = assess.indexed([screen.read(p) for p in source.glob("*.result.json")], ids)
         prompts, responses = {}, {}
@@ -208,7 +204,7 @@ def export(root):
                               ("messages_sha256", "input_ids_sha256", "input_tokens")}}
         run = {"dataset": {"sample_ids": ids}, "model": settings}
         loaded[model] = (run, prompts, responses)
-        provenance[model] = {"run": run, "verified_hashes": True, "reuse": reused,
+        provenance[model] = {"run": run, "verified_hashes": True,
                              "raw_artifacts_sha256": {str(p.relative_to(root)): screen.sha(p)
                                                       for p in source.glob("*.json")}}
     controls = [{"sample_id": ids[0], "kind": "identical"},

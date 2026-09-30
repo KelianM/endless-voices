@@ -6,9 +6,9 @@ message, one target response, and evaluator source references. The first experim
 prompted and fine-tuned models given identical identity instructions, lore, and history.
 
 [ADR 3](adr/0003-use-one-conversation-format-across-splits.md) records the design.
-The [fixtures](../tests/fixtures/contracts) are invented format examples. The [pilot release](../data/README.md) reconstructs the first source-backed
-corpus and freezes its test content with versioned hashes. Source statistics and curation inventories remain separate
-formats because evidence passages are not conversation samples.
+The [fixtures](../tests/fixtures/contracts) are invented format examples. The
+[current dataset](../data/scene-training-v2/README.md) uses mission-separated splits
+and records artifact hashes. Source inventories describe available material, not training samples.
 
 ## Record format
 
