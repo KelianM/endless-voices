@@ -11,6 +11,7 @@ from urllib.parse import unquote
 from prepare_conversations import flow_graph, tree, walk
 
 from endless_voices.context import substitute_variables, variable_values
+from endless_voices.instructions import CONTINUATION_INSTRUCTION, character_reference
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -417,8 +418,8 @@ def main():
             )
 
         system = (
-            meta["character_role"] + ".\nContinue the conversation as the character, responding "
-            "as authentically as possible for the given scenario.\n\nWorld reference:\n\n"
+            character_reference(meta["character_role"]) + ".\n" + CONTINUATION_INSTRUCTION
+            + "\n\nWorld reference:\n\n"
             + "\n\n".join(render(c) for c in lore)
             + "\n\nEarlier game passages. Optional alternatives are examples, "
             "not simultaneous events.\n\n" + "\n\n".join(render(c) for c in chunks)

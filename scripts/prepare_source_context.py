@@ -9,6 +9,8 @@ from urllib.parse import unquote
 
 from prepare_conversations import tree, walk
 
+from endless_voices.instructions import CONTINUATION_INSTRUCTION, character_reference
+
 SAMPLE = "fw-recon-3-jj-new-wales-base-l468-63b32cca"
 MISSION_FILE = "data/human/free worlds 0 prologue.txt"
 PLANET_FILE = "data/map planets.txt"
@@ -115,9 +117,9 @@ def main():
             for p in excerpt["passages"]
         )
 
-    instruction = ("You are Jean-Jacques Soleau (JJ), commander of the militia on Glaze.\n"
-                   "Continue the conversation as the character, responding as authentically "
-                   "as possible for the given scenario.")
+    instruction = (character_reference(
+        "Jean-Jacques Soleau (JJ), commander of the militia on Glaze.")
+        + "\n" + CONTINUATION_INSTRUCTION)
     reference = ("Earlier game passages; optional alternatives are examples, "
                  "not simultaneous events.")
     system = instruction + "\n\n" + render(lore) + "\n\n" + reference + "\n\n" + "\n\n".join(

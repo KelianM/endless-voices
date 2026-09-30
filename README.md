@@ -510,3 +510,5 @@ New benchmark references use [complete authored continuations](data/benchmark-co
 [Luna’s ten-example narration rerun](data/evaluation/luna-narrative-judge-v1/README.md) retained all ten origin decisions. The qualitative review distinguishes supported presentation differences from unsupported objections to fictional invention.
 
 [The complete narrative benchmark](data/evaluation/generator-benchmark-narrative-v1/README.md) has 48 responses per model and 194 successful Luna judgments. All originals were identified; the report explains why this does not rank storytelling quality.
+
+The task instruction is shared in `src/endless_voices/instructions.py`. [Four matched Luna responses](data/evaluation/scene-instruction-v1/README.md) show how scene-continuation wording changes the output. Historical saved prompts remain unchanged; the training prompt draft still needs target and split migration.

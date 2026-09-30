@@ -249,3 +249,15 @@ def test_release_layout_preserves_inputs_and_reconstructs_all_artifact_hashes(
     with pytest.raises(ValueError, match="Frozen release checksum mismatch"):
         pilot.build(source_root, annotations, rejected, expected_release=frozen)
     assert not rejected.exists()
+
+
+def test_training_preparation_uses_scene_task_without_speech_only_rule(example):
+    from endless_voices.instructions import CONTINUATION_INSTRUCTION
+
+    rows, _ = pilot.assemble(*example)
+    for row in rows:
+        system = row['messages'][0]['content']
+        assert CONTINUATION_INSTRUCTION in system
+        assert system.startswith('Character reference: a port clerk.')
+        assert 'Continue as this speaker' not in system
+        assert 'Do not add narrator actions' not in system

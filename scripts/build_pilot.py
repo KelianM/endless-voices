@@ -12,6 +12,7 @@ from urllib.parse import quote
 from prepare_conversations import DEFAULT_SOURCES, ROOT, SOURCE_MANIFEST, catalog, reachable
 
 from endless_voices.contracts import slug, text, validate_manifest, validate_record
+from endless_voices.instructions import CONTINUATION_INSTRUCTION, character_reference
 
 ANNOTATIONS = ROOT / "data/pilot-v1/annotations"
 BATCHES = ("free-worlds.json", "hai.json", "republic.json", "quarg.json")
@@ -121,14 +122,13 @@ def assemble(batch, source_catalog, source_root, *, review_status="draft"):
                            for s in item["sources"])
         sources = list({json.dumps(s, sort_keys=True): s for s in sources}.values())
         system = (
-            f"{profile['text']}\n\nScene: {annotation['scene']}\n\n"
+            f"{character_reference(profile['text'])}\n\nScene: {annotation['scene']}\n\n"
             + ("Scene variable values: " + "; ".join(f"{k} = {v}"
                for k, v in substitutions.items()) + ".\n\n" if substitutions else "")
             +
             "Relevant lore (respect the speaker's knowledge and the scene's story date):\n"
             + "\n".join(f"- {item['text']}" for item in selected_lore)
-            + "\n\nContinue as this speaker in direct speech. Do not add narrator actions or "
-            "quotation marks around the whole reply."
+            + "\n\n" + CONTINUATION_INSTRUCTION
         )
         seen_targets = set()
         for route in annotation["routes"]:
