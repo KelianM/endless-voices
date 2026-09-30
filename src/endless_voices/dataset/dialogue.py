@@ -85,10 +85,14 @@ class DialogueInterpreter:
                 )
                 continue
             node = nodes[pc]
-            count = visits.get(pc, 0) + 1
+            visit_key = (
+                pc,
+                tuple(sorted((k, z3.simplify(v).sexpr()) for k, v in current.values.items())),
+            )
+            count = visits.get(visit_key, 0) + 1
             if count > self.max_visits:
                 raise ValueError(f"Line {node['line']}: dialogue loop requires explicit handling")
-            visits = {**visits, pc: count}
+            visits = {**visits, visit_key: count}
             t = node["tokens"]
 
             def enqueue(dest, candidate, pre=prefix, text=paragraphs, shown=displayed):

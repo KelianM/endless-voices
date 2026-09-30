@@ -24,9 +24,9 @@ Whole missions stay in one split. Training history cannot include held-out missi
 
 `MissionDepth` preserves lore, the current encounter and nearby eligible missions, then fills the remaining input allowance with whole older missions. Overflow of the preserved core is an error. State resolution happens before this token selection, never in DataLoader workers.
 
-The current interpreter supports integer comparisons, Boolean condition groups, assignments, increments, multiplication, minimum/maximum clamps, choices, jumps and paragraph display conditions. Unsupported state expressions, external mission effects, excessive branching and loops fail the build explicitly. Supported mission assignments run after the initial conversation display and before the first player response, matching the game engine. Source order alone does not establish their execution order.
+The current interpreter supports integer comparisons, Boolean condition groups, assignments, increments, multiplication, minimum/maximum clamps, choices, jumps and paragraph display conditions. Fresh random draws, arithmetic expressions, payments, transferable outfit counts and scheduled events share the same state. Unknown travel times admit compatible event timelines; event delays are not treated as immediate. State-changing question menus can repeat. Unsupported operations, excessive branching and unchanged-state loops fail explicitly. Supported mission assignments run after the initial conversation display and before the first player response, matching the game engine. Source order alone does not establish their execution order.
 
-The former 101-example release is unchanged. It was not rebuilt by this implementation and must not be described as validated by the stateful builder. [ADR 14](adr/0014-build-scene-examples-through-stateful-dialogue.md) records the implemented rule and limits.
+The current training release is built by this pipeline. Earlier releases remain historical evidence and do not acquire these guarantees. [ADR 14](adr/0014-build-scene-examples-through-stateful-dialogue.md) records the implemented rule and limits.
 
 ## Training objectives
 

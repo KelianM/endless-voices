@@ -16,7 +16,7 @@ python -m endless_voices.dataset \
 
 A successful build writes split JSONL files, per-split context and target bundles, state provenance, configuration, code snapshots, hashes and licensing. `SceneDataset.load(output, split)` verifies the saved artifacts and provides stable indexed records. No API calls or model weights are involved; the tokenizer is loaded locally.
 
-Preparation fails instead of publishing a partial dataset when source operations are unsupported, branch exploration exceeds its limit or required context exceeds its budget. The current reviewed scope still contains unsupported random expressions and event/resource operations. The [source audit](evaluation/scene-builder-v1/README.md) currently supports 11 of 32 selected training missions. No complete replacement release has been published.
+The [current training release](scene-training-v3/README.md) contains 163 examples from all 32 selected training missions. The [verification](evaluation/scene-builder-v2/README.md) checks state witnesses, split boundaries and training loss masks. Preparation still refuses unsupported operations or context overflow rather than publishing a partial dataset.
 
 The existing [101-example release](scene-training-v2/README.md) and earlier reports remain historical evidence. They are not retroactively state-consistent. The old speech extraction and separate prototype preparation scripts have been removed; Git retains their history.
 

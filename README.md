@@ -43,8 +43,8 @@ into the loader or model.
 [Dataset preparation](data/README.md) now has one builder-owned pipeline. The parser preserves
 whole authored passages, and the example builder and context sampler share a stateful dialogue
 interpreter. [The ownership diagram](docs/story-context.md) explains the preparation and loader
-boundaries. Unsupported game operations fail explicitly; the current reviewed source scope still
-needs those failures resolved before a complete replacement dataset can be published.
+boundaries. The [prepared training release](data/scene-training-v3/README.md) contains 163 examples
+from all 32 selected training missions. Unsupported operations still fail explicitly.
 
 ## Setup
 
@@ -487,4 +487,4 @@ The task instruction is shared in `src/endless_voices/instructions.py`. [Four ma
 
 The shared minimal scene instruction and the preliminary writing objective are recorded in [ADR 11](docs/adr/0011-use-a-shared-scene-continuation-instruction.md). Training defaults to loss on the final assistant continuation only; `data.loss = "all"` includes prompt and history tokens; it is not a deduplicated corpus export.
 
-The [saved scene training release](data/scene-training-v2/README.md) contains 101 examples. It predates the stateful builder and has not been rebuilt under its rules. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.
+The [saved scene training release](data/scene-training-v3/README.md) contains 163 state-consistent examples from all 32 selected training missions. Artifact hashes, state witnesses and target-only training masks have been verified. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.

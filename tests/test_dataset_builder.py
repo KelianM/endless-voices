@@ -128,7 +128,7 @@ def test_heldout_mission_text_never_enters_training_history(tmp_path):
 
 
 def test_failed_interpretation_does_not_publish_a_partial_dataset(tmp_path):
-    source = corpus(tmp_path, STORY.replace("set earth", "outfit Laser"))
+    source = corpus(tmp_path, STORY.replace("set earth", "ship Sparrow"))
     builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}), Counter())
     with pytest.raises(ValueError, match="unsupported operation"):
         builder.build(tmp_path / "prepared")

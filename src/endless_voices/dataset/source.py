@@ -66,6 +66,7 @@ class GameCorpus:
         self.root = Path(root)
         self.revision = inventory["revision"]
         self.missions = {}
+        self.events = {}
         self.planet_systems = {}
         self.descriptions = {}
         self.files = {}
@@ -84,6 +85,8 @@ class GameCorpus:
                     if name in self.missions:
                         raise ValueError(f"Duplicate mission: {name}")
                     self.missions[name] = Mission(name, str(relative), entry["sha256"], node)
+                if kind == "event" and names:
+                    self.events[names[0]] = node
                 if kind == "system" and names:
                     for child in node["children"]:
                         if child["tokens"][:1] == ["object"]:

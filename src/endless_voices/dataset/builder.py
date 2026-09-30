@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from urllib.parse import quote
 
+import z3
+
 from endless_voices.context import ContextPool, digest, strategy_from_config
 from endless_voices.contracts import validate_record
 from endless_voices.game_variables import mission_values, render
@@ -71,6 +73,27 @@ class ContextSampler:
         return ordered
 
     def bounded(self, routes):
+        distinct = {}
+        for route in routes:
+            state = route.state
+            key = digest(
+                {
+                    "values": {k: z3.simplify(v).sexpr() for k, v in sorted(state.values.items())},
+                    "constraints": sorted(
+                        {
+                            z3.simplify(c).sexpr()
+                            for c in state.constraints
+                            if not z3.is_true(z3.simplify(c))
+                        }
+                    ),
+                    "pending": [(name, z3.simplify(due).sexpr()) for name, due in state.pending],
+                    "elapsed": z3.simplify(state.elapsed).sexpr(),
+                    "world": state.world,
+                }
+            )
+            if key not in distinct or digest(route.blocks) < digest(distinct[key].blocks):
+                distinct[key] = route
+        routes = list(distinct.values())
         if len(routes) > self.max_routes:
             raise ValueError("History route limit exceeded; no branches were silently discarded")
         return routes
@@ -126,13 +149,45 @@ class ContextSampler:
             <= {"train": 0, "validation": 1, "test": 2}[split]
         )
 
+    def travel_days(self, mission):
+        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+        return int(
+            "<origin>" in values
+            and "<planet>" in values
+            and values["<origin>"] != values["<planet>"]
+        )
+
+    @staticmethod
+    def enter(state, mission):
+        state.scope = mission.name
+        payload = z3.IntVal(0)
+        for node in mission.node["children"]:
+            t = node["tokens"]
+            if t[0] not in {"cargo", "passengers"}:
+                continue
+            index = 2 if t[0] == "cargo" else 1
+            if len(t) == index + 1 and t[index].isdigit():
+                count = z3.IntVal(int(t[index]))
+            else:
+                count = state.value(f"mission {t[0]}: " + mission.name)
+                state.constraints += (count >= 0,)
+            payload += count * (10 if t[0] == "passengers" else 1)
+        jumps = state.value("mission jumps: " + mission.name)
+        state.constraints += (jumps >= 0,)
+        state.values["mission payment factor: " + mission.name] = (jumps + 1) * payload
+
     def histories(self, mission, split, initial):
+        initial = initial.copy()
+        initial.events = self.corpus.events
         histories, omitted = [History(initial, [])], []
         for name in self.ancestors(mission.name):
             if not self.eligible(name, split):
                 omitted.append(name)
                 continue
+            histories = self.advance(histories)
             previous = self.corpus.missions[name]
+            for history in histories:
+                self.enter(history.state, previous)
             requirements = [
                 c
                 for n in previous.node["children"]
@@ -146,10 +201,16 @@ class ContextSampler:
                     candidates.append(History(state, h.blocks))
             histories = candidates
             for phase in ["offer", "accept", "complete"]:
+                if phase == "accept":
+                    for history in histories:
+                        history.state.values[name + ": active"] = z3.IntVal(1)
+                if phase == "complete":
+                    histories = self.advance(histories, self.travel_days(previous))
                 events = [n for n in previous.node["children"] if n["tokens"] == ["on", phase]]
                 for event in events:
                     histories = self.event(event["children"], histories, previous)
             for history in histories:
+                history.state.values[name + ": active"] = z3.IntVal(0)
                 history.state = apply(
                     [
                         {
@@ -161,6 +222,11 @@ class ContextSampler:
                     history.state,
                 )
         return histories, omitted
+
+    def advance(self, histories, minimum_days=0):
+        return self.bounded(
+            [History(state, h.blocks) for h in histories for state in h.state.advance(minimum_days)]
+        )
 
     def select(self, sample_id, conversation_id, mission, history, prefix, lore, counter):
         values = mission_values(mission.node, self.corpus.planet_systems, self.player)
@@ -190,6 +256,9 @@ class ExampleBuilder:
     def build(self, mission, specification, counter, initial):
         split = specification["split"]
         histories, omitted = self.sampler.histories(mission, split, initial)
+        histories = self.sampler.advance(histories)
+        for history in histories:
+            self.sampler.enter(history.state, mission)
         conditions = [
             c
             for n in mission.node["children"]
@@ -207,10 +276,13 @@ class ExampleBuilder:
         lore_names = set(specification.get("lore_planets", []))
         values = mission_values(mission.node, self.corpus.planet_systems, self.sampler.player)
         lore_names.update(values[k] for k in ("<planet>", "<origin>") if k in values)
-        lore = "\n\n".join(
-            p["text"] for name in sorted(lore_names) for p in self.corpus.descriptions.get(name, [])
-        )
+
         for phase in ["offer", "accept", "complete"]:
+            if phase == "accept":
+                for history in histories:
+                    history.state.values[mission.name + ": active"] = z3.IntVal(1)
+            if phase == "complete":
+                histories = self.sampler.advance(histories, self.sampler.travel_days(mission))
             for event in mission.node["children"]:
                 if event["tokens"] != ["on", phase]:
                     continue
@@ -244,13 +316,18 @@ class ExampleBuilder:
                                 "paragraphs": [p.line for p in route.paragraphs],
                             }
                         )
-                        rank = digest(
-                            [
-                                self.seed,
-                                history.blocks,
-                                [asdict(p) for p in route.prefix],
-                                route.state.snapshot(),
-                            ]
+                        rank = (
+                            len(
+                                {p.line for p in route.paragraphs} & {p.line for p in route.prefix}
+                            ),
+                            digest(
+                                [
+                                    self.seed,
+                                    history.blocks,
+                                    [asdict(p) for p in route.prefix],
+                                    route.state.snapshot(),
+                                ]
+                            ),
                         )
                         candidate = (rank, node, route, history)
                         if key not in variants or rank < variants[key][0]:
@@ -266,6 +343,16 @@ class ExampleBuilder:
         for key, (_, node, route, history) in sorted(variants.items()):
             sid = "scene-" + key[:24]
             cid = "conversation-" + digest([mission.path, node["line"]])[:24]
+            descriptions = dict(self.corpus.descriptions)
+            for change in route.state.world:
+                t = change["tokens"]
+                if t[0] == "planet" and len(t) == 2:
+                    paragraphs = [n for n in change["children"] if n["tokens"][0] == "description"]
+                    if paragraphs:
+                        descriptions[t[1]] = [{"text": n["tokens"][1]} for n in paragraphs]
+            lore = "\n\n".join(
+                p["text"] for name in sorted(lore_names) for p in descriptions.get(name, [])
+            )
             selection = self.sampler.select(sid, cid, mission, history, route.prefix, lore, counter)
             target = "\n\n".join(render(p.text, values)[0] for p in route.paragraphs)
             target_lines = {p.line for p in route.paragraphs}
