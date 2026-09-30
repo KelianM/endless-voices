@@ -122,7 +122,7 @@ def preflight(root, tokenizers):
     plan = screen.read(root / "plan.json")
     locals_ = {name: screen.read(root / f"{name}-config.json")
                for name in plan["local_configs"]}
-    instructions = Path("data/evaluation/judge-instructions.md").read_text()
+    instructions = Path("configs/judge-instructions.md").read_text()
     rows = []
     for prompt in prompts:
         sid = prompt["sample_id"]

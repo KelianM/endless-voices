@@ -14,6 +14,20 @@ spec.loader.exec_module(viewer)
 FIXTURE = Path(__file__).parent / "fixtures/contracts/manifest.json"
 
 
+@pytest.fixture(autouse=True)
+def prepared_fixture(tmp_path, monkeypatch):
+    import shutil
+    dataset = tmp_path / "prepared"
+    shutil.copytree(FIXTURE.parent, dataset)
+    manifest = dataset / "manifest.json"
+    manifest.write_text(json.dumps({
+        "format": "scene-dataset-v1", "split_unit": "mission",
+        "splits": ["train", "validation", "test"],
+        "artifacts": {f"{name}.jsonl": viewer.sha256(dataset / f"{name}.jsonl")
+                      for name in ["train", "validation", "test"]}}))
+    monkeypatch.setattr(__import__(__name__, fromlist=["FIXTURE"]), "FIXTURE", manifest)
+
+
 def payload(output):
     text = output.read_text()
     return json.loads(
@@ -47,7 +61,7 @@ def test_literal_script_delimiters_cannot_escape_sample_data(tmp_path):
     record["messages"][-1]["content"] = hostile
     source.write_text(json.dumps(record) + "\n")
     declaration = json.loads(manifest.read_text())
-    declaration["files"]["train"][0]["sha256"] = viewer.sha256(source)
+    declaration["artifacts"]["train.jsonl"] = viewer.sha256(source)
     manifest.write_text(json.dumps(declaration))
     output = tmp_path / "samples.html"
     viewer.build_viewer(manifest, output)

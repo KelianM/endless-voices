@@ -7,7 +7,7 @@ prompted and fine-tuned models given identical identity instructions, lore, and 
 
 [ADR 3](adr/0003-use-one-conversation-format-across-splits.md) records the design.
 The [fixtures](../tests/fixtures/contracts) are invented format examples. The
-[current dataset](../data/scene-training-v2/README.md) uses mission-separated splits
+[current dataset](../data/dataset/README.md) uses mission-separated splits
 and records artifact hashes. Source inventories describe available material, not training samples.
 
 ## Record format

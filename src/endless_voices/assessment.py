@@ -183,7 +183,7 @@ def prepare_trials(records, loaded, output, run_provenance, *, split="validation
         raise ValueError("At least one condition is required")
     seed = secrets.randbits(64) if seed is None else seed
     rng = random.Random(seed)
-    instructions = (ROOT / "data/evaluation/judge-instructions.md").read_text()
+    instructions = (ROOT / "configs/judge-instructions.md").read_text()
     public, private, coverage = [], [], []
     for name, (run, prompts, responses) in loaded.items():
         ids = run["dataset"]["sample_ids"]

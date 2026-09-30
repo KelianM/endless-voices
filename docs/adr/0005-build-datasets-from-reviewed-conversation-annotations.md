@@ -28,7 +28,7 @@ the annotation rules and source references. Construction agents annotate speaker
 profiles, lore and scene assumptions. The lead agent inspects those annotations against the source,
 requests or makes corrections, resolves attribution and split conflicts, and assembles the release
 for the owner's PR review. Construction review, implementing review and human approval remain
-distinct claims, as recorded in the [pilot review evidence](../../data/pilot-v1/evidence/review.json).
+distinct claims, as recorded in the [pilot review evidence](https://github.com/KelianM/endless-voices/blob/4579d5b9d4f063750c3037ffe374180b48015d3c/data/pilot-v1/evidence/review.json).
 
 Source preparation, speech extraction, sample assembly and validation run in deterministic scripts.
 Agent dispatch, follow-up instructions, correction cycles and acceptance of annotations are

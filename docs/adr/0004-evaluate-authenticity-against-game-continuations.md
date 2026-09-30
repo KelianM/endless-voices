@@ -17,7 +17,7 @@ would penalize successful alternatives as well as poor ones.
 
 ## Decision
 
-The [evaluation protocol](../../data/evaluation/README.md) makes source authenticity the primary
+The [evaluation protocol](../evaluation.md) makes source authenticity the primary
 question: given the same speaker and scene, can a blinded judge identify the original game
 continuation among an original and a generated reply? The base and adapted model are each
 compared against the same source continuation, with the same supplied context.
@@ -29,7 +29,7 @@ failures, recognition, and control results; chance performance alone does not es
 
 The [development calibration pack](../../data/evaluation/calibration.json) uses source continuations,
 authored alternatives, wrong-context speech, and identical pairs. The
-[initial human review](../../data/evaluation/calibration-findings.md), including controls, is recorded.
+[initial human review](https://github.com/KelianM/endless-voices/blob/4579d5b9d4f063750c3037ffe374180b48015d3c/data/evaluation/calibration-findings.md), including controls, is recorded.
 No automated discriminator or adversarial training loop is implemented. The fixed-context boundary
 from [ADR 3](0003-use-one-conversation-format-across-splits.md) remains unchanged.
 
