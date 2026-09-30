@@ -508,3 +508,5 @@ API generation and judging default to a 30-minute network-operation timeout. Set
 New benchmark references use [complete authored continuations](data/benchmark-continuations-v1/README.md), including narration, actions and quotation marks. Preparation follows the recorded route to the next choice or response boundary and rejects restored target paragraphs already present in the input. The model's loose authenticity instruction is unchanged; older speech-only results remain historical evidence.
 
 [Luna’s ten-example narration rerun](data/evaluation/luna-narrative-judge-v1/README.md) retained all ten origin decisions. The qualitative review distinguishes supported presentation differences from unsupported objections to fictional invention.
+
+[The complete narrative benchmark](data/evaluation/generator-benchmark-narrative-v1/README.md) has 48 responses per model and 194 successful Luna judgments. All originals were identified; the report explains why this does not rank storytelling quality.

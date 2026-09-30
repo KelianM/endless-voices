@@ -195,3 +195,26 @@ def test_four_model_lineup_accepts_both_provider_completion_formats(recorded):
     assert len(private["coverage"]) == 12
     assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 4
     assert set(private["runs"]) == {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
+
+
+@pytest.mark.parametrize("tamper", [False, True])
+def test_reused_generation_accepts_only_verified_original_code(recorded, tamper):
+    model = screen.read(recorded / "plan.json")["generators"][0]
+    snapshot = recorded / "original-generation.py"
+    snapshot.write_text("# Historical generation implementation\n")
+    settings_path = recorded / model / "settings.json"
+    settings = screen.read(settings_path)
+    settings["code_sha256"] = screen.sha(snapshot)
+    settings_path.write_text(json.dumps(settings))
+    selection = screen.read(recorded / "selection.json")
+    selection["reused_generations"] = {
+        model: {"source": "previous-run", "code_path": snapshot.name}
+    }
+    selection["artifacts_sha256"][snapshot.name] = screen.sha(snapshot)
+    (recorded / "selection.json").write_text(json.dumps(selection))
+    if tamper:
+        snapshot.write_text("# Changed historical implementation\n")
+        with pytest.raises(ValueError, match="preparation changed"):
+            benchmark.export(recorded)
+    else:
+        benchmark.export(recorded)
