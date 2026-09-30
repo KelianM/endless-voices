@@ -9,7 +9,6 @@ from endless_voices.context import (
     FullContext,
     MissionDepth,
     distances,
-    pool_from_draft,
     strategy_from_config,
 )
 from endless_voices.prepare_context import load_selections, save_selections
@@ -92,14 +91,6 @@ def test_saved_selection_drives_training_generation_and_isolated_judge(tmp_path)
 def test_bad_strategy_configuration_cannot_silently_change_selection(config):
     with pytest.raises(ValueError):
         strategy_from_config(config)
-
-
-def test_draft_adapter_rejects_mismatched_source_and_rendered_context():
-    draft = {"sample_id": "s", "conversation_id": "c", "mission": "now",
-             "source_blocks": [], "messages": [{"role": "system", "content": "Unrelated"},
-                                                 {"role": "user", "content": "Question"}]}
-    with pytest.raises(ValueError, match="does not match"):
-        pool_from_draft(draft, {})
 
 
 def test_longer_preserved_context_reduces_older_history_allowance():

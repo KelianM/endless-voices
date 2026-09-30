@@ -1,7 +1,11 @@
 {
-  "generators": ["gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"],
+  "generators": [
+    "gemma31b",
+    "qwen30b",
+    "gpt-6-luna",
+    "claude-sonnet-5-5"
+  ],
   "api_timeout_seconds": 1800,
-  "targets": "data/benchmark-continuations-v1",
   "judge": "gpt-6-luna",
   "generation_budget_usd": 3,
   "judge_budget_usd": 2,

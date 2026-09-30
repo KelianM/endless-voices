@@ -11,7 +11,8 @@ from types import SimpleNamespace
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
 from endless_voices import openai_judge
-from endless_voices.continuations import load_targets, target_text
+from endless_voices.dataset.storage import SceneDataset
+from endless_voices.dataset.targets import load_targets, target_text
 from endless_voices.prepare_context import load_selections
 
 
@@ -42,12 +43,14 @@ def checked_inputs(root):
     return selection, records, prompts
 
 
-def prepare(root, context, manifest, config):
+def prepare(root, dataset, config):
     """Join selected inputs to validation targets, preserving the changed context provenance."""
     if root.exists():
         raise ValueError("Output exists; choose a new directory")
+    manifest = dataset / "manifest.json"
+    context = dataset / "validation/context"
+    records = {r['metadata']['id']: r for r in SceneDataset.load(dataset, 'validation')}
     selections = load_selections(context)
-    records = assess.load_dataset(manifest, "validation")
     ids = [s.sample_id for s in selections]
     if set(ids) != set(records):
         raise ValueError("Expected all validation samples, without test or extra samples")
@@ -66,7 +69,7 @@ def prepare(root, context, manifest, config):
     locals_ = {name: screen.read(path) for name, path in plan["local_configs"].items()}
     if any(cfg["label"] != name for name, cfg in locals_.items()):
         raise ValueError("Local model label differs from configuration")
-    targets_path = Path(plan["targets"])
+    targets_path = dataset / "validation/targets"
     targets = load_targets(targets_path)
     if set(targets) != set(records):
         raise ValueError("Source continuation IDs differ")
@@ -76,6 +79,8 @@ def prepare(root, context, manifest, config):
         original = records[s.sample_id]
         values = s.provenance.get("game_variables", {})
         target = target_text(targets[s.sample_id], s.messages, values)
+        if original['messages'] != s.training_messages(target):
+            raise ValueError('Prepared dataset differs from saved context or target')
         if any(target in m["content"] for m in s.messages):
             raise ValueError("Original target appears in generation context")
         markers = sorted(set(re.findall(r"<[^>]+>", json.dumps(s.messages) + target)))
@@ -87,7 +92,7 @@ def prepare(root, context, manifest, config):
     root.mkdir(parents=True)
     shutil.copytree(context, root / "context")
     shutil.copytree(targets_path, root / "targets")
-    licensing = manifest.parent.parent / "licensing"
+    licensing = dataset / "licensing"
     if licensing.is_dir():
         shutil.copytree(licensing, root / "attribution")
     screen.save(root / "variables.json", unresolved_variables)
@@ -267,18 +272,16 @@ def main():
     parser.add_argument("stage", choices=["prepare", "preflight", "local-smoke", "local",
                                           "hosted", "export", "judge", "report"])
     parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--context", type=Path)
-    parser.add_argument("--manifest", type=Path,
-                        default=Path("data/pilot-v1/samples/manifest.json"))
+    parser.add_argument("--dataset", type=Path)
     parser.add_argument("--config", type=Path, default=Path("configs/benchmark.json"))
     parser.add_argument("--model", choices=["gemma31b", "qwen30b"],
                         help="Local model for local and local-smoke stages")
     args = parser.parse_args()
     root = args.root
     if args.stage == "prepare":
-        if args.context is None:
-            parser.error("prepare requires --context")
-        prepare(root, args.context, args.manifest, args.config)
+        if args.dataset is None:
+            parser.error("prepare requires --dataset")
+        prepare(root, args.dataset, args.config)
         return
     checked_inputs(root)
     plan = screen.read(root / "plan.json")

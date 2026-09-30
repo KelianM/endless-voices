@@ -1,6 +1,5 @@
 """Save reusable context selections from eligible source drafts, without model calls."""
 
-import argparse
 import hashlib
 import json
 from dataclasses import asdict
@@ -8,10 +7,7 @@ from pathlib import Path
 
 from endless_voices.context import (
     Selection,
-    TokenizerCounter,
     digest,
-    pool_from_draft,
-    strategy_from_config,
 )
 
 
@@ -55,38 +51,3 @@ def load_selections(output):
     if any(digest(s.messages) != s.provenance["messages_sha256"] for s in selections):
         raise ValueError("Selected message hash differs")
     return selections
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--drafts", type=Path, required=True, help="Eligible source-context JSONL")
-    parser.add_argument("--graph", type=Path, required=True, help="Mission prerequisite JSON map")
-    parser.add_argument("--strategy", type=Path, required=True, help="Context strategy JSON config")
-    parser.add_argument("--tokenizer", type=Path, required=True, help="Cached tokenizer directory")
-    parser.add_argument("--output", type=Path, required=True, help="New organizer bundle directory")
-    args = parser.parse_args()
-    if args.output.exists():
-        parser.error("Output exists; choose a new directory")
-    strategy = strategy_from_config(json.loads(args.strategy.read_text()))
-    graph = json.loads(args.graph.read_text())
-    from transformers import AutoTokenizer
-
-    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, local_files_only=True)
-    counter = TokenizerCounter(tokenizer)
-    selections = [strategy.select(pool_from_draft(json.loads(line), graph), counter)
-                  for line in args.drafts.read_text().splitlines() if line.strip()]
-    import endless_voices.context as context_module
-
-    inputs = [args.drafts, args.graph, args.strategy]
-    save_selections(args.output, selections, {
-        "inputs": {str(p): file_hash(p) for p in inputs},
-        "tokenizer_files": {str(p.relative_to(args.tokenizer)): file_hash(p)
-                            for p in args.tokenizer.rglob("*") if p.is_file()},
-        "code": {"context.py": file_hash(context_module.__file__),
-                 "prepare_context.py": file_hash(__file__)},
-    })
-    print(f"Prepared {len(selections)} contexts in {args.output}")
-
-
-if __name__ == "__main__":
-    main()

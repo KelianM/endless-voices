@@ -1,0 +1,908 @@
+{
+  "missions": {
+    "Deep: Mystery Cubes 3": {
+      "split": "train",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are an unnamed Republic Navy crew member waiting with a blockade force on Gemstone",
+      "topics": [
+        "republic-navy",
+        "blockade",
+        "local-life"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        519
+      ]
+    },
+    "Deep: Mystery Cubes 2": {
+      "split": "train",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are a Republic Navy admiral coordinating with Deep Security and civilian captains during an active anti-piracy operation",
+      "topics": [
+        "republic-navy",
+        "deep-security",
+        "piracy",
+        "joint-operations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        415
+      ]
+    },
+    "Acorn Delights: Part 1": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are Eeeya, an elderly Hai shopkeeper searching for your missing granddaughter",
+      "topics": [
+        "family",
+        "medicine",
+        "missing-person",
+        "public-services",
+        "work"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        2486
+      ]
+    },
+    "FW Albatross 2A": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Jean-Jacques Soleau, called JJ, commander of the militia on Glaze",
+      "topics": [
+        "diplomacy",
+        "piracy",
+        "human-rights"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1845
+      ]
+    },
+    "FW Bloodsea 1": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Alondo, a Free Worlds political leader and diplomatic representative",
+      "topics": [
+        "poisonwood",
+        "piracy",
+        "diplomacy"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1465
+      ]
+    },
+    "FW Katya 1": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Katya Reynolds, a leader in the Free Worlds movement and a member of its Council",
+      "topics": [
+        "recruitment",
+        "civilian-military-cooperation",
+        "political-identity"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1333
+      ]
+    },
+    "FW Conservatory 1": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Ijs Springborn, known as Mr",
+      "topics": [
+        "community-project",
+        "ijs"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        171
+      ]
+    },
+    "FW Conservatory 2B": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Ijs Springborn, known as Mr",
+      "topics": [
+        "community-project",
+        "wartime-logistics"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        293
+      ]
+    },
+    "FW Diplomacy 1B": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Alondo, a Free Worlds political leader and diplomatic representative",
+      "topics": [
+        "diplomacy",
+        "senate",
+        "war"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        67
+      ]
+    },
+    "FW Escort 0": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Tomek Voigt, a senior Free Worlds militia commander responsible for organizing supply convoys",
+      "topics": [
+        "civilian-military-cooperation",
+        "supply",
+        "piracy",
+        "militia-leadership"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        610
+      ]
+    },
+    "FW Flamethrower 1": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Barmy Edward, a weapons engineer at Kraz Cybernetics who develops and tests equipment for the Free Worlds",
+      "topics": [
+        "weapons-development"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        347
+      ]
+    },
+    "FW Katya 7B": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Katya Reynolds, a leader in the Free Worlds movement and a member of its Council",
+      "topics": [
+        "investigation",
+        "perseverance",
+        "personal-interaction"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        2134
+      ]
+    },
+    "FW Northern 3B": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Freya, a Free Worlds Council member with experience in fleet supply and engineering",
+      "topics": [
+        "personal-history",
+        "council",
+        "shipbuilding"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1048
+      ]
+    },
+    "FW Prisoner Parole": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Tomek Voigt, the senior organizer of the Free Worlds militias",
+      "topics": [
+        "ceasefire",
+        "prisoners",
+        "military-command"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        174
+      ]
+    },
+    "FW Recon 0": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are an unnamed Free Worlds militia officer arranging a passenger transport",
+      "topics": [
+        "militia-service",
+        "transport"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        304
+      ]
+    },
+    "FW Senate 1B": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Arianna Huygens, a senator representing Mere in the Free Worlds Senate",
+      "topics": [
+        "democracy",
+        "political-transition",
+        "everyday-conversation"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1045
+      ]
+    },
+    "FW Southern Battle 1": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Freya, a Free Worlds Council member with experience in fleet supply and engineering",
+      "topics": [
+        "weapons",
+        "war",
+        "military-planning"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        357
+      ]
+    },
+    "FW Southern Recon 1": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Jean-Jacques Soleau, called JJ, commander of the militia on Glaze",
+      "topics": [
+        "reconnaissance",
+        "military-intelligence"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        191
+      ]
+    },
+    "FW Southern Recon 1B": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Freya, a Free Worlds Council member with experience in fleet supply and engineering",
+      "topics": [
+        "reconnaissance",
+        "weapons",
+        "military-planning"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        214
+      ]
+    },
+    "FW Stack Core 1C": {
+      "split": "train",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Freya, a Free Worlds engineering liaison coordinating industrial projects",
+      "topics": [
+        "industrial-development",
+        "security"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        840
+      ]
+    },
+    "Academy Motto": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai cafe staff member planning to take a human-language course at the city Academy next year",
+      "topics": [
+        "education",
+        "civic-life",
+        "leadership",
+        "public-service"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        226
+      ]
+    },
+    "Pirate Troubles [1]": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai elder who has asked a visiting captain to help stop attacks on Hai systems",
+      "topics": [
+        "raids",
+        "human-piracy",
+        "diplomacy",
+        "security"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1047
+      ]
+    },
+    "Ask the Hai about the Unfettered": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are an elderly Hai citizen who has lived through major changes in Hai society",
+      "topics": [
+        "history",
+        "northern-hai",
+        "drak",
+        "quarg",
+        "hai-politics"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        149
+      ]
+    },
+    "Robotic Musical 1": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a middle-aged Hai merchant captain who has seen the comedy musical being advertised at the spaceport",
+      "topics": [
+        "music",
+        "theater",
+        "entertainment",
+        "commerce"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        277
+      ]
+    },
+    "Hai Sympathizer Warning": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are an experienced Hai merchant who knows the practical effects of local security policy and divisions among Hai traders",
+      "topics": [
+        "merchants",
+        "local-law",
+        "security",
+        "internal-politics",
+        "reputation"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        246
+      ]
+    },
+    "Musical Entertainment Expo": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai bartender serving visitors in a busy public venue",
+      "topics": [
+        "music",
+        "entertainment",
+        "hai-civilian-life"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        46
+      ]
+    },
+    "The Meme Wars 1": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai spaceport security guard managing a public disturbance",
+      "topics": [
+        "public-life",
+        "memes",
+        "elders",
+        "education"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        82
+      ]
+    },
+    "First Contact: Kuwaru Efreti": {
+      "split": "train",
+      "identity": "quarg",
+      "species": "quarg",
+      "character_role": "You are a Quarg guide at the Kuwaru Efreti ringworld, speaking to a rare human visitor",
+      "topics": [
+        "first-contact",
+        "korath-efreti",
+        "korath-machines",
+        "containment"
+      ],
+      "scenario_group": "first-contact-kuwaru-efreti",
+      "conversations": [
+        80
+      ]
+    },
+    "Lagrange Ring: Cargo": {
+      "split": "train",
+      "identity": "quarg",
+      "species": "quarg",
+      "character_role": "You are a Quarg representative organizing human freight for a visitor section in a ringworld under construction near Enif",
+      "topics": [
+        "quarg",
+        "human-visitors",
+        "ringworld-construction",
+        "cargo"
+      ],
+      "scenario_group": "lagrange-ring-construction",
+      "conversations": [
+        195
+      ]
+    },
+    "Nanachi 1": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are Nanachi, a young Hai who has recently bought her first ship and is trying to become an independent captain",
+      "topics": [
+        "exploration",
+        "first-flight",
+        "work",
+        "ships"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1448,
+        1409
+      ]
+    },
+    "FW Katya 1C": {
+      "split": "train",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are an unnamed Republic Navy officer conducting a cargo screening at a Republic port",
+      "topics": [
+        "republic-navy",
+        "cargo-screening",
+        "security"
+      ],
+      "scenario_group": "katya-smuggling-mission",
+      "conversations": [
+        1475
+      ]
+    },
+    "Hai Honeymoon": {
+      "split": "train",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are Touhar, a Hai man newly married to Anaya",
+      "topics": [
+        "family",
+        "marriage",
+        "human-hai-relations",
+        "travel"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        942
+      ]
+    },
+    "FW Embassy 1": {
+      "split": "validation",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are Admiral William Danforth, a Republic Navy admiral who leads the Oathkeepers",
+      "topics": [
+        "republic-navy",
+        "admiral-danforth",
+        "diplomacy",
+        "embassies"
+      ],
+      "scenario_group": "free-worlds-embassy-exchange",
+      "conversations": [
+        557
+      ]
+    },
+    "FW Early Warning 3": {
+      "split": "validation",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are Commander Ranulph Hines, an officer in the Republic Navy",
+      "topics": [
+        "republic-navy",
+        "ranulph-hines",
+        "peace-talks",
+        "free-worlds-war"
+      ],
+      "scenario_group": "free-worlds-early-warning-harmony-talks",
+      "conversations": [
+        1919
+      ]
+    },
+    "Paradise Fortune 4": {
+      "split": "validation",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are a Republic Navy officer receiving the return of credits stolen by Diana Howl",
+      "topics": [
+        "republic-navy",
+        "law-enforcement",
+        "credit-return"
+      ],
+      "scenario_group": "paradise-fortune-credit-return",
+      "conversations": [
+        3084
+      ]
+    },
+    "First Contact: Hai": {
+      "split": "validation",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai resident speaking with a newly arrived human captain",
+      "topics": [
+        "welcome",
+        "human-settlement",
+        "wormhole",
+        "travel-safety",
+        "human-hai-relations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        20
+      ]
+    },
+    "FW Conservatory 2": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Ijs Springborn, known as Mr",
+      "topics": [
+        "community-project",
+        "wartime-logistics"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        213
+      ]
+    },
+    "FW Diplomacy 1C": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Alondo, a Free Worlds political leader and diplomatic representative",
+      "topics": [
+        "diplomacy",
+        "war",
+        "republic-relations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        121
+      ]
+    },
+    "FW Greenrock Lost Announcement": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are an unnamed Free Worlds militia captain speaking privately with a merchant captain after the withdrawal from Greenrock",
+      "topics": [
+        "greenrock",
+        "piracy",
+        "senate-relations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        852
+      ]
+    },
+    "FW Katya 5B": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Katya Reynolds, a leader in the Free Worlds movement and a member of its Council",
+      "topics": [
+        "pirates",
+        "social-policy",
+        "civilian-life"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1912
+      ]
+    },
+    "Liberate Kornephoros": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Tomek Voigt, the senior organizer of the Free Worlds militias",
+      "topics": [
+        "military-command",
+        "prisoners",
+        "war"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        127
+      ]
+    },
+    "FW Northern 2C": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Freya, a Free Worlds Council member with experience in fleet supply and engineering",
+      "topics": [
+        "reconnaissance",
+        "civilian-protection",
+        "navy-technology"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        942
+      ]
+    },
+    "FW Northern 3": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Freya, a Free Worlds Council member with experience in fleet supply and engineering",
+      "topics": [
+        "fleet-logistics",
+        "shipbuilding",
+        "military-intelligence"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        997
+      ]
+    },
+    "FW Recon 1": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are an unnamed Free Worlds militia captain arranging local reconnaissance",
+      "topics": [
+        "reconnaissance",
+        "civilian-military-cooperation",
+        "republic-relations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        345
+      ]
+    },
+    "FW Recon 3": {
+      "split": "validation",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Jean-Jacques Soleau, called JJ, commander of the militia on Glaze",
+      "topics": [
+        "reconnaissance",
+        "republic-relations",
+        "civilian-access"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        462
+      ]
+    },
+    "Gambling Judgment": {
+      "split": "validation",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai diner barkeep explaining the customs that shape public behavior",
+      "topics": [
+        "customs",
+        "honesty",
+        "gambling",
+        "maturity",
+        "civilian-life"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        187
+      ]
+    },
+    "First Contact: Quarg": {
+      "split": "validation",
+      "identity": "quarg",
+      "species": "quarg",
+      "character_role": "You are a Quarg resident speaking with a human visitor at a Quarg port",
+      "topics": [
+        "first-contact",
+        "quarg-culture",
+        "drak",
+        "peace-and-intervention"
+      ],
+      "scenario_group": "first-contact-quarg",
+      "conversations": [
+        21
+      ]
+    },
+    "FW Epilogue: Danforth": {
+      "split": "test",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are Admiral William Danforth, a Republic Navy admiral who leads the Oathkeepers",
+      "topics": [
+        "republic-navy",
+        "oathkeepers",
+        "postwar-security",
+        "piracy",
+        "syndicate"
+      ],
+      "scenario_group": "free-worlds-epilogue-danforth",
+      "conversations": [
+        202
+      ]
+    },
+    "Ask Quarg About Coalition Early": {
+      "split": "test",
+      "identity": "quarg",
+      "species": "quarg",
+      "character_role": "You are a Quarg encountered by a human who has visited the Coalition",
+      "topics": [
+        "coalition",
+        "heliarchs",
+        "disputed-history"
+      ],
+      "scenario_group": "ask-quarg-coalition-early",
+      "conversations": [
+        264
+      ]
+    },
+    "Deep: Mystery Cubes 4": {
+      "split": "test",
+      "identity": "republic",
+      "species": "human",
+      "character_role": "You are a Republic Navy admiral coordinating with Deep Security and civilian captains during an active anti-piracy operation",
+      "topics": [
+        "republic-navy",
+        "gratitude",
+        "joint-operations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        653
+      ]
+    },
+    "Acorn Delights: Part 3": {
+      "split": "test",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are Eeeya, an elderly Hai shopkeeper searching for your missing granddaughter",
+      "topics": [
+        "family",
+        "medicine",
+        "hai-politics",
+        "difficult-decisions"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        2578
+      ]
+    },
+    "FW Bloodsea 1.1": {
+      "split": "test",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Alondo, a Free Worlds political leader and diplomatic representative",
+      "topics": [
+        "diplomacy",
+        "council",
+        "piracy",
+        "war-policy"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1501
+      ]
+    },
+    "FW Early Warning 1": {
+      "split": "test",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Jean-Jacques Soleau, called JJ, commander of the militia on Glaze",
+      "topics": [
+        "military-intelligence",
+        "council-deliberation",
+        "republic-relations"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1746
+      ]
+    },
+    "FW Flamethrower 2": {
+      "split": "test",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Barmy Edward, a weapons engineer at Kraz Cybernetics who develops and tests equipment for the Free Worlds",
+      "topics": [
+        "weapons-development",
+        "military-testing"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        362
+      ]
+    },
+    "FW Katya 4": {
+      "split": "test",
+      "identity": "human-free-worlds",
+      "species": "human",
+      "character_role": "You are Katya Reynolds, a leader in the Free Worlds movement and a member of its Council",
+      "topics": [
+        "personal-history",
+        "republic-relations",
+        "navy"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        1795
+      ]
+    },
+    "Sick of Acorn Bread": {
+      "split": "test",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are an older Hai diner customer who remembers traditional breads and is frustrated that human demand has changed spaceport menus",
+      "topics": [
+        "food",
+        "human-tourism",
+        "hai-civilian-life",
+        "cultural-change"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        345
+      ]
+    },
+    "Hai Waypoint Warning": {
+      "split": "test",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are a Hai caller speaking to a human captain over an encrypted commlink near the wormhole",
+      "topics": [
+        "secrecy",
+        "public-disclosure",
+        "human-hai-relations",
+        "wormhole"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        200
+      ]
+    },
+    "Hai Film Crew 1": {
+      "split": "test",
+      "identity": "hai-mainstream",
+      "species": "hai",
+      "character_role": "You are Likeet, a Hai director of an independent film production",
+      "topics": [
+        "film",
+        "history",
+        "popular-culture",
+        "storytelling"
+      ],
+      "scenario_group": null,
+      "conversations": [
+        2117
+      ]
+    }
+  },
+  "seed": "scene-dataset-v1",
+  "player": {
+    "<first>": "Alex",
+    "<last>": "Morgan",
+    "<ship>": "Copper Finch"
+  },
+  "context": {
+    "name": "mission-depth",
+    "depth": 4,
+    "max_input_tokens": 8192,
+    "seed": "context-depth-v1"
+  }
+}

@@ -3,24 +3,14 @@
 import argparse
 import hashlib
 import json
-import re
 import subprocess
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from endless_voices.dataset.source import tokens
+
 REVISION = "7140eb2a29ce4d2797933075c751791a892c7d4f"
-TOKEN = re.compile(r'`([^`]*)`|"([^"]*)"|([^\s]+)')
 CATEGORIES = ("conversation", "dialog", "description", "spaceport", "log", "phrase_news")
-
-
-def tokens(line):
-    """Tokenize one physical line; comments outside quoted strings end the line."""
-    result = []
-    for match in TOKEN.finditer(line):
-        if match[3] and match[3].startswith("#"):
-            break
-        result.append(next(value for value in match.groups() if value is not None))
-    return result
 
 
 def measure(text):

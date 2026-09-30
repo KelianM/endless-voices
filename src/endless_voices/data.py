@@ -1,6 +1,7 @@
 """JSONL conversations and causal language modelling batches."""
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -28,9 +29,23 @@ def load_conversations(path: str) -> list[list[dict[str, str]]]:
     return conversations
 
 
+
+class TokenizedSceneDataset(torch.utils.data.Dataset):
+    """Provide fixed tokenized examples to the trainer's DataLoader."""
+
+    def __init__(self, examples):
+        self.examples = examples
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, index):
+        return deepcopy(self.examples[index])
+
+
 def tokenize_conversations(
     path: str, tokenizer: PreTrainedTokenizerBase, max_length: int, loss: str = "continuation"
-) -> list[dict[str, list[int]]]:
+) -> TokenizedSceneDataset:
     if max_length < 2:
         raise ValueError("data.max_length must be at least 2")
     if loss not in {"continuation", "all"}:
@@ -46,7 +61,7 @@ def tokenize_conversations(
             labels[:len(prefix)] = [-100] * len(prefix)
         examples.append({"input_ids": ids, "attention_mask": [1] * len(ids),
                          "labels": labels})
-    return examples
+    return TokenizedSceneDataset(examples)
 
 
 def chat_ids(messages, tokenizer):

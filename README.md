@@ -32,21 +32,19 @@ data/evaluation/           Evaluation protocol and calibration evidence
 data/overview/             Upstream source inventory and statistics
 ```
 
-There is no general game-data ingestion or synthetic dataset generator.
+Dataset preparation uses the stateful builder in `endless_voices.dataset`.
 Blinded review pages and a local prompted judge assess saved generation runs.
 Each training run writes an independent adapter directory. You can use one per faction, a shared
 adapter, or another dataset organization without changing the code: faction names are not built
 into the loader or model.
 
-## Pilot data curation
+## Dataset preparation
 
-The [first conversation dataset](data/README.md) covers Free Worlds representatives,
-Republic Navy, mainstream Hai and Quarg. Reviewed annotations record speaker attribution,
-branch routes, profiles and selected lore. Deterministic preparation builds original-speech
-samples into Git LFS-versioned train, validation and test files under `data/pilot-v1/`, with frozen hashes,
-source provenance, agent review evidence and attribution. The [dataset overview](data/overview/README.md)
-distinguishes the available source corpus from the selected coverage. Install Git LFS, then run
-`git lfs install --local` and `git lfs pull` to fetch the committed release payload.
+[Dataset preparation](data/README.md) now has one builder-owned pipeline. The parser preserves
+whole authored passages, and the example builder and context sampler share a stateful dialogue
+interpreter. [The ownership diagram](docs/story-context.md) explains the preparation and loader
+boundaries. Unsupported game operations fail explicitly; the current reviewed source scope still
+needs those failures resolved before a complete replacement dataset can be published.
 
 ## Setup
 
@@ -460,34 +458,10 @@ Unknown runtime values remain explicit markers and are recorded for review; no g
 locations or payment amounts are supplied. See [ADR 12](docs/adr/0012-resolve-game-variables-within-their-mission.md).
 Historical previews and benchmark results retain their original substitutions.
 
-Context selection is shared by dataset and benchmark preparation through
-`endless_voices.context`. Choose `configs/context-full.json` or
-`configs/context-mission-depth.json`; the latter records depth, total input ceiling and seed.
-The default ceiling is 8,192 tokens for the fully rendered input, including chat formatting.
-The selector preserves lore, the current encounter and eligible missions through depth four,
-then samples whole older missions into the remaining space. A preserved core that exceeds the
-ceiling fails preparation instead of being truncated. Sparse eligible pools can produce shorter
-inputs. The 1,024-token local output allowance is separate from this input ceiling.
-See the [48-example verification](data/evaluation/context-total-budget-v1/README.md).
-The source assembler also writes `prerequisites.json` alongside its drafts.
-
-```sh
-python -m endless_voices.prepare_context \
-  --drafts /path/to/drafts/contexts.jsonl \
-  --graph /path/to/drafts/prerequisites.json \
-  --strategy configs/context-mission-depth.json \
-  --tokenizer /path/to/cached/tokenizer \
-  --output outputs/selected-context
-```
-
-Preparation is offline and refuses an existing output directory. The output contains
-`prompts.json` for generation, private `selections.json` with retained and omitted passages,
-and provenance with hashes. `load_selections()` verifies the bundle. Each selection provides
-`generation_prompt()`, `judge_context()` and `training_messages(target)`; these reuse identical
-selected context and return copies. The target is supplied only after selection. Keep the
-selection bundle private and give judges only the context and anonymous candidates.
-The generation prompt format is also accepted by the existing screen runner. Curated dataset
-export still requires the existing release checks; preparation does not silently change the source records.
+Context selection uses the strategy in `endless_voices.context` through `DatasetBuilder`.
+The default input ceiling is 8,192 tokens, including chat formatting. Preparation resolves
+compatible histories before selecting whole missions into the remaining budget. See
+[data preparation](data/README.md) for the single entry point.
 
 The [mission-depth comparison](data/evaluation/context-depth-v1/README.md) measures automatic
 selection at depths 4, 8 and 12 with an 8,000-token budget for older history. The
@@ -503,7 +477,7 @@ API generation and judging default to a 30-minute network-operation timeout. Set
 
 [Sonnet 5.5 versus Luna](data/evaluation/sonnet55-luna-judge-v1/README.md): both judges identified 10/10 originals and passed two controls. Luna cost about 29 times less on this sample and remains the default judge. Sonnet 5.5 replaces Sonnet 5 in new benchmark generation runs.
 
-New benchmark references use [complete authored continuations](data/benchmark-continuations-v1/README.md), including narration, actions and quotation marks. Preparation follows the recorded route to the next choice or response boundary and rejects restored target paragraphs already present in the input. The model's loose authenticity instruction is unchanged; older speech-only results remain historical evidence.
+New benchmark references use [complete authored continuations](data/benchmark-continuations-v1/README.md), including narration, actions and quotation marks. The stateful builder follows game routes to explicit player choices or endpoints and rejects target paragraphs present in the input. The model's loose authenticity instruction is unchanged; older speech-only results remain historical evidence.
 
 [Luna’s ten-example narration rerun](data/evaluation/luna-narrative-judge-v1/README.md) retained all ten origin decisions. The qualitative review distinguishes supported presentation differences from unsupported objections to fictional invention.
 
@@ -511,6 +485,6 @@ New benchmark references use [complete authored continuations](data/benchmark-co
 
 The task instruction is shared in `src/endless_voices/instructions.py`. [Four matched Luna responses](data/evaluation/scene-instruction-v1/README.md) show how scene-continuation wording changes the output. Historical saved prompts remain unchanged; the training prompt draft still needs target and split migration.
 
-The shared minimal scene instruction and the preliminary writing objective are recorded in [ADR 11](docs/adr/0011-use-a-shared-scene-continuation-instruction.md). Training defaults to loss on the final assistant continuation only; `data.loss = "all"` explicitly restores the earlier full-conversation objective.
+The shared minimal scene instruction and the preliminary writing objective are recorded in [ADR 11](docs/adr/0011-use-a-shared-scene-continuation-instruction.md). Training defaults to loss on the final assistant continuation only; `data.loss = "all"` includes prompt and history tokens; it is not a deduplicated corpus export.
 
-The [preliminary scene training release](data/scene-training-v2/README.md) replaces the old speech-only training input for the next experiment: 101 examples, full authored targets, source context and mission-scoped variables. Its exclusions and token measurements are recorded. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.
+The [saved scene training release](data/scene-training-v2/README.md) contains 101 examples. It predates the stateful builder and has not been rebuilt under its rules. Actual Gemma adapter training memory remains untested; the generic float32 training example is not a local 31B training recipe.

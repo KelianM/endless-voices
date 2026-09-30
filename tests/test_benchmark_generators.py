@@ -29,8 +29,8 @@ class Counter:
 @pytest.fixture
 def recorded(tmp_path, monkeypatch, request):
     models = getattr(request, "param", ["gemma31b", "gpt-6-luna"])
-    manifest = tmp_path / "manifest.json"
-    screen.save(manifest, {})
+    dataset = tmp_path / "dataset"
+    dataset.mkdir()
     template = json.loads(
         Path("tests/fixtures/contracts/validation.jsonl").read_text().splitlines()[0]
     )
@@ -50,9 +50,8 @@ def recorded(tmp_path, monkeypatch, request):
             {},
         )
         selections.append(FullContext().select(pool, Counter()))
-    context = tmp_path / "context"
+    context = dataset / "validation/context"
     save_selections(context, selections, {"simulated_fixture": True})
-    monkeypatch.setattr(benchmark.assess, "load_dataset", lambda *_: records)
     local = tmp_path / "local.json"
     screen.save(local, {"label": "gemma31b"})
     locals_ = {"gemma31b": str(local)}
@@ -60,7 +59,7 @@ def recorded(tmp_path, monkeypatch, request):
         qwen = tmp_path / "qwen.json"
         screen.save(qwen, {"label": "qwen30b"})
         locals_["qwen30b"] = str(qwen)
-    targets = tmp_path / "targets"
+    targets = dataset / "validation/targets"
     targets.mkdir()
     screen.save(targets / "targets.json", [
         {"sample_id": sid, "paragraphs": [{"line": 1,
@@ -84,7 +83,16 @@ def recorded(tmp_path, monkeypatch, request):
         },
     )
     root = tmp_path / "run"
-    benchmark.prepare(root, context, manifest, config)
+    for row, selection in zip(records.values(), selections, strict=True):
+        row['messages'] = selection.training_messages(
+            'She nods. "A complete source reply for ' + row['metadata']['id'] + '."')
+    (dataset / 'validation.jsonl').write_text(
+        ''.join(json.dumps(r) + '\n' for r in records.values()))
+    screen.save(dataset / 'manifest.json', {
+        'format': 'scene-dataset-v1', 'split_unit': 'mission', 'splits': ['validation'],
+        'artifacts': {str(p.relative_to(dataset)): screen.sha(p)
+                      for p in dataset.rglob('*') if p.is_file()}})
+    benchmark.prepare(root, dataset, config)
     messages = selections[0].messages
     for model in models:
         folder = root / model
@@ -195,3 +203,16 @@ def test_four_model_lineup_accepts_both_provider_completion_formats(recorded):
     assert len(private["coverage"]) == 12
     assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 4
     assert set(private["runs"]) == {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
+
+
+def test_prepare_cli_passes_the_prepared_dataset(monkeypatch, tmp_path):
+    import sys
+
+    dataset = tmp_path / 'dataset'
+    output = tmp_path / 'benchmark'
+    calls = []
+    monkeypatch.setattr(sys, 'argv', ['benchmark_generators.py', 'prepare',
+                                     '--root', str(output), '--dataset', str(dataset)])
+    monkeypatch.setattr(benchmark, 'prepare', lambda *args: calls.append(args))
+    benchmark.main()
+    assert calls == [(output, dataset, Path('configs/benchmark.json'))]

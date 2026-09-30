@@ -38,7 +38,7 @@ def distances(graph, start):
 def render(block):
     """Render an original source block without changing its passages."""
     return block["heading"] + "\n" + "\n\n".join(
-        ("Optional player response: " if p["role"] == "option" else "") + p["text"]
+        ("Player choice: " if p["role"] == "option" else "") + p["text"]
         for p in block["passages"]
     )
 
@@ -200,22 +200,3 @@ def strategy_from_config(config) -> ContextStrategy:
         if config["name"] == "mission-depth":
             return MissionDepth(config["depth"], config["max_input_tokens"], config["seed"])
     raise ValueError("Invalid context strategy configuration")
-
-
-def pool_from_draft(draft, graph):
-    """Adapt source-context drafts while preserving fixed lore and encounter messages."""
-    blocks = [deepcopy(b) for b in draft["source_blocks"] if b["kind"] == "earlier-source-examples"]
-    for block in blocks:
-        block["mission"] = block["heading"].rsplit(" / ", 1)[0]
-    history = "\n\n".join(map(render, blocks))
-    marker = ("Earlier game passages. Optional alternatives are examples, "
-              "not simultaneous events.\n\n")
-    messages = draft["messages"]
-    if messages[0]["role"] != "system" or not messages[0]["content"].endswith(marker + history):
-        raise ValueError("Draft history does not match its rendered messages")
-    validate_messages([*messages, {"role": "assistant", "content": "Boundary check"}])
-    system = messages[0]["content"]
-    return ContextPool(draft["sample_id"], draft["conversation_id"], draft["mission"],
-                       system[:-len(history)] if history else system,
-                       deepcopy(messages[1:]), blocks, deepcopy(graph),
-                       dict(draft["game_variables"]))

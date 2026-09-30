@@ -1,25 +1,35 @@
-# Context for preliminary scene-continuation training
+# Scene dataset preparation
 
-The objective is to learn the game's writing and characters. Dataset and benchmark preparation use the same minimal task instruction, recorded in [ADR 11](adr/0011-use-a-shared-scene-continuation-instruction.md). The model receives a character reference, verbatim game lore, earlier mission passages and the current encounter. No directions about cadence, caution, verbosity or speaking authority are added.
+`DatasetBuilder.build()` owns source preparation. The builder supplies the parsed corpus, mission ownership, interpreter and context strategy to `ExampleBuilder`. The example builder asks the interpreter for reachable targets and asks `ContextSampler` for compatible history. Both consumers use the same state semantics.
 
-## Split and target boundaries
+```text
+DatasetBuilder
+  ├─ GameCorpus: verified source paragraphs and mission structure
+  ├─ mission split ownership
+  └─ ExampleBuilder
+       ├─ DialogueInterpreter: reachable targets and state constraints
+       └─ ContextSampler
+            ├─ DialogueInterpreter: consistent preceding routes
+            └─ ContextStrategy: select whole missions within the token budget
+  → saved SceneDataset
+       ├─ training adapter → DataLoader and collator → batches
+       └─ benchmark → saved context and reference
+```
 
-Whole source missions form the split unit, as recorded in [ADR 13](adr/0013-split-datasets-by-source-mission.md). Existing held-out assignments take precedence when migrating conversation-level assignments. Training preparation excludes examples belonging to missions represented in validation or test, and excludes those missions from historical references. Unannotated prerequisite passages remain eligible unless they belong to a held-out mission. Ambiguous continuation boundaries are recorded as exclusions.
+The interpreter preserves full authored paragraphs, including narration and embedded questions. A player choice is an explicit game node, not a sentence spoken by a character. Unknown initial conditions can produce multiple satisfiable routes. Assignments on a route determine subsequent conditions; the sampler cannot reverse those assignments to select another passage.
 
-The target preserves complete authored paragraphs, including narration and other speakers. Preparation rejects target paragraphs already present in the current input. The current encounter ends before the target; subsequent scene text is not supplied as its lead-in.
+Every distinct reachable target paragraph sequence is retained. When several histories produce that target, preparation chooses one reproducibly. Targets and histories are resolved together before the token-budget strategy selects passages. The saved state witness includes the chosen history's conditions even when the token budget omits some history text.
 
-Later training conversations may reveal story developments. That is compatible with learning game writing, but means these data do not measure chronological character knowledge or unseen-story generalization. The validation set has been used repeatedly for development. The earlier proposal to reorder every story chronologically is superseded; historical prototype measurements remain unchanged.
+Whole missions stay in one split. Training history cannot include held-out mission text. Validation may use permitted training history, and test may use permitted training or validation history. Unassigned source missions are omitted until ownership is assigned. The current prerequisite graph follows positive completed-mission requirements; it does not reconstruct arbitrary OR dependencies or event timelines.
 
-## Context selection
+`MissionDepth` preserves lore, the current encounter and nearby eligible missions, then fills the remaining input allowance with whole older missions. Overflow of the preserved core is an error. State resolution happens before this token selection, never in DataLoader workers.
 
-Mission prerequisites select relevant earlier material without a maintained list of important stories. Optional alternatives can supply writing examples but are labelled as alternatives, not simultaneous events. Unresolved prerequisites and exclusions are recorded instead of being filled with generated summaries.
+The current interpreter supports integer comparisons, Boolean condition groups, assignments, increments, multiplication, minimum/maximum clamps, choices, jumps and paragraph display conditions. Unsupported state expressions, external mission effects, excessive branching and loops fail the build explicitly. Supported mission assignments run after the initial conversation display and before the first player response, matching the game engine. Source order alone does not establish their execution order.
 
-`endless_voices.context` provides the shared strategy interface. `FullContext` retains all eligible passages. `MissionDepth` preserves the current encounter, lore and nearby prerequisite missions, then samples whole older missions into the remaining input budget. Preparation fails if the preserved core exceeds the budget. Whole-mission boundaries and sparse reference pools can leave unused space.
+The former 101-example release is unchanged. It was not rebuilt by this implementation and must not be described as validated by the stateful builder. [ADR 14](adr/0014-build-scene-examples-through-stateful-dialogue.md) records the implemented rule and limits.
 
-The saved selection records depth, token budget, seed, source coordinates, retained and omitted passages, and hashes. Generation, judging and training reuse the same selected messages. The judge additionally receives anonymous candidate continuations and its own judging task. Origin detection is not a direct measure of storytelling quality.
+## Training objectives
 
-## Game variables
+The same source ownership can support two objectives. Scene continuation trains the final passage given context. Corpus language modeling trains authored text throughout each training sequence. Both use next-token prediction, but they put loss on different tokens.
 
-Player identity is configurable. Static mission values are resolved separately for each passage's owning mission, under [ADR 12](adr/0012-resolve-game-variables-within-their-mission.md). Unknown runtime values remain literal markers. Source text, substitutions and unresolved markers are retained for review. Historical passages are never substituted again using the current mission's destination.
-
-The [preliminary training release](../data/scene-training-v2/README.md) records exclusions, token measurements and remaining markers. The release does not claim that every optional branch occurred in one playthrough, that the game state machine has been reconstructed, or that adapter training fits the local machine.
+The current training adapter uses scene examples. Its `loss="all"` option includes the saved prompt and history; that is not a deduplicated full-corpus text export. A corpus export should preserve coherent branches and avoid repeatedly training on shared context or including held-out mission text. No corpus-training run is included in this change.

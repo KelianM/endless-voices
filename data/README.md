@@ -1,35 +1,23 @@
 # Dataset preparation
 
-The current preliminary dataset is [scene-training-v2](scene-training-v2/README.md), with 101 training examples, 48 validation examples and 27 test examples. Training uses full authored scene continuations and saved source context. Evaluation records remain unchanged from the existing development selection.
-
-Whole source missions are the split unit. Known conversation and scenario variants also stay together. The current validator accepts only mission-level manifests:
+The maintained preparation entry point is `endless_voices.dataset`. `DatasetBuilder` parses verified game source, constructs state-consistent targets and history, applies mission ownership and the context budget, and publishes one prepared bundle.
 
 ```sh
-python -m endless_voices.contracts data/scene-training-v2/split-manifest.json
+python -m endless_voices.dataset \
+  --source data/local/endless-sky-7140eb2a29ce \
+  --inventory data/overview/source-statistics.json \
+  --config configs/scene-dataset.json \
+  --tokenizer /path/to/cached/tokenizer \
+  --splits train \
+  --output outputs/prepared-scenes
 ```
 
-Mission eligibility is checked before context sampling. Training histories exclude held-out missions. The context strategy preserves lore, the current encounter and nearby prerequisite missions, then fills the remaining input budget with whole older missions. Targets must not appear in their own input.
+`configs/scene-dataset.json` records the existing reviewed mission/conversation scope and split assignments. The configuration contains no quote selectors or per-branch routes. Omitting a mission's conversation list selects all supported inline conversations in that mission. Broader corpus extraction is not enabled by default.
 
-## Rebuild the replacement selection
+A successful build writes split JSONL files, per-split context and target bundles, state provenance, configuration, code snapshots, hashes and licensing. `SceneDataset.load(output, split)` verifies the saved artifacts and provides stable indexed records. No API calls or model weights are involved; the tokenizer is loaded locally.
 
-[Replacement annotations](training-replacements-v1/annotations.json) identify nine unused continuations in existing training-only missions. The replacement preparation reads the original reviewed annotations and removes the nine recorded exclusions. This is a data migration input, not a supported conversation-level split mode.
+Preparation fails instead of publishing a partial dataset when source operations are unsupported, branch exploration exceeds its limit or required context exceeds its budget. The current reviewed scope still contains unsupported random expressions and event/resource operations. The [source audit](evaluation/scene-builder-v1/README.md) currently supports 11 of 32 selected training missions. No complete replacement release has been published.
 
-```sh
-python scripts/replace_training_examples.py --output outputs/replacement-preparation
-python scripts/prepare_continuations.py \
-  --manifest outputs/replacement-preparation/split-manifest.json \
-  --provenance outputs/replacement-preparation/provenance.json \
-  --split train --output outputs/replacement-targets
-```
+The existing [101-example release](scene-training-v2/README.md) and earlier reports remain historical evidence. They are not retroactively state-consistent. The old speech extraction and separate prototype preparation scripts have been removed; Git retains their history.
 
-Run `assemble_validation_context.py --split train` with that manifest, provenance and target bundle, the cached game source and a cached tokenizer. The assembler writes source-context drafts and a prerequisite graph. Pass those drafts to `python -m endless_voices.prepare_context` with `configs/context-mission-depth.json`, then export the selected contexts and targets with `scripts/prepare_training_release.py`. Each stage requires a new output directory. No model generation is involved.
-
-The [data contract](../docs/contracts.md) defines record validation. [ADR 13](../docs/adr/0013-split-datasets-by-source-mission.md) records mission splitting; [ADR 11](../docs/adr/0011-use-a-shared-scene-continuation-instruction.md) records the shared task; [ADR 12](../docs/adr/0012-resolve-game-variables-within-their-mission.md) records game variables.
-
-## Scope and evidence
-
-The source selection covers Free Worlds representatives, Republic Navy, mainstream Hai and Quarg. The replacement release does not expand into the broader corpus. Source inventories describe available text, not reviewed training yield.
-
-Preserve source hashes, licensing, reviewed annotations, replacement records and selected-context provenance. Agent review does not imply human approval. Validation is development data, and no adapter training has been performed by dataset preparation.
-
-Historical data and reports remain evidence. The current tools do not reconstruct historical split behavior; use the corresponding Git revision if that becomes necessary.
+See [the ownership diagram and training objectives](../docs/story-context.md), [ADR 13](../docs/adr/0013-split-datasets-by-source-mission.md) for mission ownership and [ADR 14](../docs/adr/0014-build-scene-examples-through-stateful-dialogue.md) for the stateful builder.
