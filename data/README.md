@@ -24,4 +24,4 @@ A successful build writes one JSONL file per split, source and state provenance,
 The [current training release](dataset/README.md) contains 163 examples from all 32 selected training missions. The build verifies state witnesses, split boundaries and training loss masks. Preparation still refuses unsupported operations or context overflow rather than publishing a partial dataset.
 
 
-See [the ownership diagram and training objectives](../docs/story-context.md), [ADR 8](../docs/adr/0008-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.
+See [the ownership diagram and training objectives](../docs/story-context.md), [ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.

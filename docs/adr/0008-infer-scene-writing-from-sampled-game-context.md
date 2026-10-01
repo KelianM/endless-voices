@@ -1,4 +1,4 @@
-# 7. Infer scene writing from sampled game context
+# 8. Infer scene writing from sampled game context
 
 - **Status:** Accepted
 - **Date:** 2026-10-01
@@ -14,7 +14,7 @@ The current conversation alone may not establish the characters, world or preced
 
 Supply sampled authored game context with one minimal continuation instruction, rather than handcrafted summaries or directions about how a character should speak. The shared instruction in `src/endless_voices/instructions.py` is: “Continue the scene with the next passage, keeping the characters and events authentic to the supplied context.” The model infers voice, presentation and appropriate detail from the supplied text. The instruction does not prescribe tone, length, invention, speaking authority or a dialogue-only format.
 
-The context sampler uses eligible game lore and dialogue without summarizing or rewriting the passages. `endless_voices.context` separates source eligibility from selection. Its budgeted strategy preserves lore, the current encounter and nearby prerequisite missions, then fills the remaining input budget with whole older missions in a reproducible order. Preparation fails if the preserved core exceeds the budget; it does not silently truncate that core. Full-context selection is available when the eligible pool fits.
+Apply [mission split ownership](0007-split-datasets-by-source-mission.md) before selecting context: training context excludes held-out mission text. The context sampler uses eligible game lore and dialogue without summarizing or rewriting the passages. `endless_voices.context` separates source eligibility from selection. Its budgeted strategy preserves lore, the current encounter and nearby prerequisite missions, then fills the remaining input budget with whole older missions in a reproducible order. Preparation fails if the preserved core exceeds the budget; it does not silently truncate that core. Full-context selection is available when the eligible pool fits.
 
 Save each selection in the dataset record. Training appends the authored continuation; generation withholds the continuation; judging receives the same selected context. Source coordinates and selection settings make the input inspectable. The sampler cannot inspect target answers.
 
