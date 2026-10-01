@@ -1,24 +1,14 @@
 {
-  "schema_version": 1,
-  "dataset_version": "fixture-v1",
-  "files": {
-    "train": [
-      {
-        "path": "train.jsonl",
-        "sha256": "74dfa3895c4aa5559810b7c7260ad5e45fdd7ab2495ee0a2ea7ccc2123896b98"
-      }
-    ],
-    "validation": [
-      {
-        "path": "validation.jsonl",
-        "sha256": "eec72ee5f00f3d54e82b4abcfcb94d8ca47ce2f5584b3897136b2691fd5e2615"
-      }
-    ],
-    "test": [
-      {
-        "path": "test.jsonl",
-        "sha256": "81bf5b52bc54a9a1b063c9efa07b6aa2de0e610c0fe9c92dbe946249f01269b2"
-      }
-    ]
+  "format": "scene-dataset-v1",
+  "split_unit": "mission",
+  "splits": [
+    "train",
+    "validation",
+    "test"
+  ],
+  "artifacts": {
+    "train.jsonl": "c68ed14c2fc24743c300210d5a29c440517a59dc6b7fe95801b8c88f45fa1fdf",
+    "validation.jsonl": "3d4719e591a6c9d177ee5c5a240f6b3997f8b2a7d1b0c996b604945425ddd248",
+    "test.jsonl": "3d5e050fb324e582068af3fe35151fa5ff9c859c68f9b8717ffb3d234ba30512"
   }
 }

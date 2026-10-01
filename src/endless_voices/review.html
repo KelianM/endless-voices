@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Dialogue authenticity review</title>
+<style>
+body{max-width:900px;margin:32px auto;padding:0 24px;font:17px/1.6 system-ui;color:#24313b;background:#f5f3ee}
+article,section{background:white;padding:24px;margin:20px 0;border-radius:12px}pre{white-space:pre-wrap;font:inherit}
+button,input,select,textarea{font:inherit;padding:8px}button{cursor:pointer}textarea{width:95%;height:70px}
+nav{display:flex;gap:12px;align-items:center}label{display:block;margin:12px 0}details{margin:16px 0}
+#status{color:#415b44}h1{line-height:1.2}small{color:#52616b}
+</style>
+<h1>Which continuation came from the game?</h1>
+<p>Choose A, B, or abstain. A short reason is enough. The question is origin, not which answer you prefer.</p>
+<details><summary>Full review instructions</summary><pre id="instructions"></pre></details>
+<label>Your reviewer name <input id="reviewer" autocomplete="name" placeholder="Reviewer name"></label>
+<nav><button id="previous">Previous</button><span id="progress"></span><button id="next">Next</button></nav>
+<article id="context"></article><section><h2>A</h2><pre id="candidateA"></pre></section>
+<section><h2>B</h2><pre id="candidateB"></pre></section>
+<section><label>Your choice <select id="choice"><option value="">Unanswered</option><option>A</option><option>B</option><option value="abstain">Abstain</option></select></label>
+<label>Confidence <select id="confidence"><option value="">Select</option><option>low</option><option>medium</option><option>high</option></select></label>
+<label>Brief reason <textarea id="reason" placeholder="A phrase is enough"></textarea></label>
+<label>Do you remember either passage or its answer key? <select id="recognized"><option value="">Select</option><option value="false">No</option><option value="true">Yes</option></select></label>
+<button id="save">Save answer</button><p id="status" role="status"></p></section>
+<p><button id="download">Download submitted judgments</button> <button id="importButton">Restore a saved review</button><input hidden type="file" id="import" accept="application/json"></p>
+<small>Answers remain in this page until downloaded. Download before closing. No answers are sent to a server. A saved answer cannot be replaced here; corrections should be submitted separately.</small>
+<script id="review-data" type="application/json">__REVIEW_DATA__</script>
+<script>
+const data=JSON.parse(document.getElementById('review-data').textContent);
+const el=id=>document.getElementById(id);let current=0;const saved=new Map();
+el('instructions').textContent=data.instructions;
+function show(){const t=data.trials[current];el('progress').textContent=`Example ${current+1} of ${data.trials.length}`;
+el('context').replaceChildren();for(const m of t.context){const h=document.createElement('h3'),p=document.createElement('pre');h.textContent=m.role==='system'?'Speaker and setting':m.role==='user'?'Player':'Earlier reply';p.textContent=m.content;el('context').append(h,p)}
+el('candidateA').textContent=t.A;el('candidateB').textContent=t.B;const r=saved.get(t.trial_id)||{};
+el('choice').value=r.choice||'';el('confidence').value=r.confidence||'';el('reason').value=r.reason||'';el('recognized').value=typeof r.recognized_source==='boolean'?String(r.recognized_source):'';
+for(const id of ['choice','confidence','reason','recognized','save'])el(id).disabled=saved.has(t.trial_id);
+el('previous').disabled=current===0;el('next').disabled=current===data.trials.length-1;
+el('status').textContent=saved.has(t.trial_id)?'Answer saved. Download the review before closing.':'';}
+el('choice').onchange=()=>{el('confidence').disabled=el('choice').value==='abstain';if(el('confidence').disabled)el('confidence').value=''};
+el('save').onclick=()=>{const t=data.trials[current],choice=el('choice').value,confidence=el('confidence').value,reason=el('reason').value.trim(),recognition=el('recognized').value;
+if(!el('reviewer').value.trim()||!choice||!reason||!recognition||(choice!=='abstain'&&!confidence)){el('status').textContent='Enter your name, choice, brief reason, recognition, and confidence for A/B.';return}
+saved.set(t.trial_id,{trial_id:t.trial_id,trial_sha256:t.trial_sha256,status:'ok',choice,confidence:choice==='abstain'?null:confidence,reason,recognized_source:recognition==='true'});el('reviewer').disabled=true;show()};
+el('previous').onclick=()=>{current--;show()};el('next').onclick=()=>{current++;show();window.scrollTo(0,0)};
+el('download').onclick=()=>{if(!el('reviewer').value.trim()){el('status').textContent='Enter your reviewer name first.';return}
+const review={reviewer_id:el('reviewer').value.trim(),reviewer_type:'human',judge_model_and_prompt:null,reviews:[...saved.values()]};
+const link=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(review,null,2)+'\n'],{type:'application/json'}));link.href=url;link.download='authenticity-review.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
+el('importButton').onclick=()=>el('import').click();el('import').onchange=async()=>{try{const r=JSON.parse(await el('import').files[0].text());if(r.reviewer_type!=='human'||!r.reviewer_id||saved.size)throw Error('Restore only into an empty page using a human review.');for(const row of r.reviews){const t=data.trials.find(t=>t.trial_id===row.trial_id);if(!t||t.trial_sha256!==row.trial_sha256)throw Error('Review belongs to different trials.')}
+el('reviewer').value=r.reviewer_id;for(const row of r.reviews)saved.set(row.trial_id,row);el('reviewer').disabled=saved.size>0;show()}catch(e){el('status').textContent=e.message}};
+show();window.addEventListener('beforeunload',e=>{if(saved.size){e.preventDefault();e.returnValue=''}});
+</script></html>

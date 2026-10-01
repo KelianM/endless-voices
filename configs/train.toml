@@ -6,8 +6,10 @@ revision = "main"
 
 [data]
 # Paths are relative to the working directory, not this config file.
-path = "data/example.jsonl"
-max_length = 512
+path = "data/dataset"
+split = "train"
+max_length = 2048
+loss = "continuation"
 
 [lora]
 r = 8

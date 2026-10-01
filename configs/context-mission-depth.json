@@ -1,0 +1,6 @@
+{
+  "name": "mission-depth",
+  "depth": 4,
+  "max_input_tokens": 8192,
+  "seed": "context-depth-v1"
+}

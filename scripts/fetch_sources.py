@@ -9,7 +9,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = REPO_ROOT / "data/overview/source-statistics.json"
+MANIFEST = REPO_ROOT / "data/sources/source-statistics.json"
 UPSTREAM = "https://github.com/endless-sky/endless-sky.git"
 
 

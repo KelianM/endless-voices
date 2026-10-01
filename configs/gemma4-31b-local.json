@@ -1,0 +1,13 @@
+{
+  "source": "mlx-community/gemma-4-31b-it-4bit",
+  "revision": "696d436c404745a59f30e4939a658162b0a9e57f",
+  "label": "gemma31b",
+  "path": "data/local/hub/models--mlx-community--gemma-4-31b-it-4bit/snapshots/696d436c404745a59f30e4939a658162b0a9e57f",
+  "context_ceiling": 16384,
+  "max_output_tokens": 1024,
+  "prefill_step_size": 64,
+  "kv_bits": 8,
+  "kv_group_size": 64,
+  "quantized_kv_start": 0,
+  "kv_scope": "full_history"
+}

@@ -13,6 +13,7 @@ dependencies = [
     "transformers>=4.57,<5",
     "peft>=0.17,<0.19",
     "accelerate>=1.2,<2",
+    "z3-solver>=4.13,<5",
 ]
 
 [project.optional-dependencies]
@@ -36,3 +37,6 @@ select = ["E", "F", "I", "UP"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+endless_voices = ["review.html"]

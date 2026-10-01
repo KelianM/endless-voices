@@ -47,7 +47,7 @@ def test_literal_script_delimiters_cannot_escape_sample_data(tmp_path):
     record["messages"][-1]["content"] = hostile
     source.write_text(json.dumps(record) + "\n")
     declaration = json.loads(manifest.read_text())
-    declaration["files"]["train"][0]["sha256"] = viewer.sha256(source)
+    declaration["artifacts"]["train.jsonl"] = viewer.sha256(source)
     manifest.write_text(json.dumps(declaration))
     output = tmp_path / "samples.html"
     viewer.build_viewer(manifest, output)

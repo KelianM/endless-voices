@@ -1,7 +1,6 @@
 """Validate conversation samples and split manifests offline."""
 
 import argparse
-import hashlib
 import json
 import re
 from pathlib import Path
@@ -137,74 +136,26 @@ def read_records(path: Path, split: str):
 
 
 def validate_manifest(path: Path, *, tokenizer=None, max_length: int | None = None) -> dict:
-    """Validate all split files together, returning structural coverage counts."""
+    """Verify the prepared dataset and return coverage with optional token checks."""
+    from endless_voices.dataset.storage import SceneDataset
+
     if (tokenizer is None) != (max_length is None):
         raise ValueError("tokenizer and max_length must be supplied together")
-    try:
-        manifest = json.loads(path.read_text(encoding="utf-8"))
-        fields(manifest, {"schema_version", "dataset_version", "files"}, "manifest")
-        version(manifest["schema_version"])
-        text(manifest["dataset_version"], "dataset_version")
-        fields(manifest["files"], SPLITS, "manifest.files")
-    except ValueError as error:
-        raise ValueError(f"{path}: {error}") from error
-    ids, groups, physical_files = {}, {}, set()
-    coverage = {split: {"records": 0, "identities": {}, "topics": {}} for split in sorted(SPLITS)}
-    for split, entries in manifest["files"].items():
-        if not isinstance(entries, list) or not entries:
-            raise ValueError(f"{path}: files.{split} must be a nonempty list")
-        for entry in entries:
-            try:
-                fields(entry, {"path", "sha256"}, f"files.{split}")
-                text(entry["path"], "path")
-                text(entry["sha256"], "sha256")
-                if not re.fullmatch(r"[0-9a-f]{64}", entry["sha256"]):
-                    raise ValueError("sha256 must be 64 lowercase hex digits")
-                relative = Path(entry["path"])
-                file = (path.parent / relative).resolve()
-                if relative.is_absolute() or not file.is_relative_to(path.parent.resolve()):
-                    raise ValueError("split file must be inside the manifest directory")
-                # Resolve symlinks and detect hard links as well as reused path strings.
-                stat = file.stat()
-                physical = (stat.st_dev, stat.st_ino)
-                if physical in physical_files:
-                    raise ValueError(f"split file reused: {file}")
-                physical_files.add(physical)
-                if hashlib.sha256(file.read_bytes()).hexdigest() != entry["sha256"]:
-                    raise ValueError(f"{file}: sha256 mismatch; review changes and update manifest")
-            except (ValueError, OSError) as error:
-                raise ValueError(f"{path}: files.{split}: {error}") from error
-            for line, record in read_records(file, split):
-                location = f"{file}:{line}"
-                meta = record["metadata"]
-                if meta["id"] in ids:
-                    raise ValueError(
-                        f"{location}: duplicate ID {meta['id']!r}; first at {ids[meta['id']]}"
-                    )
-                ids[meta["id"]] = location
-                for field in ("conversation_id", "scenario_group"):
-                    group = meta[field]
-                    if group is None:
-                        continue
-                    key = (field, group)
-                    if key in groups and groups[key][0] != split:
-                        raise ValueError(
-                            f"{location}: {field} {group!r} crosses splits; "
-                            f"first at {groups[key][1]}"
-                        )
-                    groups.setdefault(key, (split, location))
-                if tokenizer is not None:
-                    from endless_voices.data import tokenize_messages
+    datasets = SceneDataset.load_all(path.parent)
+    coverage = {}
+    for split, dataset in datasets.items():
+        stats = {"records": len(dataset), "identities": {}, "topics": {}}
+        for record in dataset:
+            meta = record["metadata"]
+            if tokenizer is not None:
+                from endless_voices.data import tokenize_messages
 
-                    try:
-                        tokenize_messages(record["messages"], tokenizer, max_length)
-                    except ValueError as error:
-                        raise ValueError(f"{location}: {error}") from error
-                stats = coverage[split]
-                stats["records"] += 1
-                for key, values in (("identities", [meta["identity"]]), ("topics", meta["topics"])):
-                    for value in set(values):
-                        stats[key][value] = stats[key].get(value, 0) + 1
+                tokenize_messages(record["messages"], tokenizer, max_length,
+                                  label=f"{split}/{meta['id']}")
+            for key, values in (("identities", [meta["identity"]]), ("topics", meta["topics"])):
+                for value in set(values):
+                    stats[key][value] = stats[key].get(value, 0) + 1
+        coverage[split] = stats
     return coverage
 
 

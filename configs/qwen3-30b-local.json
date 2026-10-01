@@ -1,0 +1,10 @@
+{
+  "source": "mlx-community/Qwen3-30B-A3B-Instruct-2507-4bit",
+  "revision": "e9675aa3ca5f900ccef55267914466d55ab325fa",
+  "path": "data/local/hub/models--mlx-community--Qwen3-30B-A3B-Instruct-2507-4bit/snapshots/e9675aa3ca5f900ccef55267914466d55ab325fa",
+  "quantization": "4-bit MLX conversion",
+  "label": "qwen30b",
+  "context_ceiling": 16384,
+  "max_output_tokens": 1024,
+  "prefill_step_size": 64
+}

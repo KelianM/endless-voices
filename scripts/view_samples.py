@@ -6,7 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from endless_voices.contracts import read_records, validate_manifest
+from endless_voices.dataset.storage import SceneDataset
 
 
 def sha256(path: Path) -> str:
@@ -64,14 +64,9 @@ def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
 
 def build_viewer(manifest: Path, output: Path, split="train", run_directory: Path | None = None):
     """Validate the dataset and write a self-contained viewer without replacing existing files."""
-    validate_manifest(manifest)
     declaration = json.loads(manifest.read_text(encoding="utf-8"))
-    records = [
-        row
-        for split_name in ("train", "validation", "test")
-        for entry in declaration["files"][split_name]
-        for _, row in read_records(manifest.parent / entry["path"], split_name)
-    ]
+    requested = declaration["splits"] if split == "all" else [split]
+    records = [row for name in requested for row in SceneDataset.load(manifest.parent, name)]
     run = (
         load_run(run_directory, manifest, {r["metadata"]["id"] for r in records})
         if (run_directory)
@@ -83,7 +78,7 @@ def build_viewer(manifest: Path, output: Path, split="train", run_directory: Pat
         run["responses"] = {k: v for k, v in run["responses"].items() if k in visible_ids}
         run["selected_ids"] = [s for s in run["selected_ids"] if s in visible_ids]
     records = [{key: value for key, value in row.items() if key != "evaluation"} for row in records]
-    payload = {"dataset_version": declaration["dataset_version"], "samples": records, "run": run}
+    payload = {"dataset_version": declaration["format"], "samples": records, "run": run}
     # Escape script delimiters; sample text is rendered through textContent in the browser.
     serialized = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
     template = Path(__file__).with_name("sample_viewer.html").read_text(encoding="utf-8")
@@ -97,7 +92,7 @@ def build_viewer(manifest: Path, output: Path, split="train", run_directory: Pat
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--manifest", type=Path, default=Path("data/pilot-v1/samples/manifest.json")
+        "--manifest", type=Path, default=Path("data/dataset/manifest.json")
     )
     parser.add_argument("--split", choices=["train", "validation", "test", "all"], default="train")
     parser.add_argument("--run", type=Path, help="Optional generation run directory")
