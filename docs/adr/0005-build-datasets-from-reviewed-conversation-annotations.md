@@ -1,6 +1,6 @@
 # 5. Build datasets from reviewed conversation annotations
 
-- **Status:** Superseded by ADR 13
+- **Status:** Superseded by ADR 11
 - **Date:** 2026-09-23
 - **Sources:** [Issue #5](https://github.com/KelianM/endless-voices/issues/5),
   [PR #14](https://github.com/KelianM/endless-voices/pull/14)
