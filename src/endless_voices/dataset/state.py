@@ -67,7 +67,7 @@ class GameState:
         node = self.events[name]
         assignments = []
         for child in node["children"]:
-            if child["tokens"][0] in {"government", "system", "planet"}:
+            if child["tokens"][0] in {"government", "system", "planet", "outfitter", "shipyard"}:
                 self.world += (child,)
             else:
                 assignments.append(child)

@@ -139,15 +139,21 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
     assert (output / "train.jsonl").read_bytes() == (tmp_path / "again/train.jsonl").read_bytes()
 
 
-def test_heldout_mission_text_never_enters_training_history(tmp_path):
+@pytest.mark.parametrize("owner", [None, "validation", "test"])
+def test_history_eligibility_excludes_heldout_not_unselected_missions(tmp_path, owner):
     source = corpus(tmp_path, STORY)
-    builder = DatasetBuilder(source, config({"Earlier": spec("test"), "Later": spec()}), Counter())
+    missions = {"Later": spec()}
+    if owner is not None:
+        missions["Earlier"] = spec(owner)
+    builder = DatasetBuilder(source, config(missions), Counter())
     builder.build(tmp_path / "prepared")
     dataset = SceneDataset.load(tmp_path / "prepared", "train")
     assert len(dataset) == 2
-    assert all("childhood" not in json.dumps(dataset.prompt(i)) for i in range(len(dataset)))
+    assert all(("childhood" in json.dumps(dataset.prompt(i))) == (owner is None)
+               for i in range(len(dataset)))
     notes = json.loads((tmp_path / "prepared/provenance.json").read_text())
-    assert all(n["omitted_history_missions"] == ["Earlier"] for n in notes.values())
+    assert all(n["omitted_history_missions"] == ([] if owner is None else ["Earlier"])
+               for n in notes.values())
 
 
 def test_failed_interpretation_does_not_publish_a_partial_dataset(tmp_path):
@@ -200,3 +206,26 @@ def test_unhandled_requested_conversation_cannot_silently_disappear(tmp_path):
     builder = DatasetBuilder(source, config({"Earlier": selection}), Counter())
     with pytest.raises(ValueError, match="unreachable or use unsupported"):
         builder.build(tmp_path / "prepared")
+
+
+def test_nested_literal_dialog_is_preserved_in_prerequisite_history(tmp_path):
+    text = '''mission Earlier
+\ton complete
+\t\tdialog
+\t\t\t`She returns with the papers.`
+\t\t\t`"We can leave," she says.`
+mission Later
+\tto offer
+\t\thas "Earlier: done"
+\ton offer
+\t\tconversation
+\t\t\t`The next passage.`
+\t\t\t\taccept
+'''
+    builder = DatasetBuilder(corpus(tmp_path, text), config({"Later": spec()}), Counter())
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    assert len(dataset) == 1
+    history = dataset.prompt(0)[0]["content"]
+    assert 'She returns with the papers.\n\n"We can leave," she says.' in history
+    assert dataset.target(0) == "The next passage."

@@ -16,7 +16,7 @@ from endless_voices.splits import check_mission_splits
 
 from .dialogue import DialogueInterpreter, Passage
 from .source import walk
-from .state import GameState, UnsupportedOperation, apply, condition
+from .state import GameState, UnsupportedOperation, apply, condition, unsupported
 
 
 @dataclass
@@ -126,9 +126,18 @@ class ContextSampler:
                 blocks = list(history.blocks)
                 if dialogs:
                     node = dialogs[0]
-                    if len(node["tokens"]) != 2 or node["children"]:
+                    if len(node["tokens"]) == 2 and not node["children"]:
+                        paragraphs = [Passage(node["line"], node["tokens"][1])]
+                    elif node["tokens"] == ["dialog"] and node["children"]:
+                        paragraphs = []
+                        for child in node["children"]:
+                            if (len(child["tokens"]) != 1 or child["children"]
+                                    or not child["raw"].lstrip().startswith(('"', "`"))):
+                                raise unsupported(child)
+                            paragraphs.append(Passage(child["line"], child["tokens"][0]))
+                    else:
                         raise UnsupportedOperation("Only literal mission dialogs are supported")
-                    blocks.append(self.block(mission, [Passage(node["line"], node["tokens"][1])]))
+                    blocks.append(self.block(mission, paragraphs))
                 updated.append(History(apply(actions, history.state), blocks))
         return self.bounded(updated)
 
@@ -144,8 +153,8 @@ class ContextSampler:
     def eligible(self, name, split):
         owner = self.assignments.get(name)
         return (
-            owner is not None
-            and {"train": 0, "validation": 1, "test": 2}[owner]
+            owner is None
+            or {"train": 0, "validation": 1, "test": 2}[owner]
             <= {"train": 0, "validation": 1, "test": 2}[split]
         )
 

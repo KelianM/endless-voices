@@ -68,10 +68,11 @@ class DialogueInterpreter:
             conditions = [n for n in node["children"] if n["tokens"] == ["to", "display"]]
             return condition([c for n in conditions for c in n["children"]], current)
 
-        pending = [(0, state.copy() if state is not None else GameState(), (), (), {}, False)]
+        initial = state.copy() if state is not None else GameState()
+        pending = [(0, initial, (), (), {}, False, frozenset())]
         results, steps = [], 0
         while pending:
-            pc, current, prefix, paragraphs, visits, displayed = pending.pop()
+            pc, current, prefix, paragraphs, visits, displayed, choices = pending.pop()
             steps += 1
             if steps > self.max_steps:
                 raise ValueError("Dialogue route limit exceeded; no partial build is published")
@@ -95,9 +96,10 @@ class DialogueInterpreter:
             visits = {**visits, visit_key: count}
             t = node["tokens"]
 
-            def enqueue(dest, candidate, pre=prefix, text=paragraphs, shown=displayed):
+            def enqueue(dest, candidate, pre=prefix, text=paragraphs, shown=displayed,
+                        seen=visits, edges=choices):
                 if candidate is not None:
-                    pending.append((dest, candidate, pre, text, visits, shown))
+                    pending.append((dest, candidate, pre, text, seen, shown, edges))
 
             if t == ["choice"]:
                 options = node["children"]
@@ -115,7 +117,10 @@ class DialogueInterpreter:
                     candidate = current.assume(predicate)
                     if candidate is not None and not displayed:
                         candidate = apply(after_display, candidate)
-                    enqueue(controls(option, pc + 1), candidate, pre, (), True)
+                    edge = (option["line"], visit_key[1], displayed)
+                    if edge not in choices:
+                        enqueue(controls(option, pc + 1), candidate, pre, (), True,
+                                seen={}, edges=choices | {edge})
                 stopping = current.assume(z3.Or(*any_visible))
                 if paragraphs and stopping is not None:
                     results.append(Continuation(prefix, paragraphs, stopping, node["line"], False))

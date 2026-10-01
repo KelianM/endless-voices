@@ -130,3 +130,18 @@ def test_question_menu_can_repeat_when_answers_change_state():
         for r in routes
         if r.terminal
     )
+
+
+def test_repeatable_menu_retains_each_answer_and_finite_exit_histories():
+    routes = run(
+        "\tlabel menu\n\tchoice\n\t\t`Ask about Earth.`\n\t\t\tgoto earth\n"
+        "\t\t`Ask about Mars.`\n\t\t\tgoto mars\n\t\t`Leave.`\n\t\t\taccept\n"
+        "\tlabel earth\n\t`Earth answer.`\n\t\tgoto menu\n"
+        "\tlabel mars\n\t`Mars answer.`\n\t\tgoto menu\n"
+    )
+    assert {r.text for r in routes if r.paragraphs} == {"Earth answer.", "Mars answer."}
+    complete = [r for r in routes if r.terminal]
+    assert complete and all(r.stop == "accept" for r in complete)
+    assert any({"Earth answer.", "Mars answer."} <= {p.text for p in r.prefix}
+               for r in complete)
+    assert all(sum(p.text == "Ask about Earth." for p in r.prefix) <= 2 for r in complete)

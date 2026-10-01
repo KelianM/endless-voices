@@ -53,3 +53,15 @@ def test_outfit_removal_keeps_a_nonnegative_resource_witness():
         saved["current_values"]["outfit: Electron Beam"]
         == saved["initial_values"]["outfit: Electron Beam"] - 1
     )
+
+
+def test_shop_updates_remain_world_changes_without_becoming_conditions():
+    state = GameState.fixed({"ready": 0})
+    changes = tree('event shops\n\toutfitter "Depot"\n\t\t"Ramscoop"\n'
+                   '\tshipyard "Yard"\n\t\t"Shuttle"\n\tset ready')[0]
+    state.events = {"shops": changes}
+    updated = apply(tree('event shops 0'), state)
+    saved = updated.snapshot()
+    assert saved["world_changes"] == changes["children"][:2]
+    assert saved["current_values"]["ready"] == 1
+    assert "outfitter" not in saved["current_values"]
