@@ -1,6 +1,6 @@
 # 7. Infer scene writing from sampled game context
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-01
 - **Sources:** [PR 16](https://github.com/KelianM/endless-voices/pull/16), [Issue 9](https://github.com/KelianM/endless-voices/issues/9)
 
