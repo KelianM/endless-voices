@@ -1,6 +1,5 @@
 """Protect reusable context selection and shared dataset/benchmark inputs."""
 
-import json
 
 import pytest
 
@@ -11,7 +10,6 @@ from endless_voices.context import (
     distances,
     strategy_from_config,
 )
-from endless_voices.prepare_context import load_selections, save_selections
 
 
 class Counter:
@@ -62,25 +60,6 @@ def test_full_strategy_retains_all_history_without_needing_graph_edges():
     assert selection.omitted == []
     with pytest.raises(ValueError, match="absent"):
         MissionDepth(4, 8000, "seed").select(source, Counter())
-
-
-def test_saved_selection_drives_training_generation_and_isolated_judge(tmp_path):
-    selected = MissionDepth(1, 45, "seed").select(pool(), Counter())
-    output = tmp_path / "bundle"
-    save_selections(output, [selected], {"test_fixture": True})
-    loaded = load_selections(output)[0]
-    prompt = loaded.generation_prompt()
-    assert prompt["messages"] == loaded.judge_context()
-    assert loaded.training_messages("Private target")[:-1] == prompt["messages"]
-    assert "Private target" not in json.dumps(prompt)
-    assert "source.txt" not in json.dumps(loaded.judge_context())
-    prompt["messages"][0]["content"] = "Changed by caller"
-    assert loaded.messages == selected.messages
-    with pytest.raises(FileExistsError):
-        save_selections(output, [selected], {})
-    (output / "prompts.json").write_text("[]")
-    with pytest.raises(ValueError, match="hash mismatch"):
-        load_selections(output)
 
 
 @pytest.mark.parametrize("config", [

@@ -105,6 +105,18 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
+    assert {p.name for p in output.iterdir()} == {
+        "train.jsonl", "manifest.json", "config.json", "provenance.json", "licensing"}
+    manifest = json.loads((output / "manifest.json").read_text())
+    assert manifest["build"]["git_revision"]
+    assert manifest["build"]["source_hashes"]
+    evidence = json.loads((output / "provenance.json").read_text())
+    assert set(evidence) == {row["metadata"]["id"] for row in dataset}
+    for row in dataset:
+        context = evidence[row["metadata"]["id"]]["context"]
+        assert context["messages_sha256"]
+        assert all(set(block) == {"mission", "path", "lines"}
+                   for block in context["selected"] + context["omitted"])
     assert validate_manifest(output / "manifest.json")["train"]["records"] == len(dataset)
     assert load_conversations(output) == [row["messages"] for row in dataset]
     selected, _ = select_samples(Namespace(

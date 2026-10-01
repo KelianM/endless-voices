@@ -9,7 +9,6 @@ import pytest
 
 from endless_voices import generation_backends as screen
 from endless_voices.context import ContextPool, FullContext
-from endless_voices.prepare_context import save_selections
 
 spec = importlib.util.spec_from_file_location(
     "benchmark_generators", "scripts/benchmark_generators.py"
@@ -50,8 +49,6 @@ def recorded(tmp_path, monkeypatch, request):
             {},
         )
         selections.append(FullContext().select(pool, Counter()))
-    context = dataset / "validation/context"
-    save_selections(context, selections, {"simulated_fixture": True})
     local = tmp_path / "local.json"
     screen.save(local, {"label": "gemma31b"})
     locals_ = {"gemma31b": str(local)}
@@ -59,22 +56,11 @@ def recorded(tmp_path, monkeypatch, request):
         qwen = tmp_path / "qwen.json"
         screen.save(qwen, {"label": "qwen30b"})
         locals_["qwen30b"] = str(qwen)
-    targets = dataset / "validation/targets"
-    targets.mkdir()
-    screen.save(targets / "targets.json", [
-        {"sample_id": sid, "paragraphs": [{"line": 1,
-          "text": 'She nods. "A complete source reply for ' + sid + '."'}]}
-        for sid in records
-    ])
-    screen.save(targets / "manifest.json", {
-        "sample_ids": list(records), "targets_sha256": screen.sha(targets / "targets.json")
-    })
     config = tmp_path / "config.json"
     screen.save(
         config,
         {
             "generators": models,
-            "targets": str(targets),
             "judge": "gpt-6-luna",
             "local_configs": locals_,
             "judge_context_limit": 1050000,

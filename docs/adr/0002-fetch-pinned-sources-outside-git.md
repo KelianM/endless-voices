@@ -23,7 +23,7 @@ and file hashes before accepting a checkout, and reuse a verified checkout offli
 Keep the raw checkout under gitignored `data/local/`. Keep the revision, hashes, statistics,
 and curation evidence in ordinary Git. Raw sources are neither committed nor stored through
 Git LFS ([fetch_sources.py](../../scripts/fetch_sources.py),
-[source manifest](../../data/overview/source-statistics.json)).
+[source manifest](../../data/sources/source-statistics.json)).
 
 ## Consequences
 

@@ -15,7 +15,7 @@ git lfs install --local
 git lfs pull
 ```
 
-Run commands from the repository root. Data payloads, evidence archives and upstream
+Run commands from the repository root. Dataset payloads, source inventory and upstream
 licensing are stored in LFS. Raw source caches, model weights, secrets and run outputs
 are ignored. Normal Git contains code, configuration, tests, code documentation,
 dataset descriptions and architecture decisions.
@@ -67,8 +67,8 @@ Hosted runners read provider keys from ignored `.env`, preserve requests and
 results, enforce configured budgets and retain failures without silently retrying them.
 
 [Evaluation behavior](docs/evaluation.md) describes blinding and reporting. The judge instruction
-is maintained in `configs/judge-instructions.md`. Evidence payloads are under `data/evaluation/`
-in LFS; experiment narratives are not maintained as repository documentation.
+is maintained in `configs/judge-instructions.md`. Experiment outputs stay in ignored `outputs/`;
+historical experiments are recoverable from Git history.
 
 ## Development
 

@@ -1,7 +1,6 @@
 """Select eligible story context once for dataset preparation and benchmarking."""
 
 import hashlib
-import re
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -14,11 +13,6 @@ from endless_voices.messages import validate_messages
 def digest(value):
     return hashlib.sha256(encoded(value)).hexdigest()
 
-
-
-def substitute_variables(text, values):
-    """Replace configured markers once while leaving unknown markers visible."""
-    return re.sub(r"<[^>]+>", lambda match: values.get(match[0], match[0]), text)
 
 
 def distances(graph, start):
@@ -101,12 +95,14 @@ class Selection:
     token_counts: dict[str, int]
     provenance: dict
 
-    def generation_prompt(self):
-        return {"sample_id": self.sample_id, "messages": deepcopy(self.messages),
-                "messages_sha256": digest(self.messages)}
+    def evidence(self):
+        """Return selection settings and source coordinates without duplicating text."""
+        def coordinates(blocks):
+            return [{"mission": b["mission"], "path": b["path"],
+                     "lines": [p["line"] for p in b["passages"]]} for b in blocks]
 
-    def judge_context(self):
-        return deepcopy(self.messages)
+        return {**deepcopy(self.provenance), "token_counts": dict(self.token_counts),
+                "selected": coordinates(self.selected), "omitted": coordinates(self.omitted)}
 
     def training_messages(self, target):
         messages = [*deepcopy(self.messages), {"role": "assistant", "content": target}]

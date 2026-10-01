@@ -4,8 +4,9 @@
 benchmarking. The loader verifies every published split before returning the requested split.
 Loading performs no sampling, interpretation or model calls.
 
-A dataset directory contains `manifest.json`, one JSONL file per published split, and the saved
-context, target, provenance and licensing artifacts. The manifest declares
+A dataset directory contains `manifest.json`, one JSONL file per published split, and
+`config.json`, `provenance.json` and licensing. Each JSONL record contains its context and target;
+provenance retains source coordinates and state evidence without duplicating dialogue. The manifest declares
 `format: scene-dataset-v1`, `split_unit: mission`, the published `splits`, and SHA-256 hashes
 in `artifacts`. A training-only dataset is valid; requesting an unpublished split fails.
 Artifact paths must remain inside the dataset directory. Modified files, reused split files,

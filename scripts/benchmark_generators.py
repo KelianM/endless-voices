@@ -4,7 +4,6 @@ import argparse
 import json
 import re
 import shutil
-from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,8 +11,6 @@ from endless_voices import artifacts, hosted_judge, providers
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
 from endless_voices.dataset.storage import SceneDataset
-from endless_voices.dataset.targets import load_targets, target_text
-from endless_voices.prepare_context import load_selections
 
 
 def checked_inputs(root):
@@ -22,38 +19,29 @@ def checked_inputs(root):
     for name, expected in selection["artifacts_sha256"].items():
         if screen.sha(root / name) != expected:
             raise ValueError(f"Benchmark preparation changed: {name}")
-    contexts = load_selections(root / "context")
     records = screen.read(root / "records.json")
     prompts = screen.read(root / "prompts.json")
-    if [s.sample_id for s in contexts] != selection["ids"]:
-        raise ValueError("Context selection IDs differ")
-    if prompts != [s.generation_prompt() for s in contexts]:
-        raise ValueError("Generation prompts differ from saved context")
-    for s in contexts:
-        if assess.evaluation_messages(records[s.sample_id]) != s.judge_context():
-            raise ValueError("Dataset and judge context differ")
-    targets = load_targets(root / "targets")
-    if set(targets) != set(records):
-        raise ValueError("Source continuation IDs differ")
-    for item in contexts:
-        target = target_text(targets[item.sample_id], item.messages,
-                             item.provenance.get("game_variables", {}))
-        if records[item.sample_id]["messages"][-1]["content"] != target:
-            raise ValueError("Reference differs from source continuation")
+    if list(records) != selection["ids"]:
+        raise ValueError("Dataset sample IDs differ")
+    expected = [generation_prompt(row) for row in records.values()]
+    if prompts != expected:
+        raise ValueError("Generation prompts differ from dataset context")
     return selection, records, prompts
 
 
+def generation_prompt(record):
+    messages = assess.evaluation_messages(record)
+    return {"sample_id": record["metadata"]["id"], "messages": messages,
+            "messages_sha256": assess.digest(assess.encoded(messages))}
+
+
 def prepare(root, dataset, config):
-    """Join selected inputs to validation targets, preserving the changed context provenance."""
+    """Prepare a benchmark directly from verified validation records."""
     if root.exists():
         raise ValueError("Output exists; choose a new directory")
     manifest = dataset / "manifest.json"
-    context = dataset / "validation/context"
     records = {r['metadata']['id']: r for r in SceneDataset.load(dataset, 'validation')}
-    selections = load_selections(context)
-    ids = [s.sample_id for s in selections]
-    if set(ids) != set(records):
-        raise ValueError("Expected all validation samples, without test or extra samples")
+    ids = list(records)
     plan = screen.read(config)
     supported = {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
     if (not plan["generators"] or set(plan["generators"]) - supported
@@ -69,35 +57,23 @@ def prepare(root, dataset, config):
     locals_ = {name: screen.read(path) for name, path in plan["local_configs"].items()}
     if any(cfg["label"] != name for name, cfg in locals_.items()):
         raise ValueError("Local model label differs from configuration")
-    targets_path = dataset / "validation/targets"
-    targets = load_targets(targets_path)
-    if set(targets) != set(records):
-        raise ValueError("Source continuation IDs differ")
-    prepared = {}
+    prompts = [generation_prompt(row) for row in records.values()]
     unresolved_variables = {}
-    for s in selections:
-        original = records[s.sample_id]
-        values = s.provenance.get("game_variables", {})
-        target = target_text(targets[s.sample_id], s.messages, values)
-        if original['messages'] != s.training_messages(target):
-            raise ValueError('Prepared dataset differs from saved context or target')
-        if any(target in m["content"] for m in s.messages):
-            raise ValueError("Original target appears in generation context")
-        markers = sorted(set(re.findall(r"<[^>]+>", json.dumps(s.messages) + target)))
-        if markers and s.provenance.get("variable_policy") != "mission-scoped":
-            raise ValueError("Unresolved game variable in final input or target")
+    for sid, row in records.items():
+        messages, target = row["messages"][:-1], row["messages"][-1]["content"]
+        paragraphs = target.split("\n\n")
+        if any(p.strip() and p.strip() in m["content"] for p in paragraphs for m in messages):
+            raise ValueError("Original target paragraph appears in generation context")
+        markers = sorted(set(re.findall(r"<[^>]+>", json.dumps(row["messages"]))))
         if markers:
-            unresolved_variables[s.sample_id] = markers
-        prepared[s.sample_id] = {**deepcopy(original), "messages": s.training_messages(target)}
+            unresolved_variables[sid] = markers
     root.mkdir(parents=True)
-    shutil.copytree(context, root / "context")
-    shutil.copytree(targets_path, root / "targets")
     licensing = dataset / "licensing"
     if licensing.is_dir():
         shutil.copytree(licensing, root / "attribution")
     screen.save(root / "variables.json", unresolved_variables)
-    screen.save(root / "records.json", prepared)
-    screen.save(root / "prompts.json", [s.generation_prompt() for s in selections])
+    screen.save(root / "records.json", records)
+    screen.save(root / "prompts.json", prompts)
     for name, cfg in locals_.items():
         screen.save(root / f"{name}-config.json", cfg)
     screen.save(root / "plan.json", plan)
@@ -107,10 +83,10 @@ def prepare(root, dataset, config):
     files = [p for p in root.rglob("*") if p.is_file()]
     screen.save(root / "selection.json", {
         "ids": ids, "split": "validation", "manifest_sha256": screen.sha(manifest),
-        "context_sha256": screen.sha(root / "context/provenance.json"),
-        "target_source": str(targets_path), "sample_metadata_source": str(manifest),
+        "context_sha256": screen.sha(root / "prompts.json"),
+        "dataset_source": str(dataset),
         "models": plan["generators"],
-        "context": "Selected game-source context replaces the earlier dataset prompts",
+        "context": "Prepared dataset messages; final target withheld from generation",
         "candidate_order": "one balanced randomized assignment per condition; no reversed trials",
         "artifacts_sha256": {str(p.relative_to(root)): screen.sha(p) for p in files},
     })

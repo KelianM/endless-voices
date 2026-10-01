@@ -401,7 +401,7 @@ class ExampleBuilder:
                 "omitted_history_missions": omitted,
                 "prefix_lines": [p.line for p in route.prefix],
             }
-            examples.append((record, selection, provenance, route.paragraphs))
+            examples.append((record, selection, provenance))
         return examples
 
 

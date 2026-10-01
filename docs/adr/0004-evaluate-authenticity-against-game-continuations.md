@@ -27,7 +27,7 @@ persona scores are requested; the initial review found the reasons sufficient to
 Original-identification accuracy is reported with abstentions,
 failures, recognition, and control results; chance performance alone does not establish quality.
 
-The [development calibration pack](../../data/evaluation/calibration.json) uses source continuations,
+The [development calibration pack](https://github.com/KelianM/endless-voices/blob/86815a5c37508938b5655718d37c7f83bee27277/data/evaluation/calibration.json) uses source continuations,
 authored alternatives, wrong-context speech, and identical pairs. The
 [initial human review](https://github.com/KelianM/endless-voices/blob/4579d5b9d4f063750c3037ffe374180b48015d3c/data/evaluation/calibration-findings.md), including controls, is recorded.
 No automated discriminator or adversarial training loop is implemented. The fixed-context boundary

@@ -2,6 +2,7 @@
 
 import json
 import shutil
+import subprocess
 import tempfile
 from collections.abc import Sequence
 from copy import deepcopy
@@ -10,7 +11,6 @@ from pathlib import Path
 from endless_voices.artifacts import file_hash
 from endless_voices.artifacts import write_json as save
 from endless_voices.contracts import SPLITS, read_records, validate_record
-from endless_voices.prepare_context import save_selections
 from endless_voices.splits import mission_key
 
 
@@ -95,8 +95,22 @@ class SceneDataset(Sequence):
         return self[index]["messages"][-1]["content"]
 
 
+def implementation():
+    """Identify the preparation source by Git revision and actual Python file hashes."""
+    source = Path(__file__).resolve().parent.parent
+    repo = source.parents[1]
+    revision = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo,
+                              capture_output=True, text=True)
+    status = subprocess.run(["git", "status", "--porcelain", "--", str(source)], cwd=repo,
+                            capture_output=True, text=True)
+    return {"git_revision": revision.stdout.strip() if revision.returncode == 0 else None,
+            "working_tree_modified": bool(status.stdout) if status.returncode == 0 else None,
+            "source_hashes": {str(p.relative_to(repo)): file_hash(p)
+                              for p in sorted(source.rglob("*.py"))}}
+
+
 def write_dataset(output, built, config, corpus):
-    """Atomically save records, shared contexts, targets and execution provenance."""
+    """Atomically save split records, source provenance, configuration and licensing."""
     import z3
 
     output = Path(output)
@@ -110,32 +124,9 @@ def write_dataset(output, built, config, corpus):
             (root / f"{split}.jsonl").write_text(
                 "".join(json.dumps(r[0], ensure_ascii=False) + "\n" for r in rows)
             )
-            save_selections(
-                root / split / "context",
-                [r[1] for r in rows],
-                {"builder": "DatasetBuilder", "config": config},
-            )
-            targets = root / split / "targets"
-            targets.mkdir()
-            save(
-                targets / "targets.json",
-                [
-                    {
-                        "sample_id": r[0]["metadata"]["id"],
-                        **r[2],
-                        "paragraphs": [{"line": p.line, "text": p.text} for p in r[3]],
-                    }
-                    for r in rows
-                ],
-            )
-            save(
-                targets / "manifest.json",
-                {
-                    "sample_ids": [r[0]["metadata"]["id"] for r in rows],
-                    "targets_sha256": file_hash(targets / "targets.json"),
-                },
-            )
-        save(root / "provenance.json", {r[0]["metadata"]["id"]: r[2] for r in built})
+        save(root / "provenance.json", {
+            record["metadata"]["id"]: {**provenance, "context": selection.evidence()}
+            for record, selection, provenance in built})
         save(root / "config.json", config)
         licensing = root / "licensing"
         licensing.mkdir()
@@ -146,23 +137,6 @@ def write_dataset(output, built, config, corpus):
             + corpus.revision
             + ". Preserve the accompanying upstream notices.\n"
         )
-        code = root / "code"
-        code.mkdir()
-        for path in Path(__file__).parent.glob("*.py"):
-            shutil.copyfile(path, code / path.name)
-        shared = code / "shared"
-        shared.mkdir()
-        for name in [
-            "artifacts.py",
-            "context.py",
-            "splits.py",
-            "game_variables.py",
-            "instructions.py",
-            "contracts.py",
-            "messages.py",
-            "prepare_context.py",
-        ]:
-            shutil.copyfile(Path(__file__).parent.parent / name, shared / name)
         save(
             root / "manifest.json",
             {
@@ -170,6 +144,7 @@ def write_dataset(output, built, config, corpus):
                 "split_unit": "mission",
                 "splits": splits,
                 "solver_version": z3.get_version_string(),
+                "build": implementation(),
                 "source_revision": corpus.revision,
                 "source_files": corpus.files,
                 "artifacts": {
