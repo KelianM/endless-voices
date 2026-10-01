@@ -14,20 +14,6 @@ spec.loader.exec_module(viewer)
 FIXTURE = Path(__file__).parent / "fixtures/contracts/manifest.json"
 
 
-@pytest.fixture(autouse=True)
-def prepared_fixture(tmp_path, monkeypatch):
-    import shutil
-    dataset = tmp_path / "prepared"
-    shutil.copytree(FIXTURE.parent, dataset)
-    manifest = dataset / "manifest.json"
-    manifest.write_text(json.dumps({
-        "format": "scene-dataset-v1", "split_unit": "mission",
-        "splits": ["train", "validation", "test"],
-        "artifacts": {f"{name}.jsonl": viewer.sha256(dataset / f"{name}.jsonl")
-                      for name in ["train", "validation", "test"]}}))
-    monkeypatch.setattr(__import__(__name__, fromlist=["FIXTURE"]), "FIXTURE", manifest)
-
-
 def payload(output):
     text = output.read_text()
     return json.loads(

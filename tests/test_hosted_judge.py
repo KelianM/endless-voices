@@ -167,3 +167,46 @@ def test_anthropic_blocks_and_usage():
         with pytest.raises(ValueError):
             judge.assessment("claude-sonnet-5-5", anthropic_response(status))
     assert providers.charge("claude-sonnet-5-5", anthropic_response()) == pytest.approx(0.00402)
+
+
+@pytest.mark.parametrize("failure,attempts", [("http", 1), ("timeout", 3)])
+def test_transport_failures_stop_calls_and_preserve_reservations(tmp_path, monkeypatch,
+                                                                failure, attempts):
+    from urllib.error import HTTPError
+
+    public = tmp_path / "public"
+    (public / "primary").mkdir(parents=True)
+    (public / "instructions.txt").write_text("Choose the original")
+    for i in range(4):
+        trial = {"trial_id": str(i), "context": [], "A": f"First {i}", "B": f"Second {i}"}
+        (public / "primary" / f"{i}.json").write_text(json.dumps(trial))
+    args = Namespace(public=public, output=tmp_path / "run", env_file=tmp_path / ".env",
+                     budget=5, limit=4)
+    monkeypatch.setattr(providers, "load_key", lambda *_: "fake-secret")
+    monkeypatch.setattr(judge.time, "sleep", lambda _: None)
+    calls = []
+
+    def send(request, timeout):
+        calls.append(json.loads(request.data))
+        if failure == "http":
+            raise HTTPError(request.full_url, 429, "fake-secret", None, None)
+        raise TimeoutError("fake-secret")
+
+    monkeypatch.setattr(providers.urllib.request, "urlopen", send)
+    judge.run(args)
+    assert len(calls) == attempts
+    folder = args.output / "gpt-6-luna"
+    results = sorted(folder.glob("*.result.json"))
+    assert len(results) == attempts
+    assert all(json.loads(p.read_text())["status"] == "failed" for p in results)
+    assert judge.spent(args.output) == pytest.approx(sum(map(judge.reservation, calls)))
+    assert json.loads((args.output / "state.json").read_text())["stop"] == (
+        "HTTP 429" if failure == "http" else "three consecutive failures")
+    assert all("fake-secret" not in p.read_text() for p in args.output.rglob("*.json"))
+    before = {p: p.read_bytes() for p in results}
+    args.limit = 1
+    judge.run(args)
+    assert len(calls) == attempts + 1
+    assert calls[-1] not in calls[:-1]
+    assert all(p.read_bytes() == content for p, content in before.items())
+    assert judge.spent(args.output) == pytest.approx(sum(map(judge.reservation, calls)))

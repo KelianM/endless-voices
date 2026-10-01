@@ -13,7 +13,7 @@ from peft import LoraConfig, TaskType, get_peft_model
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
-from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
+from transformers import GenerationConfig, GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from endless_voices import generate as gen
 
@@ -94,6 +94,14 @@ class ReplyModel:
         self.output = output
         self.error = error
         self.inputs = []
+        self.config = GPT2Config(n_positions=256)
+        self.generation_config = GenerationConfig(bos_token_id=1, eos_token_id=1)
+
+    def to(self, device):
+        return self
+
+    def eval(self):
+        return self
 
     def generate(self, input_ids, **kwargs):
         self.inputs.append(input_ids.tolist())
@@ -103,13 +111,7 @@ class ReplyModel:
 
 
 def use_stub(monkeypatch, model):
-    original = gen.load_condition
-
-    def load(*values):
-        _, tokenizer, device, limit, settings = original(*values)
-        return model, tokenizer, device, limit, settings
-
-    monkeypatch.setattr(gen, "load_condition", load)
+    monkeypatch.setattr(gen.AutoModelForCausalLM, "from_pretrained", lambda *a, **kw: model)
 
 
 def read_run(args):

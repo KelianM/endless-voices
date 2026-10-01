@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from endless_voices import generation_backends as screen
+from endless_voices import generation_backends as backends
 from endless_voices.context import ContextPool, FullContext
 
 spec = importlib.util.spec_from_file_location(
@@ -26,7 +26,7 @@ class Counter:
 
 
 @pytest.fixture
-def recorded(tmp_path, monkeypatch, request):
+def recorded(tmp_path, request):
     models = getattr(request, "param", ["gemma31b", "gpt-6-luna"])
     dataset = tmp_path / "dataset"
     dataset.mkdir()
@@ -34,7 +34,7 @@ def recorded(tmp_path, monkeypatch, request):
         Path("tests/fixtures/contracts/validation.jsonl").read_text().splitlines()[0]
     )
     records, selections = {}, []
-    for sid in ["one", "two", "three"]:
+    for sid in ["one", "two", "three", "four"]:
         row = deepcopy(template)
         row["metadata"]["id"] = sid
         row["messages"][-1]["content"] = "Original fixture continuation " + sid
@@ -43,21 +43,21 @@ def recorded(tmp_path, monkeypatch, request):
             sid,
             "conversation",
             "mission",
-            "New source lore\n",
-            [{"role": "user", "content": "New source encounter"}],
+            f"Source lore for {sid}\n",
+            [{"role": "user", "content": f"Encounter for {sid}"}],
             [],
             {},
         )
         selections.append(FullContext().select(pool, Counter()))
     local = tmp_path / "local.json"
-    screen.save(local, {"label": "gemma31b"})
+    backends.save(local, {"label": "gemma31b"})
     locals_ = {"gemma31b": str(local)}
     if "qwen30b" in models:
         qwen = tmp_path / "qwen.json"
-        screen.save(qwen, {"label": "qwen30b"})
+        backends.save(qwen, {"label": "qwen30b"})
         locals_["qwen30b"] = str(qwen)
     config = tmp_path / "config.json"
-    screen.save(
+    backends.save(
         config,
         {
             "generators": models,
@@ -74,27 +74,27 @@ def recorded(tmp_path, monkeypatch, request):
             'She nods. "A complete source reply for ' + row['metadata']['id'] + '."')
     (dataset / 'validation.jsonl').write_text(
         ''.join(json.dumps(r) + '\n' for r in records.values()))
-    screen.save(dataset / 'manifest.json', {
+    backends.save(dataset / 'manifest.json', {
         'format': 'scene-dataset-v1', 'split_unit': 'mission', 'splits': ['validation'],
-        'artifacts': {str(p.relative_to(dataset)): screen.sha(p)
+        'artifacts': {str(p.relative_to(dataset)): backends.sha(p)
                       for p in dataset.rglob('*') if p.is_file()}})
     benchmark.prepare(root, dataset, config)
-    messages = selections[0].messages
     for model in models:
         folder = root / model
         folder.mkdir()
-        screen.save(
+        backends.save(
             folder / "settings.json",
             {
-                "prompts_sha256": screen.sha(root / "prompts.json"),
-                "code_sha256": screen.sha(root / "generation_backends.py"),
-                "provider_code_sha256": screen.sha(root / "providers.py"),
-                "artifact_code_sha256": screen.sha(root / "artifacts.py"),
+                "prompts_sha256": backends.sha(root / "prompts.json"),
+                "code_sha256": backends.sha(root / "generation_backends.py"),
+                "provider_code_sha256": backends.sha(root / "providers.py"),
+                "artifact_code_sha256": backends.sha(root / "artifacts.py"),
             },
         )
-        for sid in ["one", "two"]:
+        for sid in ["one", "two", "four"]:
+            messages = records[sid]["messages"][:-1]
             if model in locals_:
-                screen.save(
+                backends.save(
                     folder / f"{sid}.prompt.json", {"messages": messages, "input_ids": [1, 2]}
                 )
             else:
@@ -103,18 +103,19 @@ def recorded(tmp_path, monkeypatch, request):
                     if model == "claude-sonnet-5-5"
                     else {"model": model, "input": messages}
                 )
-                screen.save(folder / f"{sid}.request.json", {"body": body})
-            screen.save(
+                backends.save(folder / f"{sid}.request.json", {"body": body})
+            backends.save(
                 folder / f"{sid}.result.json",
                 {
                     "sample_id": sid,
-                    "status": "ok" if sid == "one" else "failed",
-                    "response": "Simulated complete response" if sid == "one" else "Partial",
-                    "finish_reason": "stop" if sid == "one" else "length",
-                    "error": None if sid == "one" else "Output limit",
+                    "status": "ok" if sid in {"one", "four"} else "failed",
+                    "response": ("Simulated complete response"
+                                 if sid in {"one", "four"} else "Partial"),
+                    "finish_reason": "stop" if sid in {"one", "four"} else "length",
+                    "error": None if sid in {"one", "four"} else "Output limit",
                     "api_response": {
-                        "status": "completed" if sid == "one" else "incomplete",
-                        "stop_reason": "end_turn" if sid == "one" else "max_tokens",
+                        "status": "completed" if sid in {"one", "four"} else "incomplete",
+                        "stop_reason": "end_turn" if sid in {"one", "four"} else "max_tokens",
                     },
                 },
             )
@@ -124,8 +125,8 @@ def recorded(tmp_path, monkeypatch, request):
 def test_export_uses_saved_context_once_and_reports_failures_and_missing(recorded):
     benchmark.export(recorded)
     pack = recorded / "assessment"
-    private = screen.read(pack / "private.json")
-    assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 2
+    private = backends.read(pack / "private.json")
+    assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 4
     assert not list((pack / "public/reversed").glob("*.json"))
     assert sorted(r["status"] for r in private["coverage"]) == [
         "failed",
@@ -134,16 +135,20 @@ def test_export_uses_saved_context_once_and_reports_failures_and_missing(recorde
         "missing",
         "ok",
         "ok",
+        "ok",
+        "ok",
     ]
-    expected = screen.read(recorded / "prompts.json")[0]["messages"]
+    expected = {p["sample_id"]: p["messages"]
+                for p in backends.read(recorded / "prompts.json")}
     for r in private["trials"]:
-        trial = screen.read(pack / r["path"])
+        trial = backends.read(pack / r["path"])
         assert list(trial) == ["trial_id", "context", "A", "B"]
-        assert trial["context"] == expected
-    primary = next(r for r in private["trials"] if r["kind"] == "primary")
-    trial = screen.read(pack / primary["path"])
+        assert trial["context"] == expected[r["sample_id"]]
+    primary = next(r for r in private["trials"]
+                   if r["kind"] == "primary" and r["sample_id"] == "one")
+    trial = backends.read(pack / primary["path"])
     assert trial[primary["original"]] == 'She nods. "A complete source reply for one."'
-    assert screen.read(recorded / "gpt-6-luna/two.result.json")["response"] == "Partial"
+    assert backends.read(recorded / "gpt-6-luna/two.result.json")["response"] == "Partial"
     with pytest.raises(ValueError, match="exists"):
         benchmark.export(recorded)
 
@@ -153,18 +158,18 @@ def test_export_rejects_mismatched_or_incomplete_evidence(recorded, tamper):
     folder = recorded / "gpt-6-luna"
     if tamper == "context":
         path = folder / "one.request.json"
-        value = screen.read(path)
-        value["body"]["input"][0]["content"] = "Different context"
+        value = backends.read(path)
+        value["body"]["input"] = backends.read(folder / "four.request.json")["body"]["input"]
     elif tamper == "completion":
         path = folder / "one.result.json"
-        value = screen.read(path)
+        value = backends.read(path)
         value["api_response"]["status"] = "incomplete"
     elif tamper == "selection":
         path = recorded / "prompts.json"
         value = []
     else:
         path = folder / "settings.json"
-        value = screen.read(path)
+        value = backends.read(path)
         value["prompts_sha256"] = "wrong"
     path.write_text(json.dumps(value))
     with pytest.raises(ValueError):
@@ -175,7 +180,7 @@ def test_judge_rechecks_public_trials_before_sending_requests(recorded):
     benchmark.export(recorded)
     benchmark.verify_trials(recorded, save=False)
     path = next((recorded / "assessment/public/primary").glob("*.json"))
-    trial = screen.read(path)
+    trial = backends.read(path)
     trial["context"][0]["content"] = "Leaked answer key"
     path.write_text(json.dumps(trial))
     with pytest.raises(ValueError, match="hash differs"):
@@ -187,9 +192,9 @@ def test_judge_rechecks_public_trials_before_sending_requests(recorded):
 )
 def test_four_model_lineup_accepts_both_provider_completion_formats(recorded):
     benchmark.export(recorded)
-    private = screen.read(recorded / "assessment/private.json")
-    assert len(private["coverage"]) == 12
-    assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 4
+    private = backends.read(recorded / "assessment/private.json")
+    assert len(private["coverage"]) == 16
+    assert len([r for r in private["trials"] if r["kind"] == "primary"]) == 8
     assert set(private["runs"]) == {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
 
 
