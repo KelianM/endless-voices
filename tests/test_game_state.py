@@ -65,3 +65,18 @@ def test_shop_updates_remain_world_changes_without_becoming_conditions():
     assert saved["world_changes"] == changes["children"][:2]
     assert saved["current_values"]["ready"] == 1
     assert "outfitter" not in saved["current_values"]
+
+
+def test_journal_entries_inside_dialogue_preserve_following_condition_changes():
+    state = apply(tree('log "Met the captain."\nset introduced'), GameState())
+    assert state.snapshot()["current_values"]["introduced"] == 1
+    assert state.world[0]["tokens"] == ["log", "Met the captain."]
+
+
+def test_fines_do_not_spend_credits_and_quoted_conditions_remain_literal_names():
+    state = GameState.fixed({"credits": 10, "has mission: done": 1, "mission: done": 0})
+    state = apply(tree('fine 70000'), state)
+    assert state.snapshot()["current_values"]["credits"] == 10
+    assert state.world[0]["tokens"] == ["fine", "70000"]
+    assert state.assume(condition(tree('"has mission: done"'), state)) is not None
+    assert state.assume(condition(tree('has "mission: done"'), state)) is None

@@ -115,7 +115,7 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
     for row in dataset:
         context = evidence[row["metadata"]["id"]]["context"]
         assert context["messages_sha256"]
-        assert all(set(block) == {"mission", "path", "lines"}
+        assert all({"mission", "path", "lines"} <= set(block)
                    for block in context["selected"] + context["omitted"])
     assert validate_manifest(output / "manifest.json")["train"]["records"] == len(dataset)
     assert load_conversations(output) == [row["messages"] for row in dataset]
@@ -248,3 +248,54 @@ def test_context_samples_event_timing_without_collapsing_current_mission_outcome
     assert witness in [h.state.snapshot() for h in all_outcomes]
     assert witness == builder.sampler.advance([history], sample=True)[0].state.snapshot()
     assert (witness["elapsed_days"] >= 1) == (witness["current_values"]["ready"] == 1)
+
+
+def test_reference_context_excludes_target_mission_and_heldout_and_resolves_one_branch(tmp_path):
+    story = '''mission Target
+\ton offer
+\t\tconversation
+\t\t\t`Current answer.`
+\ton complete
+\t\tconversation
+\t\t\t`Own later answer.`
+mission Heldout
+\ton offer
+\t\tconversation
+\t\t\t`Held-out answer.`
+mission Reference
+\ton offer
+\t\tconversation
+\t\t\tchoice
+\t\t\t\t`Earth.`
+\t\t\t\t\tgoto earth
+\t\t\t\t`Mars.`
+\t\t\t\t\tgoto mars
+\t\t\tlabel earth
+\t\t\taction
+\t\t\t\tset earth
+\t\t\t`An Earth childhood.`
+\t\t\t\taccept
+\t\t\tlabel mars
+\t\t\taction
+\t\t\t\tclear earth
+\t\t\t`A Mars childhood.`
+\t\t\t\taccept
+'''
+    builder = DatasetBuilder(corpus(tmp_path, story),
+                             config({"Target": spec(), "Heldout": spec("validation")}), Counter())
+    output = tmp_path / "prepared"
+    builder.build(output)
+    dataset = SceneDataset.load(output, "train")
+    evidence = json.loads((output / "provenance.json").read_text())
+    for row in dataset:
+        prompt = json.dumps(row["messages"][:-1])
+        assert "Own later answer." not in prompt
+        if row["messages"][-1]["content"] == "Current answer.":
+            assert "Current answer." not in prompt
+        assert "Held-out answer." not in prompt
+        assert ("An Earth childhood." in prompt) != ("A Mars childhood." in prompt)
+        references = [b for b in evidence[row["metadata"]["id"]]["context"]["selected"]
+                      if b.get("reference")]
+        assert len(references) == 1 and references[0]["mission"] == "Reference"
+        assert references[0]["state"]["current_values"]["earth"] == int(
+            "An Earth childhood." in prompt)

@@ -145,3 +145,32 @@ def test_repeatable_menu_retains_each_answer_and_finite_exit_histories():
     assert any({"Earth answer.", "Mars answer."} <= {p.text for p in r.prefix}
                for r in complete)
     assert all(sum(p.text == "Ask about Earth." for p in r.prefix) <= 2 for r in complete)
+
+
+def test_reference_route_sampling_finishes_without_enumerating_other_branches():
+    conversation = tree('''conversation
+\tchoice
+\t\t`Earth.`
+\t\t\taccept
+\t\t`Mars.`
+\t\t\tdecline
+''')[0]
+    interpreter = DialogueInterpreter(max_steps=2)
+    sampled = interpreter.histories(conversation, GameState(), sample_seed="reference")
+    assert len(sampled) == 1 and sampled[0].terminal
+    assert sampled[0].prefix == interpreter.histories(
+        conversation, GameState(), sample_seed="reference")[0].prefix
+    with pytest.raises(ValueError, match="route limit"):
+        interpreter.histories(conversation, GameState())
+    assert len(DialogueInterpreter().histories(conversation, GameState())) == 2
+
+
+def test_event_outfit_requirement_applies_before_initial_dialogue():
+    conversation = tree('conversation\n\t`You have a brig.`')[0]
+    interpreter = DialogueInterpreter()
+    requirements = tree('require Brig')
+    assert not interpreter.histories(conversation, GameState.fixed({"outfit: Brig": 0}),
+                                     requirements)
+    routes = interpreter.histories(conversation, GameState.fixed({"outfit: Brig": 1}),
+                                   requirements)
+    assert routes[0].text == "You have a brig."

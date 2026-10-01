@@ -37,6 +37,8 @@ class ContextSampler:
         self.player = player
         self.max_routes = max_routes
         self.seed = seed
+        self.reference_cache = {}
+        self.reference_paths = {}
         self.graph = {name: self.prerequisites(m.node) for name, m in corpus.missions.items()}
 
     @staticmethod
@@ -243,7 +245,56 @@ class ContextSampler:
             advanced.extend(History(state, history.blocks) for state in outcomes)
         return self.bounded(advanced)
 
-    def select(self, sample_id, conversation_id, mission, history, prefix, lore, counter):
+    def references(self, mission, split, history):
+        """Return independent reference scenes from eligible related missions."""
+        excluded = {mission.name, *(b["mission"] for b in history.blocks)}
+        blocks = []
+        paths = self.reference_paths.get(mission.name, {mission.path})
+        for path in paths:
+            for other in self.corpus.missions.values():
+                if (other.path != path or other.name in excluded
+                        or not self.eligible(other.name, split)):
+                    continue
+                if other.name not in self.reference_cache:
+                    scenes = []
+                    for event in other.node["children"]:
+                        if event["tokens"] not in (["on", "offer"], ["on", "accept"],
+                                                   ["on", "complete"]):
+                            continue
+                        if not any(n["tokens"] == ["conversation"] and n["children"]
+                                   for n in event["children"]):
+                            continue
+                        conversations, _, actions = self.event_parts(event["children"])
+                        if not conversations:
+                            continue
+                        state = GameState(events=self.corpus.events, scope=other.name)
+                        self.enter(state, other)
+                        node = conversations[0]
+                        routes = [
+                            route for attempt in range(8)
+                            for route in self.interpreter.histories(
+                                node, state, actions,
+                                sample_seed=digest([self.seed, other.name, node["line"], attempt]),
+                            )
+                        ]
+                        routes = [r for r in routes if r.prefix or r.paragraphs]
+                        if not routes:
+                            continue
+                        route = max(routes, key=lambda r: sum(
+                            len(p.text) for p in (*r.prefix, *r.paragraphs)
+                        ))
+                        block = self.block(other, (*route.prefix, *route.paragraphs))
+                        block.update(reference=True, conversation=node["line"],
+                                     state=route.state.snapshot())
+                        scenes.append(block)
+                    self.reference_cache[other.name] = scenes
+                blocks.extend(self.reference_cache[other.name])
+        directories = {str(Path(path).parent) for path in paths}
+        blocks.extend(block for block in self.corpus.reference_lore
+                      if str(Path(block["path"]).parent) in directories)
+        return blocks
+
+    def select(self, sample_id, conversation_id, mission, history, prefix, lore, counter, split):
         values = mission_values(mission.node, self.corpus.planet_systems, self.player)
         encounter = "\n\n".join(render(p.text, values)[0] for p in prefix)
         system = (
@@ -258,6 +309,7 @@ class ContextSampler:
             history.blocks,
             self.graph,
             values,
+            self.references(mission, split, history),
         )
         return self.strategy.select(pool, counter)
 
@@ -368,7 +420,9 @@ class ExampleBuilder:
             lore = "\n\n".join(
                 p["text"] for name in sorted(lore_names) for p in descriptions.get(name, [])
             )
-            selection = self.sampler.select(sid, cid, mission, history, route.prefix, lore, counter)
+            selection = self.sampler.select(
+                sid, cid, mission, history, route.prefix, lore, counter, split
+            )
             target = "\n\n".join(render(p.text, values)[0] for p in route.paragraphs)
             target_lines = {p.line for p in route.paragraphs}
             if any(p.line in target_lines for p in route.prefix):
@@ -444,6 +498,11 @@ class DatasetBuilder:
             config.get("max_history_routes", 1000),
             seed=config["seed"],
         )
+        for name, spec in config["missions"].items():
+            self.sampler.reference_paths[name] = sorted({
+                corpus.missions[other].path for other, other_spec in config["missions"].items()
+                if other_spec["identity"] == spec["identity"]
+            })
         self.examples = ExampleBuilder(corpus, self.interpreter, self.sampler, config["seed"])
 
     def build(self, output, splits=("train",)):
