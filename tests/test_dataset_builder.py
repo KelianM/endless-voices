@@ -229,3 +229,22 @@ mission Later
     history = dataset.prompt(0)[0]["content"]
     assert 'She returns with the papers.\n\n"We can leave," she says.' in history
     assert dataset.target(0) == "The next passage."
+
+
+def test_context_samples_event_timing_without_collapsing_current_mission_outcomes(tmp_path):
+    from endless_voices.dataset.builder import History
+    from endless_voices.dataset.source import tree
+    from endless_voices.dataset.state import GameState, apply
+
+    builder = DatasetBuilder(corpus(tmp_path, STORY), config({"Later": spec()}), Counter())
+    state = GameState.fixed({"ready": 0})
+    state.events = {"change": tree('event change\n\tset ready')[0]}
+    history = History(apply(tree('event change 1'), state), [])
+    all_outcomes = builder.sampler.advance([history])
+    assert {h.state.snapshot()["current_values"]["ready"] for h in all_outcomes} == {0, 1}
+    sampled = builder.sampler.advance([history], sample=True)
+    assert len(sampled) == 1
+    witness = sampled[0].state.snapshot()
+    assert witness in [h.state.snapshot() for h in all_outcomes]
+    assert witness == builder.sampler.advance([history], sample=True)[0].state.snapshot()
+    assert (witness["elapsed_days"] >= 1) == (witness["current_values"]["ready"] == 1)

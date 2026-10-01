@@ -28,13 +28,15 @@ class History:
 class ContextSampler:
     """Construct compatible histories before applying a token-budget strategy."""
 
-    def __init__(self, corpus, interpreter, assignments, strategy, player, max_routes=1000):
+    def __init__(self, corpus, interpreter, assignments, strategy, player, max_routes=1000,
+                 seed="context"):
         self.corpus = corpus
         self.interpreter = interpreter
         self.assignments = assignments
         self.strategy = strategy
         self.player = player
         self.max_routes = max_routes
+        self.seed = seed
         self.graph = {name: self.prerequisites(m.node) for name, m in corpus.missions.items()}
 
     @staticmethod
@@ -193,7 +195,7 @@ class ContextSampler:
             if not self.eligible(name, split):
                 omitted.append(name)
                 continue
-            histories = self.advance(histories)
+            histories = self.advance(histories, sample=True)
             previous = self.corpus.missions[name]
             for history in histories:
                 self.enter(history.state, previous)
@@ -214,7 +216,7 @@ class ContextSampler:
                     for history in histories:
                         history.state.values[name + ": active"] = z3.IntVal(1)
                 if phase == "complete":
-                    histories = self.advance(histories, self.travel_days(previous))
+                    histories = self.advance(histories, self.travel_days(previous), sample=True)
                 events = [n for n in previous.node["children"] if n["tokens"] == ["on", phase]]
                 for event in events:
                     histories = self.event(event["children"], histories, previous)
@@ -232,10 +234,14 @@ class ContextSampler:
                 )
         return histories, omitted
 
-    def advance(self, histories, minimum_days=0):
-        return self.bounded(
-            [History(state, h.blocks) for h in histories for state in h.state.advance(minimum_days)]
-        )
+    def advance(self, histories, minimum_days=0, *, sample=False):
+        advanced = []
+        for history in histories:
+            outcomes = history.state.advance(minimum_days)
+            if sample:
+                outcomes = [min(outcomes, key=lambda s: digest([self.seed, s.snapshot()]))]
+            advanced.extend(History(state, history.blocks) for state in outcomes)
+        return self.bounded(advanced)
 
     def select(self, sample_id, conversation_id, mission, history, prefix, lore, counter):
         values = mission_values(mission.node, self.corpus.planet_systems, self.player)
@@ -436,6 +442,7 @@ class DatasetBuilder:
             strategy_from_config(config["context"]),
             config["player"],
             config.get("max_history_routes", 1000),
+            seed=config["seed"],
         )
         self.examples = ExampleBuilder(corpus, self.interpreter, self.sampler, config["seed"])
 

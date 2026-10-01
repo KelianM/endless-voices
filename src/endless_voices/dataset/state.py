@@ -67,7 +67,9 @@ class GameState:
         node = self.events[name]
         assignments = []
         for child in node["children"]:
-            if child["tokens"][0] in {"government", "system", "planet", "outfitter", "shipyard"}:
+            if child["tokens"][0] in {
+                "government", "system", "planet", "outfitter", "shipyard", "fleet"
+            }:
                 self.world += (child,)
             else:
                 assignments.append(child)
@@ -120,7 +122,12 @@ class GameState:
             return self.values[token]
 
     def assume(self, condition):
+        condition = z3.simplify(condition)
+        if z3.is_false(condition):
+            return None
         result = self.copy()
+        if z3.is_true(condition) or any(condition.eq(c) for c in self.constraints):
+            return result
         result.constraints += (condition,)
         solver = z3.Solver()
         solver.set(timeout=5000)
