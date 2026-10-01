@@ -1,4 +1,4 @@
-# 11. Build scene examples through stateful dialogue
+# 10. Build scene examples through stateful dialogue
 
 - **Status:** Proposed
 - **Date:** 2026-10-01
@@ -12,7 +12,7 @@ Extracting speakers’ quotes invents boundaries absent from the game. Structura
 
 Replace the manual extraction approach in [ADR 5](0005-build-datasets-from-reviewed-conversation-annotations.md) with `DatasetBuilder`. Its example builder and context sampler share a `DialogueInterpreter`. Preserve complete authored paragraphs, including narration and other speakers, through the next visible player choice or endpoint. Do not extract speech fragments or rewrite punctuation. Full passages replace the direct-speech normalization described in [ADR 4](0004-evaluate-authenticity-against-game-continuations.md); the original-versus-generated authenticity question remains unchanged.
 
-Integer state uses Z3 constraints. Unspecified initial conditions represent possible prior states; assignments constrain subsequent branches. Retain each distinct reachable target sequence and select one compatible history reproducibly. Apply [mission ownership](0010-split-datasets-by-source-mission.md) before [context budgeting](0007-save-context-selection-once-for-all-consumers.md). Required ancestors follow positive completed-mission prerequisites outside OR groups.
+Integer state uses Z3 constraints. Unspecified initial conditions represent possible prior states; assignments constrain subsequent branches. Retain each distinct reachable target sequence and select one compatible history reproducibly. Apply [mission ownership](0009-split-datasets-by-source-mission.md) before [context budgeting](0007-infer-scene-writing-from-sampled-game-context.md). Required ancestors follow positive completed-mission prerequisites outside OR groups.
 
 Publish one built dataset: split JSONL records, configuration, source/state provenance, a manifest and licensing. Record implementation revision and hashes rather than copying code. All consumers use `SceneDataset`; DataLoader batches fixed examples without resampling context. Unsupported operations, unchanged-state loops, excessive branching and context overflow fail the build without publishing partial output.
 

@@ -1,4 +1,4 @@
-# 10. Split datasets by source mission
+# 9. Split datasets by source mission
 
 - **Status:** Proposed
 - **Date:** 2026-10-01
@@ -20,4 +20,4 @@ Evaluation uncertainty resamples source missions and connected variants. Convers
 
 Large missions can make split sizes uneven. Connected variants can group multiple missions, reducing the number of independent evaluation groups.
 
-The writing objective in [ADR 8](0008-use-a-shared-scene-continuation-instruction.md) does not require campaign-level or chronological holdouts. Mission separation does not prevent repeated wording across unrelated missions, and changing the split rule does not make previously used validation scenes unseen.
+The writing objective in [ADR 7](0007-infer-scene-writing-from-sampled-game-context.md) does not require campaign-level or chronological holdouts. Mission separation does not prevent repeated wording across unrelated missions, and changing the split rule does not make previously used validation scenes unseen.

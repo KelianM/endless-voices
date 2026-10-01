@@ -1,4 +1,4 @@
-# 9. Resolve game variables within their mission
+# 8. Resolve game variables within their mission
 
 - **Status:** Proposed
 - **Date:** 2026-10-01
