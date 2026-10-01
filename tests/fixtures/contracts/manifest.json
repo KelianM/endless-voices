@@ -1,25 +1,14 @@
 {
-  "schema_version": 1,
-  "dataset_version": "fixture-v1",
-  "files": {
-    "train": [
-      {
-        "path": "train.jsonl",
-        "sha256": "c68ed14c2fc24743c300210d5a29c440517a59dc6b7fe95801b8c88f45fa1fdf"
-      }
-    ],
-    "validation": [
-      {
-        "path": "validation.jsonl",
-        "sha256": "3d4719e591a6c9d177ee5c5a240f6b3997f8b2a7d1b0c996b604945425ddd248"
-      }
-    ],
-    "test": [
-      {
-        "path": "test.jsonl",
-        "sha256": "3d5e050fb324e582068af3fe35151fa5ff9c859c68f9b8717ffb3d234ba30512"
-      }
-    ]
-  },
-  "split_unit": "mission"
+  "format": "scene-dataset-v1",
+  "split_unit": "mission",
+  "splits": [
+    "train",
+    "validation",
+    "test"
+  ],
+  "artifacts": {
+    "train.jsonl": "c68ed14c2fc24743c300210d5a29c440517a59dc6b7fe95801b8c88f45fa1fdf",
+    "validation.jsonl": "3d4719e591a6c9d177ee5c5a240f6b3997f8b2a7d1b0c996b604945425ddd248",
+    "test.jsonl": "3d5e050fb324e582068af3fe35151fa5ff9c859c68f9b8717ffb3d234ba30512"
+  }
 }

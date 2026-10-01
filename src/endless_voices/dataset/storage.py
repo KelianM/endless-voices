@@ -7,12 +7,11 @@ from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
 
-from endless_voices.messages import validate_messages
-from endless_voices.prepare_context import file_hash, save_selections
-
-
-def save(path, value):
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n")
+from endless_voices.artifacts import file_hash
+from endless_voices.artifacts import write_json as save
+from endless_voices.contracts import SPLITS, read_records, validate_record
+from endless_voices.prepare_context import save_selections
+from endless_voices.splits import mission_key
 
 
 class SceneDataset(Sequence):
@@ -24,7 +23,7 @@ class SceneDataset(Sequence):
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate scene IDs")
         for record in self.records:
-            validate_messages(record["messages"])
+            validate_record(record)
 
     def __len__(self):
         return len(self.records)
@@ -33,28 +32,61 @@ class SceneDataset(Sequence):
         return deepcopy(self.records[index])
 
     @classmethod
-    def from_jsonl(cls, path):
-        records = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
-        if not records:
-            raise ValueError("Dataset has no examples")
-        return cls(records)
+    def load_all(cls, root):
+        """Verify artifacts and cross-split ownership, returning each published split."""
+        root = Path(root).resolve()
+        manifest = json.loads((root / "manifest.json").read_text())
+        if manifest.get("format") != "scene-dataset-v1" or manifest.get("split_unit") != "mission":
+            raise ValueError("Unsupported prepared dataset format")
+        splits = manifest.get("splits")
+        if (not isinstance(splits, list) or not splits
+                or any(not isinstance(s, str) or s not in SPLITS for s in splits)
+                or len(set(splits)) != len(splits)):
+            raise ValueError("Expected unique published dataset splits")
+        artifacts = manifest.get("artifacts")
+        if not isinstance(artifacts, dict) or any(f"{s}.jsonl" not in artifacts for s in splits):
+            raise ValueError("Every published split requires an artifact hash")
+        for name, expected in artifacts.items():
+            path = (root / name).resolve()
+            if Path(name).is_absolute() or not path.is_relative_to(root):
+                raise ValueError("Artifact must be inside the manifest directory")
+            if file_hash(path) != expected:
+                raise ValueError(f"Dataset artifact differs: {name}")
+        datasets, ids, groups, physical = {}, {}, {}, set()
+        for split in splits:
+            path = root / f"{split}.jsonl"
+            stat = path.stat()
+            identity = (stat.st_dev, stat.st_ino)
+            if identity in physical:
+                raise ValueError("Split file reused")
+            physical.add(identity)
+            rows = []
+            for line, record in read_records(path, split):
+                location = f"{path}:{line}"
+                meta = record["metadata"]
+                if meta["id"] in ids:
+                    raise ValueError(f"{location}: duplicate ID; first at {ids[meta['id']]}")
+                ids[meta["id"]] = location
+                owners = [("mission", mission_key(meta)),
+                          ("conversation_id", meta["conversation_id"]),
+                          ("scenario_group", meta["scenario_group"])]
+                for kind, owner in owners:
+                    if owner is None:
+                        continue
+                    key = (kind, owner)
+                    if key in groups and groups[key] != split:
+                        raise ValueError(f"{location}: {kind} {owner!r} crosses splits")
+                    groups[key] = split
+                rows.append(record)
+            datasets[split] = cls(rows)
+        return datasets
 
     @classmethod
     def load(cls, root, split):
-        root = Path(root)
-        manifest = json.loads((root / "manifest.json").read_text())
-        if manifest["format"] != "scene-dataset-v1" or manifest["split_unit"] != "mission":
-            raise ValueError("Unsupported prepared dataset format")
-        for name, expected in manifest["artifacts"].items():
-            path = (root / name).resolve()
-            if not path.is_relative_to(root.resolve()) or file_hash(path) != expected:
-                raise ValueError(f"Dataset artifact differs: {name}")
-        if split not in manifest["splits"]:
+        datasets = cls.load_all(root)
+        if split not in datasets:
             raise ValueError(f"Split was not prepared: {split}")
-        result = cls.from_jsonl(root / f"{split}.jsonl")
-        if any(r["metadata"]["split"] != split for r in result.records):
-            raise ValueError("Record split differs from dataset split")
-        return result
+        return datasets[split]
 
     def prompt(self, index):
         return self[index]["messages"][:-1]
@@ -121,6 +153,7 @@ def write_dataset(output, built, config, corpus):
         shared = code / "shared"
         shared.mkdir()
         for name in [
+            "artifacts.py",
             "context.py",
             "splits.py",
             "game_variables.py",

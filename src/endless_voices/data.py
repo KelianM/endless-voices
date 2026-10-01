@@ -1,33 +1,17 @@
 """JSONL conversations and causal language modelling batches."""
 
-import json
 from copy import deepcopy
-from pathlib import Path
 from typing import Any
 
 import torch
 from transformers import PreTrainedTokenizerBase
 
-from endless_voices.messages import validate_messages
+from endless_voices.dataset.storage import SceneDataset
 
 
-def load_conversations(path: str) -> list[list[dict[str, str]]]:
-    conversations = []
-    with Path(path).open(encoding="utf-8") as file:
-        for line_number, line in enumerate(file, 1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-                messages = record["messages"]
-                validate_messages(messages)
-                conversations.append(messages)
-            except (ValueError, KeyError, TypeError) as error:
-                raise ValueError(f"{path}:{line_number}: {error}") from error
-    if not conversations:
-        raise ValueError(f"{path}: no conversations found")
-    return conversations
-
+def load_conversations(path: str, split: str = "train") -> list[list[dict[str, str]]]:
+    """Load messages from a verified prepared dataset split."""
+    return [record["messages"] for record in SceneDataset.load(path, split)]
 
 
 class TokenizedSceneDataset(torch.utils.data.Dataset):
@@ -44,14 +28,15 @@ class TokenizedSceneDataset(torch.utils.data.Dataset):
 
 
 def tokenize_conversations(
-    path: str, tokenizer: PreTrainedTokenizerBase, max_length: int, loss: str = "continuation"
+    path: str, tokenizer: PreTrainedTokenizerBase, max_length: int, loss: str = "continuation",
+    split: str = "train"
 ) -> TokenizedSceneDataset:
     if max_length < 2:
         raise ValueError("data.max_length must be at least 2")
     if loss not in {"continuation", "all"}:
         raise ValueError("data.loss must be continuation or all")
     examples = []
-    for index, messages in enumerate(load_conversations(path), 1):
+    for index, messages in enumerate(load_conversations(path, split), 1):
         ids = tokenize_messages(messages, tokenizer, max_length, label=f"Conversation {index}")
         labels = list(ids)
         if loss == "continuation":

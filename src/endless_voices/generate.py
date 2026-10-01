@@ -1,7 +1,6 @@
 """Generate one continuation per curated sample and save reproducible run records."""
 
 import argparse
-import hashlib
 import importlib.metadata
 import json
 import math
@@ -19,27 +18,11 @@ from huggingface_hub import snapshot_download
 from peft import PeftConfig, PeftModel
 from transformers import AutoModelForCausalLM, GenerationConfig, set_seed
 
+from endless_voices.artifacts import digest, encoded, file_hash
+from endless_voices.artifacts import save_progress as write_json
 from endless_voices.common import load_config, load_tokenizer
-from endless_voices.contracts import evaluation_messages, read_records, validate_manifest
-
-
-def digest(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
-
-
-def encoded(value) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False).encode("utf-8")
-
-
-def file_hash(path: Path) -> str:
-    with path.open("rb") as handle:
-        return hashlib.file_digest(handle, "sha256").hexdigest()
-
-
-def write_json(path: Path, value) -> None:
-    temporary = path.with_suffix(".tmp")
-    temporary.write_bytes(encoded(value) + b"\n")
-    temporary.replace(path)
+from endless_voices.contracts import evaluation_messages
+from endless_voices.dataset.storage import SceneDataset
 
 
 def append_json(handle, value) -> None:
@@ -80,15 +63,9 @@ def artifact(source: str, revision: str | None, args) -> tuple[Path, dict]:
 
 
 def select_samples(args) -> tuple[list[dict], dict]:
-    validate_manifest(args.manifest)
     manifest_bytes = args.manifest.read_bytes()
     manifest = json.loads(manifest_bytes)
-    records = []
-    for entry in manifest["files"][args.split]:
-        file = args.manifest.parent / entry["path"]
-        if file_hash(file) != entry["sha256"]:
-            raise ValueError(f"{file}: dataset changed during validation")
-        records.extend(record for _, record in read_records(file, args.split))
+    records = list(SceneDataset.load(args.manifest.parent, args.split))
     if args.sample_ids:
         ids = json.loads(args.sample_ids.read_text(encoding="utf-8"))
         if (
@@ -145,7 +122,8 @@ def execution_info() -> dict:
         },
         "git_commit": head.decode().strip() if head else None,
         "git_dirty": bool(status) if status is not None else None,
-        "code_sha256": {p.name: file_hash(p) for p in Path(__file__).parent.glob("*.py")},
+        "code_sha256": {str(p.relative_to(Path(__file__).parent)): file_hash(p)
+                        for p in Path(__file__).parent.rglob("*.py")},
         "mps_available": torch.backends.mps.is_available(),
         "cuda_version": torch.version.cuda,
         "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),

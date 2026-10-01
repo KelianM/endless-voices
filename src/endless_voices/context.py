@@ -1,19 +1,18 @@
 """Select eligible story context once for dataset preparation and benchmarking."""
 
 import hashlib
-import json
 import re
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from endless_voices.artifacts import encoded
 from endless_voices.messages import validate_messages
 
 
 def digest(value):
-    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    return hashlib.sha256(encoded(value)).hexdigest()
 
 
 

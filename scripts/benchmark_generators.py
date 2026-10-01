@@ -8,9 +8,9 @@ from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
+from endless_voices import artifacts, hosted_judge, providers
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
-from endless_voices import hosted_judge, providers
 from endless_voices.dataset.storage import SceneDataset
 from endless_voices.dataset.targets import load_targets, target_text
 from endless_voices.prepare_context import load_selections
@@ -101,7 +101,8 @@ def prepare(root, dataset, config):
     for name, cfg in locals_.items():
         screen.save(root / f"{name}-config.json", cfg)
     screen.save(root / "plan.json", plan)
-    for p in (Path(__file__), Path(screen.__file__), Path(providers.__file__)):
+    for p in (Path(__file__), Path(screen.__file__),
+              Path(providers.__file__), Path(artifacts.__file__)):
         shutil.copy2(p, root / p.name)
     files = [p for p in root.rglob("*") if p.is_file()]
     screen.save(root / "selection.json", {
@@ -181,6 +182,8 @@ def export(root):
         if (model not in plan["local_configs"]
                 and settings["provider_code_sha256"] != screen.sha(root / "providers.py")):
             raise ValueError("Provider implementation changed")
+        if settings["artifact_code_sha256"] != screen.sha(root / "artifacts.py"):
+            raise ValueError("Artifact implementation changed")
         raw_results = assess.indexed([screen.read(p) for p in source.glob("*.result.json")], ids)
         prompts, responses = {}, {}
         for sid, raw in raw_results.items():

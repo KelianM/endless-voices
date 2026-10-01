@@ -1,5 +1,6 @@
 """Offline checks of the data boundary and the actual CLI workflow."""
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -14,7 +15,6 @@ from transformers import GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from endless_voices.data import (
     ConversationCollator,
-    load_conversations,
     tokenize_conversations,
 )
 
@@ -42,34 +42,24 @@ def test_padding_preserves_eos(tokenizer: PreTrainedTokenizerFast) -> None:
     assert batch["labels"].tolist() == [[2, 1, -100], [2, 3, 1]]
 
 
-@pytest.mark.parametrize(
-    "messages",
-    [
-        [],
-        [{"role": "user", "content": "hello"}],
-        [{"role": "user", "content": "hello"}, {"role": "assistant", "content": " "}],
-        [{"role": "assistant", "content": "hello"}, {"role": "user", "content": "hello"}],
-    ],
-)
-def test_invalid_conversations(tmp_path: Path, messages: list[dict[str, str]]) -> None:
-    path = tmp_path / "bad.jsonl"
-    path.write_text(json.dumps({"messages": messages}))
-    with pytest.raises(ValueError, match=r"bad.jsonl:1:"):
-        load_conversations(str(path))
+def prepared(tmp_path, messages):
+    root = tmp_path / "dataset"
+    root.mkdir()
+    record = json.loads((Path(__file__).parent / "fixtures/contracts/train.jsonl").read_text())
+    record["messages"] = messages
+    path = root / "train.jsonl"
+    path.write_text(json.dumps(record) + "\n")
+    (root / "manifest.json").write_text(json.dumps({
+        "format": "scene-dataset-v1", "split_unit": "mission", "splits": ["train"],
+        "artifacts": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()}}))
+    return root
 
 
 def test_long_conversation_rejected(tmp_path: Path, tokenizer: PreTrainedTokenizerFast) -> None:
-    path = tmp_path / "long.jsonl"
-    path.write_text(
-        json.dumps(
-            {
-                "messages": [
-                    {"role": "user", "content": "hello hello hello"},
-                    {"role": "assistant", "content": "friend"},
-                ]
-            }
-        )
-    )
+    path = prepared(tmp_path, [
+        {"role": "system", "content": "hello"},
+        {"role": "user", "content": "hello hello hello"},
+        {"role": "assistant", "content": "friend"}])
     with pytest.raises(ValueError, match="Shorten the conversation"):
         tokenize_conversations(str(path), tokenizer, max_length=2)
 
@@ -89,18 +79,10 @@ def test_train_and_chat_cli(tmp_path: Path, tokenizer: PreTrainedTokenizerFast) 
         )
     ).save_pretrained(base)
     tokenizer.save_pretrained(base)
-    dataset = tmp_path / "train.jsonl"
-    dataset.write_text(
-        json.dumps(
-            {
-                "messages": [
-                    {"role": "user", "content": "hello"},
-                    {"role": "assistant", "content": "friend"},
-                ]
-            }
-        )
-        + "\n"
-    )
+    dataset = prepared(tmp_path, [
+        {"role": "system", "content": "hello"},
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": "friend"}])
     output = tmp_path / "adapter"
     config = tmp_path / "train.toml"
     config.write_text(f'''
@@ -175,16 +157,15 @@ def test_contract_cli_local_tokenizer(tmp_path: Path, tokenizer: PreTrainedToken
     assert result.returncode == 0, result.stderr
     result = subprocess.run([*command, "2"], capture_output=True, text=True)
     assert result.returncode == 1
-    assert "train.jsonl:1:" in result.stderr
+    assert "train/" in result.stderr
     assert "Shorten the conversation" in result.stderr
 
 
 def test_continuation_loss_excludes_lore_and_preserves_target_eos(tmp_path, tokenizer):
-    path = tmp_path / "sample.jsonl"
-    path.write_text(json.dumps({"messages": [
+    path = prepared(tmp_path, [
         {"role": "system", "content": "hello"},
         {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": "friend"}]}))
+        {"role": "assistant", "content": "friend"}])
     examples = tokenize_conversations(str(path), tokenizer, 32)
     batch = ConversationCollator(tokenizer)(examples)
     assert batch["labels"].tolist() == [[-100, -100, -100, -100, 3, 1]]
@@ -194,10 +175,10 @@ def test_mapping_tokenizer_output_keeps_ids_and_loss_boundary(tmp_path, tokenize
     original = tokenizer.apply_chat_template
     monkeypatch.setattr(tokenizer, "apply_chat_template",
                         lambda *a, **kw: {"input_ids": original(*a, **kw)})
-    path = tmp_path / "sample.jsonl"
-    path.write_text(json.dumps({"messages": [
+    path = prepared(tmp_path, [
+        {"role": "system", "content": "hello"},
         {"role": "user", "content": "hello"},
-        {"role": "assistant", "content": "friend"}]}))
+        {"role": "assistant", "content": "friend"}])
     row = tokenize_conversations(str(path), tokenizer, 16)[0]
-    assert row["input_ids"] == [2, 1, 3, 1]
-    assert row["labels"] == [-100, -100, 3, 1]
+    assert row["input_ids"] == [2, 1, 2, 1, 3, 1]
+    assert row["labels"] == [-100, -100, -100, -100, 3, 1]

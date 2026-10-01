@@ -2,13 +2,18 @@
 
 import hashlib
 import json
+from argparse import Namespace
 
 import pytest
 from torch.utils.data import DataLoader
 
+from endless_voices.assessment import load_dataset
+from endless_voices.contracts import validate_manifest
+from endless_voices.data import load_conversations
 from endless_voices.dataset.builder import DatasetBuilder
 from endless_voices.dataset.source import GameCorpus
 from endless_voices.dataset.storage import SceneDataset
+from endless_voices.generate import select_samples
 
 
 class Counter:
@@ -100,6 +105,12 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
+    assert validate_manifest(output / "manifest.json")["train"]["records"] == len(dataset)
+    assert load_conversations(output) == [row["messages"] for row in dataset]
+    selected, _ = select_samples(Namespace(
+        manifest=output / "manifest.json", split="train", sample_ids=None, limit=None))
+    assert selected == list(dataset)
+    assert list(load_dataset(output / "manifest.json", "train").values()) == list(dataset)
     later = [r for r in dataset if r["metadata"]["sources"][0]["source_group"] == "mission / Later"]
     assert len(later) == 2
     for row in later:

@@ -66,7 +66,7 @@ def args(tmp_path, base):
     ]
     path.write_text(json.dumps(record) + "\n")
     manifest = json.loads((dataset / "manifest.json").read_text())
-    manifest["files"]["validation"][0]["sha256"] = gen.file_hash(path)
+    manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     (dataset / "manifest.json").write_text(json.dumps(manifest))
     config = tmp_path / "model.toml"
     config.write_text(f'[model]\nname_or_path = "{base}"\n')
@@ -241,7 +241,7 @@ def test_changed_dataset_rejected_before_run(args, tmp_path):
     dataset = args.manifest.parent
     with (dataset / "validation.jsonl").open("a") as handle:
         handle.write("\n")
-    with pytest.raises(ValueError, match="sha256 mismatch"):
+    with pytest.raises(ValueError, match="artifact differs"):
         gen.run_generation(args)
     assert not args.output.exists()
 
@@ -338,7 +338,7 @@ def test_seed_is_independent_of_selection_order(args, monkeypatch):
     second_record["metadata"]["id"] = "second-validation"
     path.write_text(json.dumps(first_record) + "\n" + json.dumps(second_record) + "\n")
     manifest = json.loads(args.manifest.read_text())
-    manifest["files"]["validation"][0]["sha256"] = gen.file_hash(path)
+    manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     args.manifest.write_text(json.dumps(manifest))
     assert gen.run_generation(args) == 0
     first = read_run(args)[1][0]

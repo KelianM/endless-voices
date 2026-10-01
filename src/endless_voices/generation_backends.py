@@ -1,25 +1,14 @@
 """Run local or hosted generation from saved benchmark prompts."""
 
-import hashlib
 import importlib.metadata
-import json
 import time
 import urllib.error
 from pathlib import Path
 
-
-def read(path):
-    return json.loads(Path(path).read_text())
-
-
-def sha(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
-def save(path, data):
-    with Path(path).open("x") as handle:
-        json.dump(data, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+from endless_voices import artifacts
+from endless_voices.artifacts import file_hash as sha
+from endless_voices.artifacts import read_json as read
+from endless_voices.artifacts import write_json as save
 
 
 def quantize_full_history(caches, full_cache_type, *, bits=8, group_size=64):
@@ -47,6 +36,7 @@ def local(root, config):
         {
             **cfg,
             "code_sha256": sha(__file__),
+            "artifact_code_sha256": sha(artifacts.__file__),
             "prompts_sha256": sha(root / "prompts.json"),
             "max_output_tokens": output_limit,
             "context_ceiling": context_limit,
@@ -144,6 +134,7 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
             {
                 "model": model,
                 "code_sha256": sha(__file__),
+            "artifact_code_sha256": sha(artifacts.__file__),
                 "provider_code_sha256": sha(providers.__file__),
                 "prompts_sha256": sha(root / "prompts.json"),
                 "reasoning": "medium",

@@ -12,7 +12,8 @@ and reports controls separately.
 
 Reports include correct, incorrect, abstained, failed and missing counts. Accuracy uses decided
 trials as its denominator; coverage includes all scheduled trials. Paired comparisons use shared
-scenes. Conversation groups, rather than repeated turns, define the uncertainty units. Recognition
+scenes. Source missions and connected conversation variants define the uncertainty units; repeated turns
+within those groups are not independent observations. Recognition
 and free-text explanations remain inspectable.
 
 Generation and judge runners preserve settings, requests, responses and usage. Failed or uncertain

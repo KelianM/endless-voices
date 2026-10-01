@@ -1,7 +1,6 @@
 """Prepare blinded trials and report saved authenticity judgments without loading models."""
 
 import argparse
-import hashlib
 import html
 import itertools
 import json
@@ -11,30 +10,12 @@ import shutil
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from endless_voices.contracts import evaluation_messages, read_records, validate_manifest
+from endless_voices.artifacts import digest, encoded, file_hash, read_json, write_json
+from endless_voices.contracts import evaluation_messages
+from endless_voices.dataset.storage import SceneDataset
+from endless_voices.splits import mission_key
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def encoded(value):
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False).encode()
-
-
-def digest(value):
-    return hashlib.sha256(value).hexdigest()
-
-
-def file_hash(path):
-    return digest(path.read_bytes())
-
-
-def read_json(path):
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def write_json(path, value):
-    with path.open("x", encoding="utf-8") as handle:
-        handle.write(json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
 
 
 def read_rows(path):
@@ -52,13 +33,7 @@ def indexed(rows, allowed):
 
 
 def load_dataset(manifest, split):
-    validate_manifest(manifest)
-    declaration = read_json(manifest)
-    return {
-        row["metadata"]["id"]: row
-        for entry in declaration["files"][split]
-        for _, row in read_records(manifest.parent / entry["path"], split)
-    }
+    return {row["metadata"]["id"]: row for row in SceneDataset.load(manifest.parent, split)}
 
 
 def load_run(directory, manifest, records, split):
@@ -116,7 +91,7 @@ def load_run(directory, manifest, records, split):
 
 
 def connected_groups(records):
-    """Return transitive conversation/scenario groups for uncertainty calculations."""
+    """Group source missions and connected conversation variants for uncertainty."""
     parent = {}
 
     def find(x):
@@ -128,7 +103,8 @@ def connected_groups(records):
     for row in records.values():
         meta = row["metadata"]
         c = "conversation:" + meta["conversation_id"]
-        find(c)
+        mission = "mission:" + mission_key(meta)
+        parent[find(c)] = find(mission)
         if meta["scenario_group"]:
             s = "scenario:" + meta["scenario_group"]
             parent[find(c)] = find(s)
@@ -158,7 +134,7 @@ def trial_page(trial, instructions):
     return "\n".join(sections)
 
 
-def prepare(manifest, runs, output, split="validation", seed=None, controls=None, reverse=False):
+def prepare(manifest, runs, output, split="validation", seed=None, controls=None):
     """Write an immutable organizer pack and isolated public trial files."""
     records = load_dataset(manifest, split)
     loaded = {name: load_run(path, manifest, records, split) for name, path in runs.items()}
@@ -168,13 +144,13 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
         for name, (run, _, _) in loaded.items()
     }
     return prepare_trials(records, loaded, output, provenance, split=split, seed=seed,
-                          controls=controls, reverse=reverse,
+                          controls=controls,
                           input_provenance={"manifest_sha256": file_hash(manifest)},
-                          licensing=manifest.parent.parent / "licensing")
+                          licensing=manifest.parent / "licensing")
 
 
 def prepare_trials(records, loaded, output, run_provenance, *, split="validation", seed=None,
-                   controls=None, reverse=False, input_provenance=None, licensing=None):
+                   controls=None, input_provenance=None, licensing=None):
     """Build isolated trials from verified records and normalized generation evidence."""
     if output.exists():
         raise ValueError("Output already exists")
@@ -220,10 +196,6 @@ def prepare_trials(records, loaded, output, run_provenance, *, split="validation
             if status != "ok":
                 continue
             public.append((name, sid, "primary", response["response"], pos, None))
-            if reverse:
-                public.append(
-                    (name, sid, "reversed", response["response"], "B" if pos == "A" else "A", None)
-                )
     for item in controls or []:
         sid, kind = item["sample_id"], item["kind"]
         if sid not in records or kind not in {"identical", "wrong-context"}:
@@ -240,7 +212,7 @@ def prepare_trials(records, loaded, output, run_provenance, *, split="validation
     output.mkdir(parents=True)
     if licensing is not None and licensing.is_dir():
         shutil.copytree(licensing, output / "attribution")
-    for stage in ("primary", "reversed", "controls"):
+    for stage in ("primary", "controls"):
         (output / "public" / stage).mkdir(parents=True)
     for name, sid, kind, alternative, pos, control in public:
         trial_id = f"{rng.getrandbits(128):032x}"
@@ -252,7 +224,7 @@ def prepare_trials(records, loaded, output, run_provenance, *, split="validation
             "A": original if pos == "A" else alternative,
             "B": original if pos == "B" else alternative,
         }
-        stage = kind if kind in {"primary", "reversed"} else "controls"
+        stage = "primary" if kind == "primary" else "controls"
         relative = f"public/{stage}/{trial_id}.json"
         write_json(output / relative, trial)
         (output / relative).with_suffix(".html").write_text(trial_page(trial, instructions))
@@ -286,7 +258,7 @@ def prepare_trials(records, loaded, output, run_provenance, *, split="validation
             "calibration_status": "provisional; calibration and owner discussion required",
         },
     )
-    for stage in ("primary", "reversed", "controls"):
+    for stage in ("primary", "controls"):
         selected = [t for t in private if f"public/{stage}/" in t["path"]]
         write_json(
             output / f"{stage}-review-template.json",
@@ -394,6 +366,8 @@ def report(pack, reviews, output):
         raise ValueError("Instructions changed after preparation")
     trials = {t["trial_id"]: t for t in key["trials"]}
     for t in trials.values():
+        if t["kind"] not in {"primary", "identical", "wrong-context"}:
+            raise ValueError("Unsupported trial kind")
         if file_hash(pack / t["path"]) != t["trial_sha256"]:
             raise ValueError("Trial hash mismatch")
     reviewers, all_rows = {}, []
@@ -472,7 +446,7 @@ def report(pack, reviews, output):
                     "value": 1 if outcome == "correct" else 0 if outcome == "incorrect" else None,
                 }
             )
-    summaries, paired, disagreements, reversals = [], [], [], []
+    summaries, paired, disagreements = [], [], []
     conditions = list(key["runs"])
     for rid in reviewers:
         primary = [r for r in all_rows if r["reviewer_id"] == rid and r["kind"] == "primary"]
@@ -526,33 +500,11 @@ def report(pack, reviews, output):
                     "uncertainty": interval(complete),
                 }
             )
-        for r in primary:
-            other = next(
-                (
-                    x
-                    for x in all_rows
-                    if x["reviewer_id"] == rid
-                    and x["kind"] == "reversed"
-                    and x["condition"] == r["condition"]
-                    and x["sample_id"] == r["sample_id"]
-                ),
-                None,
-            )
-            if other:
-                reversals.append(
-                    {
-                        "reviewer_id": rid,
-                        "primary": r["trial_id"],
-                        "reversed": other["trial_id"],
-                        "primary_outcome": r["outcome"],
-                        "reversed_outcome": other["outcome"],
-                    }
-                )
     for tid in trials:
         rows = [r for r in all_rows if r["trial_id"] == tid and r.get("status", "ok") == "ok"]
         if len({r["choice"] for r in rows}) > 1:
             disagreements.append({"trial_id": tid, "judgments": rows})
-    controls = [r for r in all_rows if r["kind"] not in {"primary", "reversed"}]
+    controls = [r for r in all_rows if r["kind"] != "primary"]
     for row in controls:
         row["matches_control"] = (
             (
@@ -591,7 +543,6 @@ def report(pack, reviews, output):
         "paired": paired,
         "controls": controls,
         "disagreements": disagreements,
-        "position_checks": reversals,
         "trials": all_rows,
     }
     output.mkdir(parents=True)
@@ -602,9 +553,9 @@ def report(pack, reviews, output):
         "Judge calibration is not established. Lower detection is not automatically better "
         "quality. Chance performance does not establish indistinguishability or equivalence.",
         "",
-        "Intervals resample whole conversation/scenario groups. Few groups can produce "
+        "Intervals resample whole source missions and connected variants. Few groups can produce "
         "unstable or degenerate intervals; these intervals exclude judge and dataset-selection "
-        "uncertainty. Reviewer votes and reversed positions are not independent scenes.",
+        "uncertainty. Reviewer votes are not independent scenes.",
         "",
         "| Reviewer | Condition | Correct / decided | Incorrect | Abstained / scheduled | "
         "Failed | Missing |",
@@ -692,7 +643,7 @@ def report(pack, reviews, output):
         )
         for missing in pair["incomplete_pairs"]:
             lines.append(f"- {missing['sample_id']}: {missing['left']} / {missing['right']}")
-    lines.extend(["", "## Controls and position checks", ""])
+    lines.extend(["", "## Controls", ""])
     for rid in reviewers:
         subset = [r for r in controls if r["reviewer_id"] == rid]
         matching = sum(r["matches_control"] is True for r in subset)
@@ -700,12 +651,6 @@ def report(pack, reviews, output):
         lines.append(
             f"{rid}: {matching}/{submitted} submitted controls matched the intended "
             f"outcome; {len(subset)} scheduled controls. Controls do not enter detection rates."
-        )
-    for check in reversals:
-        lines.append(
-            f"- {check['reviewer_id']}, {check['primary']}: "
-            f"{check['primary_outcome']} in the primary order; "
-            f"{check['reversed_outcome']} in the reversed order."
         )
     lines.extend(
         [
@@ -775,9 +720,6 @@ def main():
         "--controls", type=Path, help="JSON control recipes; kept outside primary results"
     )
     p.add_argument("--seed", type=int, help="Private reproducibility seed; random by default")
-    p.add_argument(
-        "--reverse", action="store_true", help="Separate reversed trials for isolated calls"
-    )
     p.add_argument("--output", type=Path, required=True)
     p = sub.add_parser("report", help="Report saved judgments; never infer missing decisions")
     p.add_argument("--pack", type=Path, required=True)
@@ -803,7 +745,6 @@ def main():
                 args.split,
                 args.seed,
                 read_json(args.controls) if args.controls else None,
-                args.reverse,
             )
         elif args.command == "human":
             export_human(args.pack, args.output, args.condition, args.stage)

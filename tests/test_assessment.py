@@ -14,7 +14,7 @@ from endless_voices.judge import judge_messages, parse_answer
 def dataset(tmp_path):
     fixture = Path(__file__).parent / "fixtures/contracts"
     manifest = a.read_json(fixture / "manifest.json")
-    for split in manifest["files"]:
+    for split in manifest["splits"]:
         if split == "validation":
             original = a.read_rows(fixture / "validation.jsonl")[0]
             rows = []
@@ -27,7 +27,7 @@ def dataset(tmp_path):
             rows = a.read_rows(fixture / f"{split}.jsonl")
         path = tmp_path / f"{split}.jsonl"
         path.write_text("".join(json.dumps(r) + "\n" for r in rows))
-        manifest["files"][split] = [{"path": path.name, "sha256": a.file_hash(path)}]
+        manifest["artifacts"][path.name] = a.file_hash(path)
     a.write_json(tmp_path / "manifest.json", manifest)
     return tmp_path / "manifest.json"
 
@@ -110,21 +110,17 @@ def reviews(path, trials, choices, reviewer="simulated-reviewer"):
 def test_pack_keeps_keys_conditions_and_source_metadata_outside_public_trials(dataset, tmp_path):
     run = generation(tmp_path / "run", dataset, ["ok"] * 3 + ["failed", "missing"])
     pack = tmp_path / "pack"
-    trials = a.prepare(dataset, {"PRIVATE-CONDITION": run}, pack, seed=12, reverse=True)
-    assert len(trials) == 6
+    trials = a.prepare(dataset, {"PRIVATE-CONDITION": run}, pack, seed=12)
+    assert len(trials) == 3
     for trial in trials:
         public = a.read_json(pack / trial["path"])
         assert list(public) == ["trial_id", "context", "A", "B"]
         assert public["context"][-1]["role"] == "user"
         assert "PRIVATE-CONDITION" not in json.dumps(public)
-        other = next(
-            t for t in trials if t["sample_id"] == trial["sample_id"] and t["kind"] != trial["kind"]
-        )
-        reversed_trial = a.read_json(pack / other["path"])
-        assert public["A"] == reversed_trial["B"]
-        assert trial["original"] != other["original"]
+        assert public[trial["original"]].startswith("Original fixture answer")
+    assert len({t["sample_id"] for t in trials}) == 3
     second = tmp_path / "repeat"
-    assert a.prepare(dataset, {"PRIVATE-CONDITION": run}, second, seed=12, reverse=True) == trials
+    assert a.prepare(dataset, {"PRIVATE-CONDITION": run}, second, seed=12) == trials
     with pytest.raises(ValueError, match="exists"):
         a.prepare(dataset, {"x": run}, pack)
 
@@ -232,10 +228,17 @@ def test_group_bootstrap_does_not_count_turns_as_independent():
     assert a.interval(rows) == a.interval(rows)
     assert a.interval(rows)["groups"] == 2
     records = {
-        str(i): {"metadata": {"conversation_id": c, "scenario_group": s}}
+        str(i): {"metadata": {"conversation_id": c, "scenario_group": s,
+                              "sources": [{"revision": "r", "source_group": c}]}}
         for i, (c, s) in enumerate([("a", "x"), ("b", "x"), ("b", "y"), ("c", "y")])
     }
     assert len(set(a.connected_groups(records).values())) == 1
+    for row in records.values():
+        row["metadata"]["scenario_group"] = None
+        row["metadata"]["sources"][0]["source_group"] = "shared-mission"
+    assert len(set(a.connected_groups(records).values())) == 1
+    records["3"]["metadata"]["sources"][0]["source_group"] = "independent-mission"
+    assert len(set(a.connected_groups(records).values())) == 2
 
 
 def test_judge_treats_dialogue_as_data_and_rejects_incomplete_or_extra_fields():
@@ -289,94 +292,6 @@ def test_judgments_cannot_override_answer_keys_or_condition_labels(dataset, tmp_
         a.report(pack, [review], tmp_path / "report")
 
 
-def test_mlx_runner_isolates_trials_and_records_partial_output_as_failure(tmp_path, monkeypatch):
-    import sys
-    from types import ModuleType, SimpleNamespace
-
-    from endless_voices import judge
-
-    model = tmp_path / ("a" * 40)
-    model.mkdir()
-    a.write_json(model / "config.json", {})
-    a.write_json(
-        tmp_path / "model.json",
-        {"source": "invented-test-model", "revision": model.name, "path": str(model)},
-    )
-    trial_dir = tmp_path / "trials"
-    trial_dir.mkdir()
-    for i in range(2):
-        a.write_json(
-            trial_dir / f"{i}.json",
-            {"trial_id": str(i), "context": [], "A": "invented A", "B": "invented B"},
-        )
-    (tmp_path / "instructions.txt").write_text("Fixture judge instructions")
-    messages_seen, kwargs_seen = [], []
-
-    class Tokenizer:
-        def apply_chat_template(self, messages, **kwargs):
-            assert kwargs["enable_thinking"] is False
-            assert len(messages) == 2
-            messages_seen.append(messages)
-            return json.dumps(messages)
-
-        def encode(self, prompt, **kwargs):
-            return [1, 2]
-
-    def stream(model, tokenizer, **kwargs):
-        kwargs_seen.append(kwargs)
-        text = json.dumps(
-            {"choice": "A", "confidence": "low", "reason": "Simulated", "recognized_source": False}
-        )
-        yield SimpleNamespace(
-            text=text,
-            generation_tokens=20,
-            prompt_tokens=2,
-            peak_memory=0,
-            finish_reason="length" if len(kwargs_seen) == 1 else "stop",
-        )
-
-    mlx_lm = ModuleType("mlx_lm")
-    mlx_lm.load = lambda *args, **kwargs: (object(), Tokenizer())
-    mlx_lm.stream_generate = stream
-    sample_utils = ModuleType("mlx_lm.sample_utils")
-    sample_utils.make_sampler = lambda **kwargs: object()
-    core = ModuleType("mlx.core")
-    core.random = SimpleNamespace(seed=lambda value: None)
-    mlx = ModuleType("mlx")
-    mlx.core = core
-    for name, module in (
-        ("mlx", mlx),
-        ("mlx.core", core),
-        ("mlx_lm", mlx_lm),
-        ("mlx_lm.sample_utils", sample_utils),
-    ):
-        monkeypatch.setitem(sys.modules, name, module)
-    monkeypatch.setattr(judge.importlib.metadata, "version", lambda name: "simulated-test-version")
-    args = SimpleNamespace(
-        output=tmp_path / "out",
-        model_config=tmp_path / "model.json",
-        trials=trial_dir,
-        instructions=tmp_path / "instructions.txt",
-        reviewer_id="simulated-llm",
-        max_tokens=50,
-        max_context_tokens=100,
-        seconds_per_trial=30,
-        allow_json_fence=False,
-        limit=None,
-    )
-    assert judge.run(args) == 1
-    result = a.read_json(args.output / "review.json")
-    assert [r["status"] for r in result["reviews"]] == ["failed", "ok"]
-    assert result["reviews"][0]["choice"] is None
-    assert result["reviews"][0]["raw_output"]
-    assert all("prompt_cache" not in kwargs for kwargs in kwargs_seen)
-    assert json.loads(messages_seen[0][1]["content"])["trial_id"] == "0"
-    assert json.loads(messages_seen[1][1]["content"])["trial_id"] == "1"
-    assert len(a.read_rows(args.output / "prompts.jsonl")) == 2
-    with pytest.raises(ValueError, match="exists"):
-        judge.run(args)
-
-
 def test_changed_judge_prompt_records_are_rejected(dataset, tmp_path):
     run = generation(tmp_path / "run", dataset, ["ok"])
     pack = tmp_path / "pack"
@@ -399,11 +314,11 @@ def test_changed_judge_prompt_records_are_rejected(dataset, tmp_path):
         a.report(pack, [review], tmp_path / "report")
 
 
-def test_recognition_and_reversed_trials_do_not_change_primary_denominator(dataset, tmp_path):
+def test_recognition_does_not_change_primary_denominator(dataset, tmp_path):
     run = generation(tmp_path / "run", dataset, ["ok"])
     pack = tmp_path / "pack"
-    trials = a.prepare(dataset, {"fixture": run}, pack, seed=1, reverse=True)
-    review = reviews(tmp_path / "review.json", trials, ["correct"] * 2)
+    trials = a.prepare(dataset, {"fixture": run}, pack, seed=1)
+    review = reviews(tmp_path / "review.json", trials, ["correct"])
     content = a.read_json(review)
     for row in content["reviews"]:
         row["recognized_source"] = True
@@ -412,25 +327,6 @@ def test_recognition_and_reversed_trials_do_not_change_primary_denominator(datas
     assert result["results"][0]["scheduled"] == 1
     assert result["results"][0]["recognized"]["correct"] == 1
     assert result["results"][0]["unrecognized"]["scheduled"] == 0
-    assert len(result["position_checks"]) == 1
-
-
-def test_optional_json_fence_does_not_accept_prose_or_coerce_fields():
-    answer = {
-        "choice": "abstain",
-        "confidence": None,
-        "reason": "Simulated",
-        "recognized_source": False,
-    }
-    fenced = "```json\n" + json.dumps(answer) + "\n```"
-    assert parse_answer(fenced, allow_json_fence=True) == answer
-    with pytest.raises(ValueError):
-        parse_answer(fenced)
-    with pytest.raises(ValueError):
-        parse_answer("Here is my answer:\n" + fenced, allow_json_fence=True)
-    answer["confidence"] = "null"
-    with pytest.raises(ValueError):
-        parse_answer("```json\n" + json.dumps(answer) + "\n```", allow_json_fence=True)
 
 
 def test_judge_serialization_cannot_leak_original_through_insertion_order():

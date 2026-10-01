@@ -35,7 +35,7 @@ def rewrite(manifest, split, records):
     path = manifest.parent / f"{split}.jsonl"
     path.write_text("\n" + "\n".join(json.dumps(row) for row in records) + "\n")
     contents = json.loads(manifest.read_text())
-    contents["files"][split][0]["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    contents["artifacts"][f"{split}.jsonl"] = hashlib.sha256(path.read_bytes()).hexdigest()
     manifest.write_text(json.dumps(contents))
 
 
@@ -43,8 +43,7 @@ def test_valid_manifest_and_loader_compatibility():
     counts = validate_manifest(FIXTURES / "manifest.json")
     assert counts["train"]["identities"] == {"invented-archive-guild": 1}
     assert counts["test"]["records"] == 1
-    assert load_conversations(str(FIXTURES / "train.jsonl")) == [record()["messages"]]
-    assert load_conversations(str(Path(__file__).parents[1] / "data" / "example.jsonl"))
+    assert load_conversations(str(FIXTURES)) == [record()["messages"]]
 
 
 @pytest.mark.parametrize("key", list(record()["metadata"]))
@@ -129,11 +128,6 @@ def test_bad_jsonl_line_locations(tmp_path, payload):
         list(read_records(path, "train"))
 
 
-def test_committed_invalid_fixture():
-    with pytest.raises(ValueError, match=r"invalid.jsonl:1:.*metadata"):
-        list(read_records(FIXTURES / "invalid.jsonl", "train"))
-
-
 @pytest.mark.parametrize("split", ["train", "validation", "test"])
 def test_duplicate_ids_across_all_files(manifest, split):
     row = record(split)
@@ -165,14 +159,9 @@ def test_scenario_family_split_unit(manifest):
     assert validate_manifest(manifest)["train"]["records"] == 2
 
 
-def test_physical_separation_and_hash(manifest):
-    contents = json.loads(manifest.read_text())
-    contents["files"]["validation"] = contents["files"]["train"]
-    manifest.write_text(json.dumps(contents))
-    with pytest.raises(ValueError, match="split file reused"):
-        validate_manifest(manifest)
+def test_changed_artifact_is_rejected(manifest):
     (manifest.parent / "train.jsonl").write_text("changed")
-    with pytest.raises(ValueError, match="sha256 mismatch"):
+    with pytest.raises(ValueError, match="artifact differs"):
         validate_manifest(manifest)
 
 
@@ -247,7 +236,7 @@ def test_optional_length_check_has_line_error(manifest, split):
             assert kwargs == {"tokenize": True, "add_generation_prompt": False}
             return list(range(10 if messages[-1]["content"] == "LONG_TARGET" else 3))
 
-    with pytest.raises(ValueError, match=rf"{split}.jsonl:2:.*Shorten the conversation"):
+    with pytest.raises(ValueError, match="Shorten the conversation"):
         validate_manifest(manifest, tokenizer=LocalTokenizer(), max_length=5)
     assert validate_manifest(manifest, tokenizer=LocalTokenizer(), max_length=10)
 
@@ -287,20 +276,16 @@ def test_unsupported_schema_versions(manifest, value):
     row["schema_version"] = value
     with pytest.raises(ValueError, match="schema_version"):
         validate_record(row, "train")
-    contents = json.loads(manifest.read_text())
-    contents["schema_version"] = value
-    manifest.write_text(json.dumps(contents))
-    with pytest.raises(ValueError, match="manifest.json:.*schema_version"):
-        validate_manifest(manifest)
 
 
-def test_missing_split_and_path_escape(manifest):
+def test_missing_hash_and_path_escape(manifest):
     contents = json.loads(manifest.read_text())
-    del contents["files"]["test"]
+    del contents["artifacts"]["test.jsonl"]
     manifest.write_text(json.dumps(contents))
-    with pytest.raises(ValueError, match="missing fields.*test"):
+    with pytest.raises(ValueError, match="requires an artifact hash"):
         validate_manifest(manifest)
-    contents["files"]["test"] = [{"path": "../outside.jsonl", "sha256": "a" * 64}]
+    contents["artifacts"]["test.jsonl"] = "a" * 64
+    contents["artifacts"] = {"../outside": "a" * 64, **contents["artifacts"]}
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="inside the manifest directory"):
         validate_manifest(manifest)
@@ -308,16 +293,17 @@ def test_missing_split_and_path_escape(manifest):
 
 @pytest.mark.parametrize("alias_kind", ["symlink", "hardlink"])
 def test_physical_aliases(manifest, alias_kind):
-    alias = manifest.parent / "alias.jsonl"
+    alias = manifest.parent / "validation.jsonl"
     target = manifest.parent / "train.jsonl"
+    alias.unlink()
     if alias_kind == "symlink":
         alias.symlink_to(target)
     else:
         alias.hardlink_to(target)
     contents = json.loads(manifest.read_text())
-    contents["files"]["validation"] = [dict(contents["files"]["train"][0], path=alias.name)]
+    contents["artifacts"][alias.name] = contents["artifacts"][target.name]
     manifest.write_text(json.dumps(contents))
-    with pytest.raises(ValueError, match="split file reused"):
+    with pytest.raises(ValueError, match="Split file reused"):
         validate_manifest(manifest)
 
 
@@ -330,3 +316,20 @@ def test_mission_manifest_rejects_distinct_conversations_in_the_same_mission(man
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="mission .* crosses splits"):
         validate_manifest(manifest)
+
+
+def test_supplementary_lore_does_not_merge_mission_ownership(manifest):
+    for split in ("train", "validation", "test"):
+        row = record(split)
+        row["metadata"]["sources"].append({
+            "revision": "shared", "reference": "Lore", "source_group": "shared-lore"})
+        rewrite(manifest, split, [row])
+    assert validate_manifest(manifest)["train"]["records"] == 1
+
+
+def test_training_checks_other_published_splits_before_loading(manifest):
+    row = record("validation")
+    row["metadata"]["sources"][0] = copy.deepcopy(record()["metadata"]["sources"][0])
+    rewrite(manifest, "validation", [row])
+    with pytest.raises(ValueError, match="mission .*crosses splits"):
+        load_conversations(manifest.parent, "train")

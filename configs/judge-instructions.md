@@ -21,6 +21,4 @@ model/version and the complete judge prompt/settings separately in `judge_model_
 Leave unanswered trials unfilled; do not fabricate judgments.
 
 Judge each trial independently. Submit the primary review before seeing the control sheet.
-The control sheet reuses some passages and must not inform the primary judgments. A reversed
-form is for an independent reviewer or fresh isolated model calls, not a second independent
-observation from the same human who remembers the first form.
+The control sheet reuses some passages and must not inform the primary judgments.

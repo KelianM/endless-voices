@@ -6,9 +6,9 @@ import time
 import urllib.error
 from pathlib import Path
 
-from endless_voices import providers
-from endless_voices.assessment import file_hash, read_json, write_json
-from endless_voices.judge import judge_messages, parse_answer, save_progress
+from endless_voices import artifacts, providers
+from endless_voices.artifacts import file_hash, read_json, save_progress, write_json
+from endless_voices.judge import judge_messages, parse_answer
 from endless_voices.providers import RATES, charge, reservation
 
 SCHEMA = {
@@ -59,7 +59,7 @@ def run(args):
     instructions = (args.public / "instructions.txt").read_text()
     paths = [
         p
-        for stage in ("primary", "reversed", "controls")
+        for stage in ("primary", "controls")
         for p in sorted((args.public / stage).glob("*.json"))
     ]
     if not paths or len({p.stem for p in paths}) != len(paths):
@@ -68,6 +68,7 @@ def run(args):
     metadata = {
         "endpoints": {m: providers.endpoint(m) for m in models},
         "provider_code_sha256": file_hash(Path(providers.__file__)),
+        "artifact_code_sha256": file_hash(Path(artifacts.__file__)),
         "models": models,
         "rates_per_million_usd": RATES,
         "budget_usd": args.budget,

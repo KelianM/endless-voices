@@ -32,7 +32,7 @@ The [current training dataset](data/dataset/README.md) contains 163 examples fro
 
 ## Train and chat
 
-Edit `configs/train.toml` with a model path, training JSONL path and sequence limit, then run:
+Edit `configs/train.toml` with a model path, prepared dataset directory and split and sequence limit, then run:
 
 ```sh
 train --config configs/train.toml

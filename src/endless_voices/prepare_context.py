@@ -1,18 +1,14 @@
 """Save reusable context selections from eligible source drafts, without model calls."""
 
-import hashlib
 import json
 from dataclasses import asdict
 from pathlib import Path
 
+from endless_voices.artifacts import file_hash
 from endless_voices.context import (
     Selection,
     digest,
 )
-
-
-def file_hash(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def save_selections(output, selections, provenance):
