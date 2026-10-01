@@ -1,6 +1,6 @@
 # 4. Judge authenticity against original game continuations
 
-- **Status:** Superseded by ADR 6
+- **Status:** Accepted
 - **Date:** 2026-09-23
 - **Sources:** [Issue #6](https://github.com/KelianM/endless-voices/issues/6), [PR #13](https://github.com/KelianM/endless-voices/pull/13), [Li et al., 2017](https://aclanthology.org/D17-1230/)
 
@@ -21,6 +21,10 @@ The [evaluation protocol](../evaluation.md) makes source authenticity the primar
 question: given the same speaker and scene, can a blinded judge identify the original game
 continuation among an original and a generated reply? The base and adapted model are each
 compared against the same source continuation, with the same supplied context.
+
+Assign the original and generated continuation randomly to A and B once per generated
+response. Serialize A before B regardless of origin. Candidate order must not reveal the
+answer label.
 
 Judges give an authenticity choice and a free-text reason. No diagnostic categories or separate
 persona scores are requested; the initial review found the reasons sufficient to explain choices.
