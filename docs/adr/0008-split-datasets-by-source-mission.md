@@ -1,4 +1,4 @@
-# 9. Split datasets by source mission
+# 8. Split datasets by source mission
 
 - **Status:** Proposed
 - **Date:** 2026-10-01

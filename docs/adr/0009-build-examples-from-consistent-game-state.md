@@ -1,4 +1,4 @@
-# 8. Build examples from consistent game state
+# 9. Build examples from consistent game state
 
 - **Status:** Proposed
 - **Date:** 2026-10-01
@@ -14,7 +14,7 @@ Targets and sampled history need a consistent interpretation of the game source.
 
 Build examples by interpreting authored dialogue and mission state, replacing the manual extraction approach in [ADR 5](0005-build-datasets-from-reviewed-conversation-annotations.md). Preserve complete passages, including narration and other speakers, through the next visible player choice or endpoint. Full passages replace the direct-speech normalization in [ADR 4](0004-evaluate-authenticity-against-game-continuations.md); the authenticity question remains unchanged.
 
-Retain each distinct reachable target sequence as a separate example and select a compatible history reproducibly. Unspecified initial conditions represent possible prior states; subsequent assignments constrain which branches remain valid. Target construction and history sampling share the same interpretation of conditions and effects. Apply [mission split ownership](0009-split-datasets-by-source-mission.md) before [context selection](0007-infer-scene-writing-from-sampled-game-context.md).
+Retain each distinct reachable target sequence as a separate example and select a compatible history reproducibly. Unspecified initial conditions represent possible prior states; subsequent assignments constrain which branches remain valid. Target construction and history sampling share the same interpretation of conditions and effects. Apply [mission split ownership](0008-split-datasets-by-source-mission.md) before [context selection](0007-infer-scene-writing-from-sampled-game-context.md).
 
 Resolve each passage’s variables within its owning mission. Player identity comes from shared configuration; literal mission locations come from the game source. Do not apply the current mission’s substitutions to earlier missions or invent values for unresolved dynamic substitutions. Preserve unknown markers and record source coordinates, state and resolved values in provenance.
 
