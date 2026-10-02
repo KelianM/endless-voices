@@ -8,7 +8,7 @@ revision = "main"
 # Paths are relative to the working directory, not this config file.
 path = "data/dataset"
 split = "train"
-max_length = 2048
+max_length = 9216
 loss = "continuation"
 
 [lora]

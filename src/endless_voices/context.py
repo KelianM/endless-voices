@@ -74,13 +74,21 @@ class ContextPool:
     blocks: list[dict]
     graph: dict[str, list[str]]
     variables: dict[str, str] = field(default_factory=dict)
+    references: list[dict] = field(default_factory=list)
 
     def history(self, missions):
         text = "\n\n".join(render(b) for b in self.blocks if b["mission"] in missions)
         return text
 
-    def messages(self, missions):
-        return [{"role": "system", "content": self.system_prefix + self.history(missions)},
+    def messages(self, missions, references=()):
+        reference_text = ""
+        if references:
+            reference_text = (
+                "\n\nOther game scenes (independent writing references):\n"
+                + "\n\n".join(render(block) for block in references)
+            )
+        return [{"role": "system", "content": self.system_prefix + self.history(missions)
+                 + reference_text},
                 *deepcopy(self.encounter)]
 
 
@@ -99,7 +107,10 @@ class Selection:
         """Return selection settings and source coordinates without duplicating text."""
         def coordinates(blocks):
             return [{"mission": b["mission"], "path": b["path"],
-                     "lines": [p["line"] for p in b["passages"]]} for b in blocks]
+                     "lines": [p["line"] for p in b["passages"]],
+                     **({"reference": True, "state": b["state"],
+                         "source_kind": b.get("source_kind", "conversation")}
+                        if b.get("reference") else {})} for b in blocks]
 
         return {**deepcopy(self.provenance), "token_counts": dict(self.token_counts),
                 "selected": coordinates(self.selected), "omitted": coordinates(self.omitted)}
@@ -116,13 +127,14 @@ class ContextStrategy(Protocol):
     def select(self, pool: ContextPool, counter: TokenCounter) -> Selection: ...
 
 
-def result(pool, counter, config, full, sampled, ds):
+def result(pool, counter, config, full, sampled, ds, references=()):
     chosen = full | sampled
-    messages = pool.messages(chosen)
+    messages = pool.messages(chosen, references)
     return Selection(
         pool.sample_id, messages,
-        deepcopy([b for b in pool.blocks if b["mission"] in chosen]),
-        deepcopy([b for b in pool.blocks if b["mission"] not in chosen]),
+        deepcopy([b for b in pool.blocks if b["mission"] in chosen] + list(references)),
+        deepcopy([b for b in pool.blocks if b["mission"] not in chosen]
+                 + [b for b in pool.references if b not in references]),
         {"input": counter.messages(messages), "full_history": counter.text(pool.history(full)),
          "sampled_history": counter.text(pool.history(sampled))},
         {"strategy": config, "pool_sha256": digest(pool.__dict__),
@@ -139,7 +151,7 @@ class FullContext:
 
     def select(self, pool, counter):
         return result(pool, counter, {"name": "full"},
-                      {b["mission"] for b in pool.blocks}, set(), {})
+                      {b["mission"] for b in pool.blocks}, set(), {}, pool.references)
 
 
 @dataclass(frozen=True)
@@ -177,8 +189,17 @@ class MissionDepth:
             candidate = chosen | {mission}
             if counter.messages(pool.messages(near | candidate)) <= self.max_input_tokens:
                 chosen = candidate
+        references = []
+        for block in sorted(pool.references, key=lambda b: (
+            b["mission"] is None,
+            digest([self.seed, pool.conversation_id, b["path"], b["conversation"]]),
+        )):
+            candidate = [*references, block]
+            if counter.messages(pool.messages(near | chosen, candidate)) <= self.max_input_tokens:
+                references = candidate
         selection = result(
-            pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds
+            pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds,
+            references,
         )
         selection.token_counts.update(
             preserved_input=core_tokens,

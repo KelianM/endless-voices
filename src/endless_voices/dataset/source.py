@@ -69,6 +69,7 @@ class GameCorpus:
         self.events = {}
         self.planet_systems = {}
         self.descriptions = {}
+        self.reference_lore = []
         self.files = {}
         for entry in inventory["files"]:
             relative = Path(entry["path"])
@@ -93,6 +94,17 @@ class GameCorpus:
                             for obj, _ in walk([child]):
                                 if obj["tokens"][:1] == ["object"] and len(obj["tokens"]) == 2:
                                     self.planet_systems[obj["tokens"][1]] = names[0]
+                if kind in {"ship", "outfit", "government"} and names:
+                    passages = [{"line": n["line"], "text": n["tokens"][1], "role": "passage"}
+                                for n in node["children"]
+                                if n["tokens"][:1] == ["description"] and len(n["tokens"]) == 2
+                                and not n["children"]]
+                    if passages:
+                        self.reference_lore.append({
+                            "mission": None, "heading": names[0], "path": str(relative),
+                            "conversation": node["line"], "passages": passages,
+                            "reference": True, "state": {}, "source_kind": kind,
+                        })
                 if kind == "planet" and names:
                     self.descriptions[names[0]] = [
                         {"path": str(relative), "line": n["line"], "text": n["tokens"][1]}

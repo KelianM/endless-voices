@@ -67,7 +67,9 @@ class GameState:
         node = self.events[name]
         assignments = []
         for child in node["children"]:
-            if child["tokens"][0] in {"government", "system", "planet"}:
+            if child["tokens"][0] in {
+                "government", "system", "planet", "outfitter", "shipyard", "fleet", "link", "unlink"
+            }:
                 self.world += (child,)
             else:
                 assignments.append(child)
@@ -120,7 +122,12 @@ class GameState:
             return self.values[token]
 
     def assume(self, condition):
+        condition = z3.simplify(condition)
+        if z3.is_false(condition):
+            return None
         result = self.copy()
+        if z3.is_true(condition) or any(condition.eq(c) for c in self.constraints):
+            return result
         result.constraints += (condition,)
         solver = z3.Solver()
         solver.set(timeout=5000)
@@ -180,6 +187,8 @@ def condition(nodes, state, *, disjunction=False):
             terms.append(condition(children, state, disjunction=t == ["or"]))
         elif t == ["never"] and not children:
             terms.append(z3.BoolVal(False))
+        elif len(t) == 1 and not children:
+            terms.append(state.value(t[0]) != 0)
         elif len(t) == 2 and t[0] in {"has", "not"} and not children:
             value = state.value(t[1])
             terms.append(value != 0 if t[0] == "has" else value == 0)
@@ -204,6 +213,12 @@ def apply(nodes, state):
     result = state.copy()
     for node in nodes:
         t = node["tokens"]
+        if t[0] == "debt" and len(t) == 2 and int(t[1]) >= 0:
+            if any(c["tokens"][0] not in {"interest", "term"} or len(c["tokens"]) != 2
+                   or c["children"] for c in node["children"]):
+                raise unsupported(node)
+            result.world += (node,)
+            continue
         if node["children"]:
             raise unsupported(node)
         if t[0] == "event" and 2 <= len(t) <= 4:
@@ -223,6 +238,15 @@ def apply(nodes, state):
             if not z3.is_true(z3.simplify(active == 0)):
                 raise UnsupportedOperation("Failing an active mission requires its fail handler")
             result.values[t[1] + ": active"] = z3.IntVal(0)
+            continue
+        if t[:2] == ["give", "ship"] and len(t) in {3, 4}:
+            result.world += (node,)
+            continue
+        if t[0] == "fine" and len(t) == 2 and int(t[1]) > 0:
+            result.world += (node,)
+            continue
+        if t[0] == "log" and len(t) in {2, 4} and not node["children"]:
+            result.world += (node,)
             continue
         if t[0] == "payment" and len(t) <= 3:
             base = int(t[1]) if len(t) > 1 else 0

@@ -30,7 +30,7 @@ Neither mode silently truncates overlong examples. The collator masks padding wi
 real end-of-sequence tokens when PAD and EOS share an ID.
 
 Run `validate data/dataset/manifest.json` for structural verification and coverage. Optional
-`--tokenizer /path/to/local/tokenizer --max-length 2048` checks complete sequence lengths without
+`--tokenizer /path/to/local/tokenizer --max-length 9216` checks complete sequence lengths without
 downloading weights or a tokenizer. The generation runner separately budgets prompt and output.
 
 [Dataset preparation](story-context.md) explains source interpretation and context selection.
