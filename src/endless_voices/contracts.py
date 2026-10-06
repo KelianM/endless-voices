@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 
+from endless_voices.instructions import SCENE_INSTRUCTIONS
 from endless_voices.messages import validate_messages
 
 SPLITS = {"train", "validation", "test"}
@@ -57,6 +58,7 @@ def metadata(value: object, split: str) -> None:
     fields(
         value,
         {
+            "task",
             "id",
             "identity",
             "species",
@@ -73,6 +75,8 @@ def metadata(value: object, split: str) -> None:
     )
     for key in ("id", "identity", "species", "conversation_id"):
         slug(value[key], f"metadata.{key}")
+    if value["task"] not in tuple(SCENE_INSTRUCTIONS):
+        raise ValueError("metadata.task must be scene_opening or scene_continuation")
     if value["scenario_group"] is not None:
         slug(value["scenario_group"], "metadata.scenario_group")
     text(value["character_role"], "metadata.character_role")

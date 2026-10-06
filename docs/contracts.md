@@ -14,8 +14,11 @@ duplicate sample IDs and mission, conversation or known-variant groups crossing 
 validation. There is one maintained dataset format.
 
 Each record has `schema_version`, `metadata`, `messages` and `evaluation`. Metadata identifies
-the sample, character, split, source mission and any known variants. Messages contain the shared
-system instruction and selected context, followed by the authored conversation and final target.
+the sample, character, split, source mission and any known variants. The required `task` is
+`scene_opening` or `scene_continuation`, derived from the current conversation prefix during
+construction. The task selects the shared instruction and remains private metadata. Messages
+contain the shared system instruction and selected context, followed by the authored conversation
+and final target.
 The final assistant message is the full authored continuation, including narration. Evaluation
 metadata supplies source attribution and is never inserted into model input.
 

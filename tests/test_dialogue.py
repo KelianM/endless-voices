@@ -174,3 +174,74 @@ def test_event_outfit_requirement_applies_before_initial_dialogue():
     routes = interpreter.histories(conversation, GameState.fixed({"outfit: Brig": 1}),
                                    requirements)
     assert routes[0].text == "You have a brig."
+
+
+def test_large_question_menu_keeps_answers_without_permuting_histories():
+    body = "\tlabel menu\n\tchoice\n"
+    for index in range(12):
+        body += f"\t\t`Question {index}.`\n\t\t\tgoto answer{index}\n"
+    body += "\t\t`Leave.`\n\t\t\taccept\n"
+    for index in range(12):
+        body += f"\tlabel answer{index}\n\t`Answer {index}.`\n\t\tgoto menu\n"
+    routes = DialogueInterpreter(max_steps=1000).continuations(tree("conversation\n" + body)[0])
+    assert {r.text for r in routes if r.paragraphs} == {
+        f"Answer {index}." for index in range(12)
+    }
+    assert any(r.terminal and r.stop == "accept" for r in routes)
+    for route in routes:
+        if route.paragraphs:
+            index = route.paragraphs[0].text.split()[1]
+            assert route.prefix[-1].text == f"Question {index}"
+
+
+def test_menu_state_changes_preserve_new_answers_after_shared_paths():
+    routes = run(
+        "\tlabel menu\n\tchoice\n\t\t`Ask.`\n\t\t\tgoto answer\n"
+        "\t\t`Reveal.`\n\t\t\tgoto reveal\n\t\t`Leave.`\n\t\t\taccept\n"
+        "\tlabel answer\n\tbranch known\n\t\thas secret\n"
+        "\t`Before the revelation.`\n\t\tgoto menu\n"
+        "\tlabel known\n\t`After the revelation.`\n\t\tgoto menu\n"
+        "\tlabel reveal\n\taction\n\t\tset secret\n\tgoto menu\n",
+        GameState.fixed({"secret": 0}),
+    )
+    assert {r.text for r in routes if r.paragraphs} == {
+        "Before the revelation.", "After the revelation."
+    }
+    for route in routes:
+        if route.text == "After the revelation.":
+            assert any(p.text == "Reveal." for p in route.prefix)
+            assert route.state.snapshot()["current_values"]["secret"] == 1
+
+
+def test_sampled_history_searches_past_incompatible_endpoint():
+    conversation = tree(
+        'conversation\n\tchoice\n\t\t`Refuse.`\n\t\t\tdecline\n'
+        '\t\t`Agree.`\n\t\t\taccept\n'
+    )[0]
+    interpreter = DialogueInterpreter()
+    for seed in range(8):
+        routes = interpreter.histories(
+            conversation, GameState(), sample_seed=seed, permitted_stops={"accept"}
+        )
+        assert len(routes) == 1 and routes[0].stop == "accept"
+        assert routes[0].prefix[-1].text == "Agree."
+
+
+def test_repeatable_purchase_converges_when_money_cannot_change_target_dialogue():
+    conversation = tree(
+        'conversation\n\tlabel menu\n\tchoice\n\t\t`Buy.`\n\t\t\tgoto buy\n'
+        '\t\t`Leave.`\n\t\t\taccept\n\tlabel buy\n\taction\n\t\tpayment -10\n'
+        '\t`Purchased.`\n\t\tgoto menu\n'
+    )[0]
+    interpreter = DialogueInterpreter(max_steps=100)
+    routes = interpreter.continuations(conversation, future_variables=set())
+    assert {r.text for r in routes if r.paragraphs} == {"Purchased."}
+    assert any(r.terminal for r in routes)
+    later_observer = tree(
+        'conversation\n\tchoice\n\t\t`Buy.`\n\t\t\tgoto buy\n'
+        '\t\t`Save.`\n\t\t\tgoto end\n\tlabel buy\n\taction\n\t\tpayment -10\n'
+        '\tlabel end\n\t`Farewell.`\n\t\taccept\n'
+    )[0]
+    outcomes = interpreter.histories(
+        later_observer, GameState.fixed({"credits": 15}), future_variables={"credits"})
+    assert {r.state.snapshot()["current_values"]["credits"] for r in outcomes} == {5, 15}

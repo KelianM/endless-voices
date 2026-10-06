@@ -27,8 +27,8 @@ dataset descriptions and architecture decisions.
 interpreter. `SceneDataset` provides fixed indexed records to training and benchmarking.
 See [component ownership](docs/story-context.md) and [record validation](docs/contracts.md).
 
-The [current training dataset](data/dataset/README.md) contains 163 examples from
-32 selected missions. Dataset properties, provenance and limitations belong in that README.
+The [current dataset](data/dataset/README.md) contains training, validation and test splits.
+Dataset sizes, provenance and limitations belong in that README.
 
 ## Train and chat
 

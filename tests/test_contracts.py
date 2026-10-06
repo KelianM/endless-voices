@@ -58,6 +58,7 @@ def test_every_metadata_field_required(key):
     "key,value",
     [
         ("id", "has spaces"),
+        ("task", "rewrite"),
         ("identity", ""),
         ("species", None),
         ("character_role", " "),

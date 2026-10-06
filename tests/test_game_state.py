@@ -80,3 +80,40 @@ def test_fines_do_not_spend_credits_and_quoted_conditions_remain_literal_names()
     assert state.world[0]["tokens"] == ["fine", "70000"]
     assert state.assume(condition(tree('"has mission: done"'), state)) is not None
     assert state.assume(condition(tree('has "mission: done"'), state)) is None
+
+
+def test_unvisit_system_also_clears_its_planets():
+    state = GameState.fixed({"visited system: Port": 1, "visited planet: Dock": 1})
+    state.planet_systems = {"Dock": "Port", "Elsewhere": "Other"}
+    updated = apply(tree('unvisit Port'), state).snapshot()["current_values"]
+    assert updated["visited system: Port"] == 0
+    assert updated["visited planet: Dock"] == 0
+    assert "visited planet: Elsewhere" not in updated
+
+
+def test_event_visits_follow_unvisits_and_nested_events_stay_scheduled():
+    state = GameState()
+    state.events = {
+        "first": tree('event first\n\tvisit Port\n\tunvisit Port\n\tevent later 2')[0],
+        "later": tree('event later\n\tset arrived')[0],
+    }
+    state.trigger("first")
+    assert state.snapshot()["current_values"]["visited system: Port"] == 1
+    assert state.snapshot()["pending_events"] == [{"name": "later", "due_day": 2}]
+
+
+def test_division_assignment_truncates_toward_zero():
+    state = apply(tree('tribute /= 500\nremainder %= 500'),
+                  GameState.fixed({"tribute": -1001, "remainder": -1001}))
+    saved = state.snapshot()["current_values"]
+    assert saved["tribute"] == -2
+    assert saved["remainder"] == -1
+
+
+def test_map_markers_preserve_mission_scope_without_changing_visited_conditions():
+    state = GameState.fixed({"visited system: Port": 1})
+    state.scope = "Current"
+    updated = apply(tree('unmark Port\nmark Dock Other'), state)
+    assert updated.snapshot()["current_values"] == {"visited system: Port": 1}
+    assert [(n["tokens"][0], n["mission"]) for n in updated.world] == [
+        ("unmark", "Current"), ("mark", "Other")]

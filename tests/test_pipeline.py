@@ -32,6 +32,29 @@ def tokenizer() -> PreTrainedTokenizerFast:
     return tokenizer
 
 
+def test_context_count_reuses_sections_without_reusing_changed_dialogue(tokenizer):
+    from endless_voices.context import TokenizerCounter
+
+    counter = TokenizerCounter(tokenizer)
+    for text in ["hello", "hello friend", "hello<eos>friend", "", "café\n friend"]:
+        messages = [{"role": "system", "content": "hello friend " * 20},
+                    {"role": "user", "content": text}]
+        assert counter.messages(messages) == counter.exact_messages(messages)
+    assert counter._count.cache_info().hits >= 4
+
+
+def test_context_count_preserves_whitespace_consuming_added_tokens(tokenizer):
+    from tokenizers import AddedToken
+
+    from endless_voices.context import TokenizerCounter
+
+    tokenizer.add_tokens([AddedToken("<marker>", lstrip=True)])
+    counter = TokenizerCounter(tokenizer)
+    messages = [{"role": "user", "content": "hello  <marker> friend"}]
+    assert counter.messages(messages) == counter.exact_messages(messages)
+    assert counter._count.cache_info().misses == 0
+
+
 def test_padding_preserves_eos(tokenizer: PreTrainedTokenizerFast) -> None:
     batch = ConversationCollator(tokenizer)(
         [

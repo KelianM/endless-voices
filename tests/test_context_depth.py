@@ -128,3 +128,14 @@ def test_reference_scenes_fill_unused_budget_without_displacing_nearby_history()
     assert {b["mission"] for b in selection.selected} == {"recent", "old", "reference"}
     assert "independent writing references" in selection.messages[0]["content"]
     assert selection.messages[1:] == source.encounter
+
+
+def test_omitted_references_do_not_duplicate_unused_state_evidence():
+    from endless_voices.context import Selection
+
+    block = {"mission": "Earlier", "path": "source.txt", "reference": True,
+             "passages": [{"line": 7}], "state": {"initial_values": {"flag": 1}}}
+    saved = Selection("sample", [], [block], [block], {}, {}).evidence()
+    assert saved["selected"][0]["state"] == block["state"]
+    assert "state" not in saved["omitted"][0]
+    assert saved["omitted"][0]["lines"] == [7]

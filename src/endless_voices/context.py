@@ -1,9 +1,12 @@
 """Select eligible story context once for dataset preparation and benchmarking."""
 
 import hashlib
+import json
+import re
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Protocol
 
 from endless_voices.artifacts import encoded
@@ -48,11 +51,32 @@ class TokenizerCounter:
 
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
+        self._count = lru_cache(maxsize=2048)(self.text)
+        self._boundaries = None
+        backend = getattr(tokenizer, "backend_tokenizer", None)
+        if backend is not None and not getattr(tokenizer, "split_special_tokens", False):
+            added = json.loads(backend.to_str())["added_tokens"]
+            if added and all(not any(t[k] for k in (
+                    "single_word", "lstrip", "rstrip", "normalized")) for t in added):
+                self._boundaries = re.compile("(" + "|".join(
+                    re.escape(t["content"]) for t in sorted(
+                        added, key=lambda t: len(t["content"]), reverse=True)) + ")")
 
     def text(self, text):
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
     def messages(self, messages):
+        if self._boundaries is not None:
+            prompt = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True)
+            # Added tokens isolate sections before the tokenizer processes ordinary text.
+            parts = self._boundaries.split(prompt)
+            return sum(1 if i % 2 else self._count(part)
+                       for i, part in enumerate(parts) if part)
+        return self.exact_messages(messages)
+
+    def exact_messages(self, messages):
+        """Count the complete prompt without section caching."""
         encoded = self.tokenizer.apply_chat_template(
             messages, tokenize=True, add_generation_prompt=True
         )
@@ -105,15 +129,17 @@ class Selection:
 
     def evidence(self):
         """Return selection settings and source coordinates without duplicating text."""
-        def coordinates(blocks):
+        def coordinates(blocks, include_state=False):
             return [{"mission": b["mission"], "path": b["path"],
                      "lines": [p["line"] for p in b["passages"]],
-                     **({"reference": True, "state": b["state"],
+                     **({"reference": True,
+                         **({"state": b["state"]} if include_state else {}),
                          "source_kind": b.get("source_kind", "conversation")}
                         if b.get("reference") else {})} for b in blocks]
 
         return {**deepcopy(self.provenance), "token_counts": dict(self.token_counts),
-                "selected": coordinates(self.selected), "omitted": coordinates(self.omitted)}
+                "selected": coordinates(self.selected, include_state=True),
+                "omitted": coordinates(self.omitted)}
 
     def training_messages(self, target):
         messages = [*deepcopy(self.messages), {"role": "assistant", "content": target}]
@@ -201,6 +227,9 @@ class MissionDepth:
             pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds,
             references,
         )
+        if isinstance(counter, TokenizerCounter):
+            if counter.exact_messages(selection.messages) != selection.token_counts["input"]:
+                raise ValueError("Cached token count differs from the complete prompt")
         selection.token_counts.update(
             preserved_input=core_tokens,
             remaining_input_budget=self.max_input_tokens - selection.token_counts["input"],
