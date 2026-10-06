@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 import z3
+from z3.z3util import get_vars
 
 
 class UnsupportedOperation(ValueError):
@@ -27,6 +28,8 @@ class GameState:
     elapsed: object = field(default_factory=lambda: z3.IntVal(0))
     world: tuple = ()
     scope: str = "dialogue"
+    failures: tuple = ()
+    planet_systems: dict = field(default_factory=dict)
 
     def copy(self):
         return GameState(
@@ -39,6 +42,8 @@ class GameState:
             self.elapsed,
             self.world,
             self.scope,
+            self.failures,
+            self.planet_systems,
         )
 
     def draw(self, kind, lower, upper=None):
@@ -67,14 +72,20 @@ class GameState:
         node = self.events[name]
         assignments = []
         for child in node["children"]:
-            if child["tokens"][0] in {"government", "system", "planet"}:
+            if child["tokens"][0] in {
+                "government", "system", "planet", "outfitter", "shipyard", "fleet", "link", "unlink"
+            }:
                 self.world += (child,)
             else:
                 assignments.append(child)
         self.values["event: " + name] = z3.IntVal(1)
+        visits = {"unvisit": 1, "unvisit planet": 2, "visit": 3, "visit planet": 4}
+        assignments.sort(key=lambda n: visits.get(n["tokens"][0], 0))
         updated = apply(assignments, self)
         self.values, self.constraints = updated.values, updated.constraints
         self.initial, self.draws = updated.initial, updated.draws
+        self.world, self.failures = updated.world, updated.failures
+        self.pending, self.elapsed = updated.pending, updated.elapsed
 
     def advance(self, minimum_days=0):
         """Return feasible event timelines after an unknown nonnegative travel interval."""
@@ -120,7 +131,12 @@ class GameState:
             return self.values[token]
 
     def assume(self, condition):
+        condition = z3.simplify(condition)
+        if z3.is_false(condition):
+            return None
         result = self.copy()
+        if z3.is_true(condition) or any(condition.eq(c) for c in self.constraints):
+            return result
         result.constraints += (condition,)
         solver = z3.Solver()
         solver.set(timeout=5000)
@@ -159,6 +175,7 @@ class GameState:
                 for name, due in self.pending
             ],
             "world_changes": list(self.world),
+            "failed_missions_pending": list(self.failures),
             "requirements": [z3.simplify(c).sexpr() for c in self.constraints],
             "initial_values": {
                 k: model.eval(v, model_completion=True).as_long()
@@ -180,6 +197,8 @@ def condition(nodes, state, *, disjunction=False):
             terms.append(condition(children, state, disjunction=t == ["or"]))
         elif t == ["never"] and not children:
             terms.append(z3.BoolVal(False))
+        elif len(t) == 1 and not children:
+            terms.append(state.value(t[0]) != 0)
         elif len(t) == 2 and t[0] in {"has", "not"} and not children:
             value = state.value(t[1])
             terms.append(value != 0 if t[0] == "has" else value == 0)
@@ -204,6 +223,12 @@ def apply(nodes, state):
     result = state.copy()
     for node in nodes:
         t = node["tokens"]
+        if t[0] == "debt" and len(t) == 2 and int(t[1]) >= 0:
+            if any(c["tokens"][0] not in {"interest", "term"} or len(c["tokens"]) != 2
+                   or c["children"] for c in node["children"]):
+                raise unsupported(node)
+            result.world += (node,)
+            continue
         if node["children"]:
             raise unsupported(node)
         if t[0] == "event" and 2 <= len(t) <= 4:
@@ -218,11 +243,34 @@ def apply(nodes, state):
             result.constraints += (available >= max(0, -count),)
             result.values[name] = available + count
             continue
-        if t[0] == "fail" and len(t) == 2:
-            active = result.values.get(t[1] + ": active", z3.IntVal(0))
-            if not z3.is_true(z3.simplify(active == 0)):
-                raise UnsupportedOperation("Failing an active mission requires its fail handler")
-            result.values[t[1] + ": active"] = z3.IntVal(0)
+        if t[0] in {"visit", "unvisit", "visit planet", "unvisit planet"} and len(t) == 2:
+            planet = t[0].endswith(" planet")
+            visited = not t[0].startswith("unvisit")
+            kind = "planet" if planet else "system"
+            result.values[f"visited {kind}: " + t[1]] = z3.IntVal(int(visited))
+            if not planet and not visited:
+                for name, system in result.planet_systems.items():
+                    if system == t[1]:
+                        result.values["visited planet: " + name] = z3.IntVal(0)
+            result.world += (node,)
+            continue
+        if t[0] in {"mark", "unmark"} and len(t) in {2, 3}:
+            result.world += ({**node, "mission": t[2] if len(t) == 3 else result.scope},)
+            continue
+        if t[0] == "fail" and len(t) in {1, 2}:
+            name = t[1] if len(t) == 2 else result.scope
+            active = result.values.get(name + ": active", z3.IntVal(0))
+            if not z3.is_true(z3.simplify(active == 0)) and name not in result.failures:
+                result.failures += (name,)
+            continue
+        if t[:2] == ["give", "ship"] and len(t) in {3, 4}:
+            result.world += (node,)
+            continue
+        if t[0] == "fine" and len(t) == 2 and int(t[1]) > 0:
+            result.world += (node,)
+            continue
+        if t[0] == "log" and len(t) in {2, 4} and not node["children"]:
+            result.world += (node,)
             continue
         if t[0] == "payment" and len(t) <= 3:
             base = int(t[1]) if len(t) > 1 else 0
@@ -241,7 +289,7 @@ def apply(nodes, state):
             continue
         if len(t) == 2 and t[1] in {"++", "--"}:
             t = [t[0], "+=" if t[1] == "++" else "-=", "1"]
-        if len(t) < 3 or t[1] not in {"=", "+=", "-=", "*=", "<?=", ">?="}:
+        if len(t) < 3 or t[1] not in {"=", "+=", "-=", "*=", "/=", "%=", "<?=", ">?="}:
             raise unsupported(node)
         name, op = t[:2]
         b = expression(t[2:], result)
@@ -254,11 +302,20 @@ def apply(nodes, state):
                 "+=": a + b,
                 "-=": a - b,
                 "*=": a * b,
+                "/=": divide(a, b),
+                "%=": z3.If(b == 0, a, a - divide(a, b) * b),
                 "<?=": z3.If(a < b, a, b),
                 ">?=": z3.If(a > b, a, b),
             }[op]
         )
     return result
+
+
+def divide(left, right):
+    """Return integer division truncated toward zero, including the game's zero sentinel."""
+    quotient = z3.If(
+        left * right >= 0, z3.Abs(left) / z3.Abs(right), -(z3.Abs(left) / z3.Abs(right)))
+    return z3.If(right == 0, 2**63 - 1, quotient)
 
 
 def expression(tokens, state):
@@ -283,14 +340,12 @@ def expression(tokens, state):
             op = tokens[position]
             position += 1
             right = parse(precedence[op] + 1)
-            quotient = z3.If(
-                left * right >= 0, z3.Abs(left) / z3.Abs(right), -(z3.Abs(left) / z3.Abs(right))
-            )
+            quotient = divide(left, right)
             left = {
                 "+": left + right,
                 "-": left - right,
                 "*": left * right,
-                "/": z3.If(right == 0, 2**63 - 1, quotient),
+                "/": quotient,
                 "%": z3.If(right == 0, left, left - quotient * right),
             }[op]
         return left
@@ -299,3 +354,41 @@ def expression(tokens, state):
     if position != len(tokens):
         raise UnsupportedOperation(f"Unsupported arithmetic expression: {tokens!r}")
     return z3.simplify(result)
+
+
+def projected_state(state, variables=None, symbol_cache=None):
+    """Return future-relevant state without changing its complete history witness."""
+    symbol_cache = {} if symbol_cache is None else symbol_cache
+
+    def symbols(expression):
+        key = expression.sexpr()
+        if key not in symbol_cache:
+            symbol_cache[key] = {v.sexpr() for v in get_vars(expression)}
+        return symbol_cache[key]
+
+    values = state.values if variables is None else {
+        name: state.values.get(name, z3.Int("initial:" + name)) for name in variables}
+    constraints = [z3.simplify(c) for c in state.constraints]
+    if variables is not None:
+        live = set().union(*(symbols(v) for v in values.values()), symbols(state.elapsed),
+                           *(symbols(due) for _, due in state.pending))
+        connected = []
+        while True:
+            linked = [c for c in constraints if symbols(c) & live]
+            if not linked:
+                break
+            for c in linked:
+                live.update(symbols(c))
+                connected.append(c)
+            linked_keys = {c.sexpr() for c in linked}
+            constraints = [c for c in constraints if c.sexpr() not in linked_keys]
+        constraints = connected
+    return {
+        "values": {k: z3.simplify(v).sexpr() for k, v in sorted(values.items())},
+        "constraints": sorted({c.sexpr() for c in constraints if not z3.is_true(c)}),
+        "pending": [(name, z3.simplify(due).sexpr()) for name, due in state.pending],
+        "elapsed": z3.simplify(state.elapsed).sexpr(),
+        "world": state.world,
+        "failures": state.failures,
+        "scope": state.scope,
+    }

@@ -13,15 +13,15 @@ python -m endless_voices.dataset \
   --inventory data/sources/source-statistics.json \
   --config data/dataset/config.json \
   --tokenizer /path/to/cached/tokenizer \
-  --splits train \
+  --splits train validation test \
   --output outputs/prepared-scenes
 ```
 
-`data/dataset/config.json` records the existing reviewed mission/conversation scope and split assignments. The configuration contains no quote selectors or per-branch routes. Omitting a mission's conversation list selects all supported inline conversations in that mission. Broader corpus extraction is not enabled by default.
+`data/dataset/config.json` records the selected mission/conversation scope and split assignments. The configuration contains no quote selectors or per-branch routes. Omitting a mission's conversation list selects supported inline conversations, named conversations and dialog passages in that mission. An empty conversation list excludes targets while retaining split ownership. Exclusion reasons remain in the configuration.
 
 A successful build writes one JSONL file per split, source and state provenance, configuration, hashes and licensing. The manifest records the implementation Git revision and file hashes; it does not copy Python code. `SceneDataset.load(output, split)` verifies the saved artifacts and provides stable indexed records. No API calls or model weights are involved; the tokenizer is loaded locally.
 
-The [current training release](dataset/README.md) contains 163 examples from all 32 selected training missions. The build verifies state witnesses, split boundaries and training loss masks. Preparation still refuses unsupported operations or context overflow rather than publishing a partial dataset.
+The [current dataset](dataset/README.md) publishes all three splits. Preparation refuses unsupported operations or context overflow for selected targets rather than publishing partial examples.
 
 
-See [the ownership diagram and training objectives](../docs/story-context.md), [ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.
+See [how the dataset is produced](dataset/README.md#how-this-dataset-is-produced), [ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.

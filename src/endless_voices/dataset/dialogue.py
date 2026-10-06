@@ -1,10 +1,14 @@
 """Enumerate authored continuations with consistent dialogue state."""
 
 from dataclasses import dataclass
+from random import Random
 
 import z3
 
-from .state import GameState, apply, condition, unsupported
+from endless_voices.context import digest
+
+from .source import walk
+from .state import GameState, apply, condition, projected_state, unsupported
 
 ENDPOINTS = {"accept", "decline", "defer", "launch", "flee", "die", "explode"}
 
@@ -36,7 +40,8 @@ class DialogueInterpreter:
         self.max_steps = max_steps
         self.max_visits = max_visits
 
-    def continuations(self, conversation, state=None, after_display=()):
+    def continuations(self, conversation, state=None, after_display=(), *, sample_seed=None,
+                      permitted_stops=None, future_variables=None):
         """Return passages up to actual player choices or endpoints, with route history."""
         nodes = conversation["children"]
         labels = {n["tokens"][1]: i for i, n in enumerate(nodes) if n["tokens"][:1] == ["label"]}
@@ -68,23 +73,69 @@ class DialogueInterpreter:
             conditions = [n for n in node["children"] if n["tokens"] == ["to", "display"]]
             return condition([c for n in conditions for c in n["children"]], current)
 
-        pending = [(0, state.copy() if state is not None else GameState(), (), (), {}, False)]
+        variables = None
+        if future_variables is not None:
+            variables = set(future_variables)
+            for node, _ in walk([conversation, *after_display]):
+                t = node["tokens"]
+                variables.update(t)
+                if t[0] in {"require", "outfit"} and len(t) >= 2:
+                    variables.add("outfit: " + t[1])
+        initial = state.copy() if state is not None else GameState()
+        actions = []
+        for node in after_display:
+            t = node["tokens"]
+            if t[:1] != ["require"]:
+                actions.append(node)
+                continue
+            if len(t) not in {2, 3} or node["children"]:
+                raise unsupported(node)
+            count = int(t[2]) if len(t) == 3 else 1
+            if count < 0:
+                raise unsupported(node)
+            available = initial.value("outfit: " + t[1])
+            initial = initial.assume(available == 0 if count == 0 else available >= count)
+            if initial is None:
+                return []
+        after_display = actions
+        pending = [(0, initial, (), (), {}, False)]
         results, steps = [], 0
+        explored = set()
+        symbol_cache = {}
+        random = Random(sample_seed)
         while pending:
             pc, current, prefix, paragraphs, visits, displayed = pending.pop()
+            pending_start = len(pending)
             steps += 1
             if steps > self.max_steps:
                 raise ValueError("Dialogue route limit exceeded; no partial build is published")
             if isinstance(pc, str) or pc >= len(nodes):
                 if not displayed:
                     current = apply(after_display, current)
+                stop = pc if isinstance(pc, str) else "end"
+                if permitted_stops is not None and stop not in permitted_stops:
+                    continue
                 results.append(
                     Continuation(
-                        prefix, paragraphs, current, pc if isinstance(pc, str) else "end", True
+                        prefix, paragraphs, current, stop, True
                     )
                 )
+                if sample_seed is not None:
+                    return [results[-1]]
                 continue
             node = nodes[pc]
+            execution_key = (
+                pc,
+                digest(projected_state(
+                    current, variables & current.values.keys() if variables is not None else None,
+                    symbol_cache)),
+                tuple((p.line, p.role) for p in paragraphs),
+                displayed,
+            )
+            # Equivalent futures need one compatible prefix, not every menu permutation.
+            if execution_key in explored:
+                continue
+            explored.add(execution_key)
             visit_key = (
                 pc,
                 tuple(sorted((k, z3.simplify(v).sexpr()) for k, v in current.values.items())),
@@ -95,9 +146,10 @@ class DialogueInterpreter:
             visits = {**visits, visit_key: count}
             t = node["tokens"]
 
-            def enqueue(dest, candidate, pre=prefix, text=paragraphs, shown=displayed):
+            def enqueue(dest, candidate, pre=prefix, text=paragraphs, shown=displayed,
+                        seen=visits):
                 if candidate is not None:
-                    pending.append((dest, candidate, pre, text, visits, shown))
+                    pending.append((dest, candidate, pre, text, seen, shown))
 
             if t == ["choice"]:
                 options = node["children"]
@@ -115,7 +167,7 @@ class DialogueInterpreter:
                     candidate = current.assume(predicate)
                     if candidate is not None and not displayed:
                         candidate = apply(after_display, candidate)
-                    enqueue(controls(option, pc + 1), candidate, pre, (), True)
+                    enqueue(controls(option, pc + 1), candidate, pre, (), True, seen={})
                 stopping = current.assume(z3.Or(*any_visible))
                 if paragraphs and stopping is not None:
                     results.append(Continuation(prefix, paragraphs, stopping, node["line"], False))
@@ -144,8 +196,16 @@ class DialogueInterpreter:
                 enqueue(pc + 1, current.assume(z3.Not(predicate)))
             else:
                 raise unsupported(node)
+            if sample_seed is not None:
+                candidates = pending[pending_start:]
+                random.shuffle(candidates)
+                pending[pending_start:] = candidates
         return results
 
-    def histories(self, conversation, state, after_display=()):
+    def histories(self, conversation, state, after_display=(), *, sample_seed=None,
+                  permitted_stops=None, future_variables=None):
         """Return complete reachable dialogue routes for context construction."""
-        return [c for c in self.continuations(conversation, state, after_display) if c.terminal]
+        return [c for c in self.continuations(
+            conversation, state, after_display, sample_seed=sample_seed,
+            permitted_stops=permitted_stops, future_variables=future_variables
+        ) if c.terminal]

@@ -110,3 +110,32 @@ def test_resolved_history_never_uses_the_current_missions_destination():
     source.blocks[0]["passages"][0]["text"] = "Visit <planet>."
     assert "Visit <planet>." in source.history({"recent"})
     assert "Current destination" not in source.messages({"recent"})[0]["content"]
+
+
+def test_reference_scenes_fill_unused_budget_without_displacing_nearby_history():
+    source = pool()
+    source.references = [
+        {"mission": "reference", "conversation": 1, "heading": "Reference",
+         "path": "source.txt", "reference": True, "state": {},
+         "passages": [{"line": 200, "role": "passage", "text": "An authored scene."}]},
+        {"mission": "oversized", "conversation": 2, "heading": "Too long",
+         "path": "source.txt", "reference": True, "state": {},
+         "passages": [{"line": 300, "role": "passage", "text": "long " * 100}]},
+    ]
+    budget = Counter().messages(source.messages({"recent", "old"}, source.references[:1]))
+    selection = MissionDepth(1, budget, "seed").select(source, Counter())
+    assert selection.token_counts["input"] == budget
+    assert {b["mission"] for b in selection.selected} == {"recent", "old", "reference"}
+    assert "independent writing references" in selection.messages[0]["content"]
+    assert selection.messages[1:] == source.encounter
+
+
+def test_omitted_references_do_not_duplicate_unused_state_evidence():
+    from endless_voices.context import Selection
+
+    block = {"mission": "Earlier", "path": "source.txt", "reference": True,
+             "passages": [{"line": 7}], "state": {"initial_values": {"flag": 1}}}
+    saved = Selection("sample", [], [block], [block], {}, {}).evidence()
+    assert saved["selected"][0]["state"] == block["state"]
+    assert "state" not in saved["omitted"][0]
+    assert saved["omitted"][0]["lines"] == [7]

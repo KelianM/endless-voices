@@ -14,8 +14,11 @@ duplicate sample IDs and mission, conversation or known-variant groups crossing 
 validation. There is one maintained dataset format.
 
 Each record has `schema_version`, `metadata`, `messages` and `evaluation`. Metadata identifies
-the sample, character, split, source mission and any known variants. Messages contain the shared
-system instruction and selected context, followed by the authored conversation and final target.
+the sample, character, split, source mission and any known variants. The required `task` is
+`scene_opening` or `scene_continuation`, derived from the current conversation prefix during
+construction. The task selects the shared instruction and remains private metadata. Messages
+contain the shared system instruction and selected context, followed by the authored conversation
+and final target.
 The final assistant message is the full authored continuation, including narration. Evaluation
 metadata supplies source attribution and is never inserted into model input.
 
@@ -30,9 +33,9 @@ Neither mode silently truncates overlong examples. The collator masks padding wi
 real end-of-sequence tokens when PAD and EOS share an ID.
 
 Run `validate data/dataset/manifest.json` for structural verification and coverage. Optional
-`--tokenizer /path/to/local/tokenizer --max-length 2048` checks complete sequence lengths without
+`--tokenizer /path/to/local/tokenizer --max-length 9216` checks complete sequence lengths without
 downloading weights or a tokenizer. The generation runner separately budgets prompt and output.
 
-[Dataset preparation](story-context.md) explains source interpretation and context selection.
+[Dataset preparation](../data/dataset/README.md#how-this-dataset-is-produced) explains source interpretation and context selection.
 [Evaluation](evaluation.md) explains blinding, denominators and uncertainty. Dataset properties
 and limitations belong in [the dataset README](../data/dataset/README.md).

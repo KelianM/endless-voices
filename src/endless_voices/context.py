@@ -1,9 +1,12 @@
 """Select eligible story context once for dataset preparation and benchmarking."""
 
 import hashlib
+import json
+import re
 from collections import deque
 from copy import deepcopy
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Protocol
 
 from endless_voices.artifacts import encoded
@@ -48,11 +51,32 @@ class TokenizerCounter:
 
     def __init__(self, tokenizer):
         self.tokenizer = tokenizer
+        self._count = lru_cache(maxsize=2048)(self.text)
+        self._boundaries = None
+        backend = getattr(tokenizer, "backend_tokenizer", None)
+        if backend is not None and not getattr(tokenizer, "split_special_tokens", False):
+            added = json.loads(backend.to_str())["added_tokens"]
+            if added and all(not any(t[k] for k in (
+                    "single_word", "lstrip", "rstrip", "normalized")) for t in added):
+                self._boundaries = re.compile("(" + "|".join(
+                    re.escape(t["content"]) for t in sorted(
+                        added, key=lambda t: len(t["content"]), reverse=True)) + ")")
 
     def text(self, text):
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
     def messages(self, messages):
+        if self._boundaries is not None:
+            prompt = self.tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True)
+            # Added tokens isolate sections before the tokenizer processes ordinary text.
+            parts = self._boundaries.split(prompt)
+            return sum(1 if i % 2 else self._count(part)
+                       for i, part in enumerate(parts) if part)
+        return self.exact_messages(messages)
+
+    def exact_messages(self, messages):
+        """Count the complete prompt without section caching."""
         encoded = self.tokenizer.apply_chat_template(
             messages, tokenize=True, add_generation_prompt=True
         )
@@ -74,13 +98,21 @@ class ContextPool:
     blocks: list[dict]
     graph: dict[str, list[str]]
     variables: dict[str, str] = field(default_factory=dict)
+    references: list[dict] = field(default_factory=list)
 
     def history(self, missions):
         text = "\n\n".join(render(b) for b in self.blocks if b["mission"] in missions)
         return text
 
-    def messages(self, missions):
-        return [{"role": "system", "content": self.system_prefix + self.history(missions)},
+    def messages(self, missions, references=()):
+        reference_text = ""
+        if references:
+            reference_text = (
+                "\n\nOther game scenes (independent writing references):\n"
+                + "\n\n".join(render(block) for block in references)
+            )
+        return [{"role": "system", "content": self.system_prefix + self.history(missions)
+                 + reference_text},
                 *deepcopy(self.encounter)]
 
 
@@ -97,12 +129,17 @@ class Selection:
 
     def evidence(self):
         """Return selection settings and source coordinates without duplicating text."""
-        def coordinates(blocks):
+        def coordinates(blocks, include_state=False):
             return [{"mission": b["mission"], "path": b["path"],
-                     "lines": [p["line"] for p in b["passages"]]} for b in blocks]
+                     "lines": [p["line"] for p in b["passages"]],
+                     **({"reference": True,
+                         **({"state": b["state"]} if include_state else {}),
+                         "source_kind": b.get("source_kind", "conversation")}
+                        if b.get("reference") else {})} for b in blocks]
 
         return {**deepcopy(self.provenance), "token_counts": dict(self.token_counts),
-                "selected": coordinates(self.selected), "omitted": coordinates(self.omitted)}
+                "selected": coordinates(self.selected, include_state=True),
+                "omitted": coordinates(self.omitted)}
 
     def training_messages(self, target):
         messages = [*deepcopy(self.messages), {"role": "assistant", "content": target}]
@@ -116,13 +153,14 @@ class ContextStrategy(Protocol):
     def select(self, pool: ContextPool, counter: TokenCounter) -> Selection: ...
 
 
-def result(pool, counter, config, full, sampled, ds):
+def result(pool, counter, config, full, sampled, ds, references=()):
     chosen = full | sampled
-    messages = pool.messages(chosen)
+    messages = pool.messages(chosen, references)
     return Selection(
         pool.sample_id, messages,
-        deepcopy([b for b in pool.blocks if b["mission"] in chosen]),
-        deepcopy([b for b in pool.blocks if b["mission"] not in chosen]),
+        deepcopy([b for b in pool.blocks if b["mission"] in chosen] + list(references)),
+        deepcopy([b for b in pool.blocks if b["mission"] not in chosen]
+                 + [b for b in pool.references if b not in references]),
         {"input": counter.messages(messages), "full_history": counter.text(pool.history(full)),
          "sampled_history": counter.text(pool.history(sampled))},
         {"strategy": config, "pool_sha256": digest(pool.__dict__),
@@ -139,7 +177,7 @@ class FullContext:
 
     def select(self, pool, counter):
         return result(pool, counter, {"name": "full"},
-                      {b["mission"] for b in pool.blocks}, set(), {})
+                      {b["mission"] for b in pool.blocks}, set(), {}, pool.references)
 
 
 @dataclass(frozen=True)
@@ -177,9 +215,21 @@ class MissionDepth:
             candidate = chosen | {mission}
             if counter.messages(pool.messages(near | candidate)) <= self.max_input_tokens:
                 chosen = candidate
+        references = []
+        for block in sorted(pool.references, key=lambda b: (
+            b["mission"] is None,
+            digest([self.seed, pool.conversation_id, b["path"], b["conversation"]]),
+        )):
+            candidate = [*references, block]
+            if counter.messages(pool.messages(near | chosen, candidate)) <= self.max_input_tokens:
+                references = candidate
         selection = result(
-            pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds
+            pool, counter, {"name": "mission-depth", **self.__dict__}, near, chosen, ds,
+            references,
         )
+        if isinstance(counter, TokenizerCounter):
+            if counter.exact_messages(selection.messages) != selection.token_counts["input"]:
+                raise ValueError("Cached token count differs from the complete prompt")
         selection.token_counts.update(
             preserved_input=core_tokens,
             remaining_input_budget=self.max_input_tokens - selection.token_counts["input"],
