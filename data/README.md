@@ -24,4 +24,4 @@ A successful build writes one JSONL file per split, source and state provenance,
 The [current dataset](dataset/README.md) publishes all three splits. Preparation refuses unsupported operations or context overflow for selected targets rather than publishing partial examples.
 
 
-See [the ownership diagram and training objectives](../docs/story-context.md), [ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.
+See [how the dataset is produced](dataset/README.md#how-this-dataset-is-produced), [ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.

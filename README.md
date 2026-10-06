@@ -25,7 +25,7 @@ dataset descriptions and architecture decisions.
 [Dataset preparation](data/README.md) describes the cached-source inputs and build command.
 `DatasetBuilder` owns preparation; its example builder and context sampler share a stateful
 interpreter. `SceneDataset` provides fixed indexed records to training and benchmarking.
-See [component ownership](docs/story-context.md) and [record validation](docs/contracts.md).
+See [dataset preparation](data/dataset/README.md#how-this-dataset-is-produced) and [record validation](docs/contracts.md).
 
 The [current dataset](data/dataset/README.md) contains training, validation and test splits.
 Dataset sizes, provenance and limitations belong in that README.

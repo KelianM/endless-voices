@@ -36,6 +36,6 @@ Run `validate data/dataset/manifest.json` for structural verification and covera
 `--tokenizer /path/to/local/tokenizer --max-length 9216` checks complete sequence lengths without
 downloading weights or a tokenizer. The generation runner separately budgets prompt and output.
 
-[Dataset preparation](story-context.md) explains source interpretation and context selection.
+[Dataset preparation](../data/dataset/README.md#how-this-dataset-is-produced) explains source interpretation and context selection.
 [Evaluation](evaluation.md) explains blinding, denominators and uncertainty. Dataset properties
 and limitations belong in [the dataset README](../data/dataset/README.md).
