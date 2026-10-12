@@ -620,16 +620,13 @@ def test_retrieval_sidecar_tampering_is_rejected(tmp_path):
         SceneDataset.load(output, "train")
 
 
-def test_older_bundles_keep_fixed_prompts_without_retrieval(tmp_path):
+def test_prepared_dataset_requires_hashed_retrieval_pools(tmp_path):
     source = corpus(tmp_path, STORY)
     output = tmp_path / "prepared"
     DatasetBuilder(source, config({"Later": spec()}), Counter()).build(output)
-    original = SceneDataset.load(output, "train").prompt(0)
     manifest = json.loads((output / "manifest.json").read_text())
     del manifest["artifacts"]["retrieval.json"]
     (output / "manifest.json").write_text(json.dumps(manifest))
     (output / "retrieval.json").unlink()
-    dataset = SceneDataset.load(output, "train")
-    assert dataset.prompt(0) == original
-    with pytest.raises(ValueError, match="rebuild it"):
-        dataset.context_pool(0)
+    with pytest.raises(ValueError, match="require a retrieval.json artifact hash"):
+        SceneDataset.load(output, "train")

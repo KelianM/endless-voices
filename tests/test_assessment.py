@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+from prepared_fixtures import write_empty_pools
 
 from endless_voices import assessment as a
 from endless_voices.judge import judge_messages, parse_answer
@@ -29,6 +30,7 @@ def dataset(tmp_path):
         path.write_text("".join(json.dumps(r) + "\n" for r in rows))
         manifest["artifacts"][path.name] = a.file_hash(path)
     a.write_json(tmp_path / "manifest.json", manifest)
+    write_empty_pools(tmp_path)
     return tmp_path / "manifest.json"
 
 

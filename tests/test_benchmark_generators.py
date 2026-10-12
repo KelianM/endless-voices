@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
+from prepared_fixtures import write_empty_pools
 
 from endless_voices import generation_backends as backends
 from endless_voices.context import ContextPool, FullContext
@@ -78,6 +79,7 @@ def recorded(tmp_path, request):
         'format': 'scene-dataset-v1', 'split_unit': 'mission', 'splits': ['validation'],
         'artifacts': {str(p.relative_to(dataset)): backends.sha(p)
                       for p in dataset.rglob('*') if p.is_file()}})
+    write_empty_pools(dataset)
     benchmark.prepare(root, dataset, config)
     for model in models:
         folder = root / model

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from peft import PeftModel
+from prepared_fixtures import write_empty_pools
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
@@ -75,6 +76,7 @@ def prepared(tmp_path, messages):
     (root / "manifest.json").write_text(json.dumps({
         "format": "scene-dataset-v1", "split_unit": "mission", "splits": ["train"],
         "artifacts": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()}}))
+    write_empty_pools(root)
     return root
 
 

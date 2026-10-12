@@ -9,6 +9,8 @@
   "artifacts": {
     "train.jsonl": "f329a5124cfea13edc4abef338183cde89119d5a003859e900bb7a298f118ac8",
     "validation.jsonl": "9f7b8df968ce7a0f51ee36de2bdafcdcc32ef26d4ea78e0200cfbb79605951f5",
-    "test.jsonl": "093d179d6d92d135e5d4df771ed900bf82b5effb76f09a3d36b8ffee3a516c06"
+    "test.jsonl": "093d179d6d92d135e5d4df771ed900bf82b5effb76f09a3d36b8ffee3a516c06",
+    "retrieval.json": "246062071924ea4e48859edb1a4432800fbc0da9e0f9e387b30890aebdaaf4be",
+    "provenance.json": "cbdce0a9af78a15ba62b0b4f08a453e46c6d3486a7002d70ff9e01ea543a5373"
   }
 }

@@ -1,0 +1,62 @@
+{
+  "format": "scene-retrieval-pools-v1",
+  "scenes": {},
+  "pools": {
+    "fixture-test": {
+      "sample_id": "fixture-test",
+      "conversation_id": "conversation-test",
+      "mission": "fixture-test",
+      "system_prefix": "You are an invented archive clerk. Speak plainly. Lore (fixture-v1): The archive is closed. The clerk does not know the opening hours.",
+      "encounter": [
+        {
+          "role": "user",
+          "content": "May I enter?"
+        },
+        {
+          "role": "assistant",
+          "content": "The archive is closed."
+        },
+        {
+          "role": "user",
+          "content": "When should I return?"
+        }
+      ],
+      "blocks": [],
+      "graph": {},
+      "variables": {},
+      "references": []
+    },
+    "fixture-train": {
+      "sample_id": "fixture-train",
+      "conversation_id": "conversation-train",
+      "mission": "fixture-train",
+      "system_prefix": "You are an invented archive clerk. Speak plainly. Lore (fixture-v1): The archive is closed. The clerk does not know the opening hours.",
+      "encounter": [
+        {
+          "role": "user",
+          "content": "Who are you?"
+        }
+      ],
+      "blocks": [],
+      "graph": {},
+      "variables": {},
+      "references": []
+    },
+    "fixture-validation": {
+      "sample_id": "fixture-validation",
+      "conversation_id": "conversation-validation",
+      "mission": "fixture-validation",
+      "system_prefix": "You are an invented archive clerk. Speak plainly. Lore (fixture-v1): The archive is closed. The clerk does not know the opening hours.",
+      "encounter": [
+        {
+          "role": "user",
+          "content": "Can you promise access tomorrow?"
+        }
+      ],
+      "blocks": [],
+      "graph": {},
+      "variables": {},
+      "references": []
+    }
+  }
+}

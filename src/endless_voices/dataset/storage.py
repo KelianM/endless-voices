@@ -19,7 +19,7 @@ from endless_voices.splits import mission_key
 class SceneDataset(Sequence):
     """Provide stable indexed records without resampling their contexts."""
 
-    def __init__(self, records, pools=None):
+    def __init__(self, records, pools):
         self.records = deepcopy(records)
         self._pools = deepcopy(pools)
         ids = [r["metadata"]["id"] for r in self.records if "metadata" in r]
@@ -49,15 +49,15 @@ class SceneDataset(Sequence):
         artifacts = manifest.get("artifacts")
         if not isinstance(artifacts, dict) or any(f"{s}.jsonl" not in artifacts for s in splits):
             raise ValueError("Every published split requires an artifact hash")
+        if "retrieval.json" not in artifacts:
+            raise ValueError("Prepared datasets require a retrieval.json artifact hash")
         for name, expected in artifacts.items():
             path = (root / name).resolve()
             if Path(name).is_absolute() or not path.is_relative_to(root):
                 raise ValueError("Artifact must be inside the manifest directory")
             if file_hash(path) != expected:
                 raise ValueError(f"Dataset artifact differs: {name}")
-        pools = None
-        if "retrieval.json" in artifacts:
-            pools = load_pools(root)
+        pools = load_pools(root)
         datasets, ids, groups, physical = {}, {}, {}, set()
         for split in splits:
             path = root / f"{split}.jsonl"
@@ -84,18 +84,16 @@ class SceneDataset(Sequence):
                         raise ValueError(f"{location}: {kind} {owner!r} crosses splits")
                     groups[key] = split
                 rows.append(record)
-            split_pools = None
-            if pools is not None:
-                split_pools = {}
-                for record in rows:
-                    meta = record["metadata"]
-                    pool = pools.get(meta["id"])
-                    if (pool is None or pool.conversation_id != meta["conversation_id"]
-                            or "mission / " + pool.mission != meta["sources"][0]["source_group"]):
-                        raise ValueError("Retrieval pool does not match its scene record")
-                    split_pools[meta["id"]] = pool
+            split_pools = {}
+            for record in rows:
+                meta = record["metadata"]
+                pool = pools.get(meta["id"])
+                if (pool is None or pool.conversation_id != meta["conversation_id"]
+                        or "mission / " + pool.mission != meta["sources"][0]["source_group"]):
+                    raise ValueError("Retrieval pool does not match its scene record")
+                split_pools[meta["id"]] = pool
             datasets[split] = cls(rows, split_pools)
-        if pools is not None and set(pools) != set(ids):
+        if set(pools) != set(ids):
             raise ValueError("Retrieval pools must cover exactly the published scenes")
         return datasets
 
@@ -114,8 +112,6 @@ class SceneDataset(Sequence):
 
     def context_pool(self, index):
         """Return the saved eligible context for one scene without its continuation."""
-        if self._pools is None:
-            raise ValueError("Dataset has no retrieval pools; rebuild it to enable retrieval")
         return deepcopy(self._pools[self.records[index]["metadata"]["id"]])
 
     def retrieval_session(self, index, database):

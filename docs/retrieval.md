@@ -45,14 +45,12 @@ Queries use `Instruct: {instruction}\nQuery:{query}`. The Python constructor acc
 different `query_instruction`. Use the same model files, precision, instruction and token
 limit when building and opening an index; the encoder identity includes these settings.
 The model fingerprint covers encoding configuration, tokenizer assets and selected weights.
-Adding documentation, logs or cache bookkeeping does not invalidate the index. Indexes built
-with the earlier whole-directory fingerprint need a one-time rebuild.
+Adding documentation, logs or cache bookkeeping does not invalidate the index.
 
 No passage or query is silently truncated. The default limit is 32,768 tokens per passage
 or instructed query, within the model's configured capacity. An oversized input fails before
 model inference. A smaller `--max-length` can enforce a lower limit; a passage above that
-limit needs explicit splitting, and an oversized query needs explicit shortening. Rebuild
-indexes produced by the earlier whole-scene format before using passage retrieval.
+limit needs explicit splitting, and an oversized query needs explicit shortening.
 
 ```python
 from endless_voices.dataset.storage import SceneDataset
@@ -92,8 +90,8 @@ from scoring and reads. Existing interpreter limitations still apply, including 
 state used to resolve lore during preparation.
 
 `retrieval.json` deduplicates scene text and records each sample's permitted scene IDs.
-Dataset loading verifies the sidecar hash and pool fingerprints. Older prepared datasets
-continue to supply fixed prompts; retrieval requires rebuilding those datasets.
+Every prepared dataset requires this artifact, including datasets used by the fixed sampler.
+Dataset loading verifies the sidecar hash and pool fingerprints.
 
 The current benchmark still consumes fixed saved prompts. Integrating a model's tool loop
 and comparing retrieval budgets are separate runner work. Adaptive retrieval should retain
@@ -102,8 +100,10 @@ answer quality.
 
 ## Compare embedding models
 
-`scripts/compare_retrieval_embeddings.py` handles preparation, passage or scene retrieval,
-index reuse and blinded review. The query plan in `configs/retrieval-comparison.json` covers
+`scripts/compare_retrieval_embeddings.py` runs the production `RetrievalSession` against
+frozen queries and prepares blinded review packets. The script adds experiment setup,
+timing and token counts; encoding, eligibility, ranking and scene expansion remain in
+`src/endless_voices/retrieval.py`. The query plan in `configs/retrieval-comparison.json` covers
 Hai and Quarg references plus Acorn Delights history. Freeze the queries and eligible pools
 once, before running either model:
 
