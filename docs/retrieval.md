@@ -44,6 +44,9 @@ default query instruction is:
 Queries use `Instruct: {instruction}\nQuery:{query}`. The Python constructor accepts a
 different `query_instruction`. Use the same model files, precision, instruction and token
 limit when building and opening an index; the encoder identity includes these settings.
+The model fingerprint covers encoding configuration, tokenizer assets and selected weights.
+Adding documentation, logs or cache bookkeeping does not invalidate the index. Indexes built
+with the earlier whole-directory fingerprint need a one-time rebuild.
 
 No passage or query is silently truncated. The default limit is 32,768 tokens per passage
 or instructed query, within the model's configured capacity. An oversized input fails before

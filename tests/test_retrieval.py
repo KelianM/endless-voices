@@ -167,13 +167,9 @@ def test_hidden_target_in_an_omitted_reference_prevents_publication(tmp_path):
     assert not (tmp_path / "prepared").exists()
 
 
-def test_local_transformer_encoder_loads_and_masks_padding_without_downloads(tmp_path):
-    import torch
+def save_local_encoder(model_path, *, sharded=False):
     from transformers import BertConfig, BertModel, BertTokenizerFast
 
-    from endless_voices.retrieval import TransformersEmbedder
-
-    model_path = tmp_path / "encoder"
     model_path.mkdir()
     vocab = model_path / "vocab.txt"
     vocab.write_text("[PAD]\n[UNK]\n[CLS]\n[SEP]\n[MASK]\na\nstarship\narrives\nold\nstory\n")
@@ -181,7 +177,16 @@ def test_local_transformer_encoder_loads_and_masks_padding_without_downloads(tmp
     tokenizer.save_pretrained(model_path)
     model = BertModel(BertConfig(vocab_size=10, hidden_size=8, num_hidden_layers=1,
                                  num_attention_heads=2, intermediate_size=16))
-    model.save_pretrained(model_path)
+    model.save_pretrained(model_path, max_shard_size="2KB" if sharded else "5GB")
+    return model_path
+
+
+def test_local_transformer_encoder_loads_and_masks_padding_without_downloads(tmp_path):
+    import torch
+
+    from endless_voices.retrieval import TransformersEmbedder
+
+    model_path = save_local_encoder(tmp_path / "encoder")
     encoder = TransformersEmbedder.from_pretrained(model_path, max_length=512, device="cpu")
     encoder.tokenizer.padding_side = "right"
     alone = encoder.embed(["starship"])[0]
@@ -339,3 +344,95 @@ def test_scene_expansion_returns_neighboring_answer_and_counts_distinct_scenes(t
             session.read_context([scene_id(hidden_variant)])
         with pytest.raises(ValueError, match="expand_scenes must be a boolean"):
             session.search_context(expand_scenes="false")
+
+
+@pytest.mark.parametrize("sharded", [False, True])
+def test_encoder_identity_ignores_unloaded_files_and_tracks_dependencies(tmp_path, sharded):
+    import json
+
+    from safetensors.torch import load_file, save_file
+
+    from endless_voices.retrieval import TransformersEmbedder
+
+    model_path = save_local_encoder(tmp_path / "encoder", sharded=sharded)
+
+    def load():
+        return TransformersEmbedder.from_pretrained(model_path, max_length=512, device="cpu")
+
+    original = load()
+    path = tmp_path / "scenes.db"
+    source = pool()
+    SceneDatabase.create(path, source.blocks + source.references, original).close()
+    (model_path / "README.md").write_text("Local model notes")
+    (model_path / "run.log").write_text("An inference log")
+    (model_path / ".cache").mkdir()
+    (model_path / ".cache" / "download.metadata").write_text("Updated timestamp")
+    (model_path / "pytorch_model.bin").write_bytes(b"Unselected weight format")
+    (model_path / "generation_config.json").write_text('{"max_length": 10}')
+    (model_path / "unreferenced.safetensors").write_bytes(b"Unselected weights")
+    unchanged = load()
+    assert unchanged.identity == original.identity
+    with SceneDatabase(path, unchanged) as database:
+        assert RetrievalSession(database, source).search_context(limit=1)
+
+    if sharded:
+        index = json.loads((model_path / "model.safetensors.index.json").read_text())
+        weight_path = model_path / next(iter(index["weight_map"].values()))
+    else:
+        weight_path = model_path / "model.safetensors"
+    for dependency in (model_path / "config.json", model_path / "tokenizer.json", weight_path):
+        previous = dependency.read_bytes()
+        if dependency.name == "config.json":
+            content = json.loads(previous)
+            content["hidden_act"] = "relu"
+            dependency.write_text(json.dumps(content))
+        elif dependency.name == "tokenizer.json":
+            content = json.loads(previous)
+            content["model"]["vocab"]["starship"], content["model"]["vocab"]["arrives"] = (
+                content["model"]["vocab"]["arrives"], content["model"]["vocab"]["starship"])
+            dependency.write_text(json.dumps(content))
+        else:
+            weights = load_file(dependency)
+            first = next(iter(weights))
+            weights[first] = weights[first] + 0.25
+            save_file(weights, dependency, metadata={"format": "pt"})
+        changed = load()
+        assert changed.identity != original.identity
+        with pytest.raises(ValueError, match="model differs"):
+            SceneDatabase(path, changed)
+        dependency.write_bytes(previous)
+        assert load().identity == original.identity
+
+
+@pytest.mark.parametrize("destination", ["file", "directory", "dangling_symlink"])
+def test_existing_index_destination_fails_before_embedding(tmp_path, destination):
+    path = tmp_path / "existing"
+    if destination == "file":
+        path.write_bytes(b"Existing index contents")
+    elif destination == "directory":
+        path.mkdir()
+    else:
+        path.symlink_to(tmp_path / "missing-target")
+    encoder = Encoder()
+    with pytest.raises(FileExistsError):
+        SceneDatabase.create(path, pool().blocks, encoder)
+    assert encoder.inputs == []
+    if destination == "file":
+        assert path.read_bytes() == b"Existing index contents"
+    elif destination == "directory":
+        assert path.is_dir()
+    else:
+        assert path.is_symlink()
+
+
+def test_index_created_during_embedding_is_not_overwritten(tmp_path):
+    path = tmp_path / "scenes.db"
+
+    class RacingEncoder(Encoder):
+        def embed_documents(self, texts):
+            path.write_bytes(b"Another writer's index")
+            return super().embed_documents(texts)
+
+    with pytest.raises(FileExistsError):
+        SceneDatabase.create(path, pool().blocks, RacingEncoder())
+    assert path.read_bytes() == b"Another writer's index"

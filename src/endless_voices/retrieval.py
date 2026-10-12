@@ -25,6 +25,39 @@ class Embedder(Protocol):
     def embed_queries(self, texts: list[str]) -> list[list[float]]: ...
 
 
+def _model_fingerprint(path):
+    """Hash the weight, configuration and tokenizer files used by the local encoder."""
+    from transformers.tokenization_utils_base import get_fast_tokenizer_file
+
+    from endless_voices.artifacts import file_hash
+
+    weights = next((name for name in (
+        "model.safetensors", "model.safetensors.index.json",
+        "pytorch_model.bin", "pytorch_model.bin.index.json",
+    ) if (path / name).is_file()), None)
+    if weights is None:
+        raise ValueError("No supported encoder weights found in the model directory")
+    files = {"config.json", weights}
+    if weights.endswith(".index.json"):
+        index = json.loads((path / weights).read_text())
+        files.update(index["weight_map"].values())
+    tokenizer_config = {}
+    for name in ("tokenizer_config.json", "special_tokens_map.json", "added_tokens.json"):
+        if (path / name).is_file():
+            files.add(name)
+            if name == "tokenizer_config.json":
+                tokenizer_config = json.loads((path / name).read_text())
+    tokenizer_file = get_fast_tokenizer_file(tokenizer_config.get("fast_tokenizer_files", []))
+    if (path / tokenizer_file).is_file():
+        files.add(tokenizer_file)
+    else:
+        files.update(name for name in ("vocab.json", "merges.txt", "vocab.txt")
+                     if (path / name).is_file())
+    if any(Path(name).is_absolute() or ".." in Path(name).parts for name in files):
+        raise ValueError("Encoder assets must be inside the model directory")
+    return digest({name: file_hash(path / name) for name in sorted(files)})
+
+
 class TransformersEmbedder:
     """Encode Qwen3 passages and instructed queries with last-token pooling."""
 
@@ -58,15 +91,12 @@ class TransformersEmbedder:
         from huggingface_hub import snapshot_download
         from transformers import AutoModel, AutoTokenizer
 
-        from endless_voices.artifacts import file_hash
-
         path = Path(path)
         if not path.is_dir():
             path = Path(snapshot_download(str(path), local_files_only=local_files_only,
                                           cache_dir=cache_dir))
         if model_id is None:
-            model_id = digest({str(p.relative_to(path)): file_hash(p)
-                               for p in sorted(path.rglob("*")) if p.is_file()})
+            model_id = _model_fingerprint(path)
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else (
                 "mps" if torch.backends.mps.is_available() else "cpu")
@@ -172,6 +202,8 @@ class SceneDatabase:
     def create(cls, path, blocks, embedder):
         """Persist complete passage vectors without replacing an existing index."""
         path = Path(path)
+        if path.exists() or path.is_symlink():
+            raise FileExistsError(f"Scene index destination already exists: {path}")
         if not isinstance(embedder.identity, str) or not embedder.identity:
             raise ValueError("Embedding model identity must be a nonempty string")
         documents = {scene_id(block): deepcopy(block) for block in blocks}
