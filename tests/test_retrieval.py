@@ -209,7 +209,7 @@ def test_search_finds_late_passages_and_expands_only_the_eligible_parent(tmp_pat
     with SceneDatabase.create(tmp_path / "chunks.db", source.blocks + source.references,
                               Encoder()) as database:
         session = RetrievalSession(database, source)
-        hit = session.search_context("starship", kind="history", limit=1)[0]
+        hit = session.search_context("starship", kind="history", limit=1, expand_scenes=False)[0]
         assert hit["lines"] == [12]
         assert hit["passage_index"] == 11
         assert hit["scene_id"] == scene_id(source.blocks[0])
@@ -290,3 +290,52 @@ def test_incomplete_or_changed_passages_cannot_silently_change_retrieval(tmp_pat
     with SceneDatabase(path, Encoder()) as database:
         with pytest.raises(ValueError, match="missing an eligible passage|differs from its parent"):
             RetrievalSession(database, source)
+
+
+def test_scene_expansion_returns_neighboring_answer_and_counts_distinct_scenes(tmp_path):
+    class RankedEncoder(Encoder):
+        def embed(self, texts):
+            return [[0.8, 0.6] if "other vessel" in text else
+                    [1.0, 0.0] if "starship" in text else [0.0, 1.0] for text in texts]
+
+    source = pool()
+    first = block("parent", "Which starship carries the ambassador?", 10)
+    first["passages"].extend([
+        {"line": 11, "text": "The starship is departing soon.", "role": "passage"},
+        {"line": 12, "text": "The ambassador is aboard the Peregrine.", "role": "passage"},
+    ])
+    second = block("ancestor", "The other vessel is still in port.", 20)
+    source.blocks = [first, second]
+    hidden_variant = deepcopy(first)
+    hidden_variant["passages"].append(
+        {"line": 13, "text": "A hidden future betrayal.", "role": "passage"})
+    with SceneDatabase.create(tmp_path / "scenes.db",
+                              [*source.blocks, *source.references, hidden_variant],
+                              RankedEncoder()) as database:
+        session = RetrievalSession(database, source)
+        expanded = session.call_tool("search_context", {
+            "query": "starship", "kind": "history", "limit": 2})
+        assert [document["id"] for document in expanded] == [scene_id(first), scene_id(second)]
+        assert expanded[0]["lines"] == [10, 11, 12]
+        assert "aboard the Peregrine" in expanded[0]["text"]
+        assert "hidden future betrayal" not in expanded[0]["text"]
+        match = expanded[0]["matched_passage"]
+        assert match["line"] in {10, 11}
+        assert match["score"] == expanded[0]["score"] == 1.0
+        trace = deepcopy(session.trace[-1])
+        assert trace["arguments"]["expand_scenes"] is True
+        assert trace["matched_passages"][0] == {"scene_id": scene_id(first), **match}
+        assert trace["result_ids"] == [scene_id(first), scene_id(second)]
+        raw = session.search_context("starship", kind="history", limit=2, expand_scenes=False)
+        assert len(raw) == 2
+        assert all(document["scene_id"] == scene_id(first) for document in raw)
+        assert raw[0]["id"] == match["id"]
+        assert all("matched_passage" not in document and "text" not in document for document in raw)
+        assert all("aboard the Peregrine" not in document["excerpt"] for document in raw)
+        assert session.trace[-1]["arguments"]["expand_scenes"] is False
+        expanded[0]["matched_passage"]["line"] = 999
+        assert trace == session.trace[-2]
+        with pytest.raises(ValueError, match="not eligible"):
+            session.read_context([scene_id(hidden_variant)])
+        with pytest.raises(ValueError, match="expand_scenes must be a boolean"):
+            session.search_context(expand_scenes="false")

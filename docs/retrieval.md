@@ -16,14 +16,23 @@ python -m endless_voices.dataset.index_context \
 The default encoder is `Qwen/Qwen3-Embedding-0.6B`, loaded from `data/local/hub`. Supply
 `--model` to use a local model directory or another cached Qwen3 embedding model. Indexing
 does not download models or call hosted services. Automatic device selection prefers CUDA,
-then MPS, then CPU. The command
-accepts explicit device, precision, batch size and token-limit settings.
+then MPS, then CPU. The command accepts explicit device, precision, batch size and token-limit
+settings.
 
 The SQLite index stores every authored passage separately, including player choices, and
 retains each passage's complete interpreted parent scene. Repeated scenes share one entry;
 different interpretations remain separate entries. Search computes exact cosine similarity
-over passages whose parent scenes are eligible for the current encounter. Search results
-contain the complete passage and a parent scene ID for reading the surrounding scene.
+over passages whose parent scenes are eligible for the current encounter. Search returns
+complete parent scenes by default, ranked by each scene's highest-scoring passage. Multiple
+matching passages from one scene produce one result, and `limit` counts distinct scenes.
+Each result includes its score and `matched_passage` evidence: the passage ID, source line,
+passage position and score that caused the scene to rank. Expansion uses the saved interpreted
+scene, preserving the eligible branch rather than reading other branches from the source.
+
+Set `expand_scenes=False` to retrieve individual passages and make `limit` count passages.
+The passage mode preserves the embedding comparison baseline. Scene expansion changes only
+the returned context; existing passage indexes do not need rebuilding. Full scenes can consume
+substantially more prompt space than passages, so the caller still needs an input budget.
 
 The encoder follows the [Qwen3 embedding model's pooling and input format](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B#transformers-usage):
 documents contain the scene heading and authored passage; queries receive an instruction.
@@ -55,15 +64,18 @@ with SceneDatabase("outputs/context.sqlite", embedder) as database:
     tools = session.tool_schemas
     history = session.call_tool("get_history", {"depth": 4})
     matches = session.call_tool("search_context", {"query": "departure and farewell"})
-    if matches:
-        scene = session.call_tool("read_context", {"ids": [matches[0]["scene_id"]]})
+    passages = session.call_tool("search_context", {
+        "query": "departure and farewell", "expand_scenes": False,
+    })
     trace = session.trace
 ```
 
 `get_history` returns eligible mission history within a prerequisite distance.
 `search_context` searches eligible history and independent writing references; omitting
-the query uses the visible encounter. `read_context` accepts a passage `id` or a parent
-`scene_id` returned by retrieval and returns the complete passage or scene.
+the query uses the visible encounter. Expanded results contain the complete scene in `text`;
+passage results contain the complete passage in `excerpt`. `read_context` accepts a passage
+`id` or a parent `scene_id` and returns the complete passage or scene. Search traces record
+the expansion setting, returned IDs and matching passage coordinates and scores.
 Independent references demonstrate authored writing and do not assert events in the current
 playthrough. The session supplies tool schemas and dispatch; the caller runs the model loop,
 appends tool results, sets spending limits and saves the retrieval trace.
@@ -109,7 +121,8 @@ python scripts/compare_retrieval_embeddings.py run \
 
 Repeat `run` with the second cached model and a different output directory, preserving the
 frozen input and encoding settings. `blind --help` describes creating review packets from
-the two result files. Reviewers score each of the first three passages for relevance and
+the two result files. The comparison runner explicitly disables scene expansion. Reviewers
+score each of the first three passages for relevance and
 choose a preferred result set before opening the separate model key. Timing, source hashes
 and exact model revisions accompany the saved results. A small handwritten query set measures
 usefulness on those encounters; the results do not establish retrieval accuracy across the game.

@@ -84,7 +84,7 @@ def run(args):
 
             session = RetrievalSession(database, pools[query["mission"]])
             before = time.perf_counter()
-            matches = session.search_context(query["query"], limit=args.limit)
+            matches = session.search_context(query["query"], limit=args.limit, expand_scenes=False)
             elapsed = time.perf_counter() - before
             results.append({
                 "query_id": query["id"], "query": query["query"],
@@ -97,6 +97,7 @@ def run(args):
         "model_revision": args.revision, "embedder": embedder.identity,
         "device": str(embedder.model.device), "dtype": str(embedder.model.dtype),
         "max_length": args.max_length, "batch_size": args.batch_size, "limit": args.limit,
+        "result_unit": "passage",
         "load_seconds": loaded - started, "index_seconds": indexed - loaded,
         "query_seconds": sum(result["seconds"] for result in results),
         "total_seconds": ended - started, "platform": platform.platform(),
@@ -118,6 +119,9 @@ def blind(args):
     for setting in ("dtype", "max_length", "batch_size", "limit", "retrieval_source_sha256"):
         if first["metadata"][setting] != second["metadata"][setting]:
             raise ValueError(f"Comparison setting differs: {setting}")
+    if any(result["metadata"].get("result_unit", "passage") != "passage"
+           for result in (first, second)):
+        raise ValueError("Blinded passage comparison requires passage results")
     packets, key = [], {}
     for query, one, two in zip(frozen["plan"]["queries"], first["queries"],
                                second["queries"], strict=True):

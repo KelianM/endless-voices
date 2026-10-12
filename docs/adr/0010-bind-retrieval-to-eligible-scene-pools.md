@@ -19,28 +19,38 @@ Save each example's eligible context independently of its fixed sampled prompt. 
 tools to that pool, applying eligibility before similarity ranking or scene reads.
 
 Index complete authored passages in a static database, retaining each passage's interpreted
-parent scene. Authorize every passage through its parent scene and allow agents to expand
-a passage into that scene. Distinct interpretations remain distinct entries. Use a retrieval
-encoder's prescribed pooling and query instruction format. Reject inputs beyond the encoder's
-token limit instead of silently dropping text. Mission history and independent writing
-references retain their different meanings.
-Keep fixed sampling as one context policy and expose tool schemas and dispatch for callers
-that run an agent loop.
+parent scene. Authorize every passage through its parent scene. Return complete scenes by
+default, rank each scene by its strongest passage match and return each scene once. Preserve
+the matching passage as evidence and offer passage-only retrieval for controlled comparisons
+and callers with smaller budgets. Distinct interpretations remain distinct entries. Use a
+retrieval encoder's prescribed pooling and query instruction format. Reject inputs beyond
+the encoder's token limit instead of silently dropping text. Mission history and independent
+writing references retain their different meanings. Keep fixed sampling as one context
+policy and expose tool schemas and dispatch for callers that run an agent loop.
 
 ## Consequences
 
-Agents can select smaller passages without receiving whole missions. Shared indexing avoids
-re-embedding repeated scenes, while saved pools preserve the builder's branch and split
-decisions. Exact pool membership prevents excluded scenes from influencing search ranking.
+Agents receive the surrounding eligible dialogue without a separate expansion call. Shared
+indexing avoids re-embedding repeated scenes, while saved pools preserve the builder's branch
+and split decisions. Exact pool membership prevents excluded scenes from influencing search
+ranking.
 Filtering only after a global search was rejected because excluded scenes could displace
 eligible results.
 
 The initial prototype indexed one vector per scene using mean pooling and a truncated scene
 prefix. That approach was replaced because passages near a scene's end could not influence
 retrieval, and generic mean pooling did not follow the chosen encoder's retrieval interface.
-Passage indexing retains every authored passage but increases the number of vectors. Several
-results can come from the same scene. An unusually long passage or query now causes an
-explicit error rather than producing a vector for incomplete text.
+Passage indexing retains every authored passage but increases the number of vectors. An
+unusually long passage or query now causes an explicit error rather than producing a vector
+for incomplete text.
+
+Returning only matching passages was replaced as the default after the qualitative comparison
+found incomplete answers despite relevant scene matches. Expansion supplies surrounding
+dialogue without re-embedding scenes or widening eligibility. A strong match can bring
+substantial unrelated dialogue into the prompt, increasing input cost. Ranking by the strongest
+passage can favor a scene with one relevant passage over a scene with several weaker matches.
+Passage-only retrieval remains
+available to measure that tradeoff.
 
 Prepared bundles retain more eligible text than fixed prompts require. Rebuilding the corpus
 or changing the encoder requires a corresponding index. Retrieval inherits the interpreter's

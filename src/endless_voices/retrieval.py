@@ -290,8 +290,13 @@ class RetrievalSession:
         return document
 
     def _record(self, name, arguments, result):
-        self.trace.append({"tool": name, "arguments": deepcopy(arguments),
-                           "result_ids": [document["id"] for document in result]})
+        entry = {"tool": name, "arguments": deepcopy(arguments),
+                 "result_ids": [document["id"] for document in result]}
+        matches = [{"scene_id": document["id"], **deepcopy(document["matched_passage"])}
+                   for document in result if "matched_passage" in document]
+        if matches:
+            entry["matched_passages"] = matches
+        self.trace.append(entry)
         return result
 
     def get_history(self, depth):
@@ -304,12 +309,14 @@ class RetrievalSession:
         return self._record("get_history", {"depth": depth},
                             [self._document(sid, full=True) for sid in selected])
 
-    def search_context(self, query=None, kind="all", limit=5):
-        """Rank eligible passage vectors using a supplied query or the visible encounter."""
+    def search_context(self, query=None, kind="all", limit=5, expand_scenes=True):
+        """Rank passages and return distinct full scenes, or passages when expansion is disabled."""
         if kind not in {"all", "history", "reference"}:
             raise ValueError("kind must be all, history or reference")
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("limit must be an integer from 1 to 100")
+        if type(expand_scenes) is not bool:
+            raise ValueError("expand_scenes must be a boolean")
         if query is None:
             query = "\n\n".join(message["content"] for message in self._pool.encounter)
         if not isinstance(query, str) or not query.strip():
@@ -323,9 +330,28 @@ class RetrievalSession:
              for sid, (chunk, scene_vector) in self._chunks.items()
              if kind in {"all", self._allowed[chunk["scene_id"]][0]}),
             key=lambda item: (-item[0], item[1]),
-        )[:limit]
-        return self._record("search_context", {"query": query, "kind": kind, "limit": limit},
-                            [self._document(sid, score=score) for score, sid in ranked])
+        )
+        documents, seen = [], set()
+        for score, sid in ranked:
+            chunk = self._chunks[sid][0]
+            parent_id = chunk["scene_id"]
+            if expand_scenes:
+                if parent_id in seen:
+                    continue
+                seen.add(parent_id)
+                document = self._document(parent_id, full=True, score=score)
+                document["matched_passage"] = {
+                    "id": sid, "line": chunk["line"], "passage_index": chunk["passage_index"],
+                    "score": score,
+                }
+            else:
+                document = self._document(sid, score=score)
+            documents.append(document)
+            if len(documents) == limit:
+                break
+        return self._record("search_context", {
+            "query": query, "kind": kind, "limit": limit, "expand_scenes": expand_scenes,
+        }, documents)
 
     def read_context(self, ids):
         """Return complete authorized passages or parent scenes by their IDs."""
@@ -347,12 +373,17 @@ class RetrievalSession:
                     "required": ["depth"], "additionalProperties": False}}},
             {"type": "function", "function": {
                 "name": "search_context", "description":
-                    "Search eligible history and independent writing references by meaning.",
+                    "Search eligible passages and expand the best matches into complete scenes.",
                 "parameters": {"type": "object", "properties": {
                     "query": {"type": "string", "description":
                               "Search text; omit to use only the visible encounter."},
                     "kind": {"type": "string", "enum": ["all", "history", "reference"]},
-                    "limit": {"type": "integer", "minimum": 1, "maximum": 100}},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 100,
+                              "description": "Maximum distinct scenes, or passages if expansion "
+                                             "is disabled."},
+                    "expand_scenes": {"type": "boolean", "default": True,
+                                      "description": "Return full scenes with matching passage "
+                                                     "evidence; false returns passages only."}},
                     "additionalProperties": False}}},
             {"type": "function", "function": {
                 "name": "read_context", "description":
