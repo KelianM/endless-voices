@@ -5,7 +5,7 @@ from copy import deepcopy
 import pytest
 
 from endless_voices.context import ContextPool, MissionDepth
-from endless_voices.retrieval import RetrievalSession, SceneDatabase, scene_id
+from endless_voices.retrieval import RetrievalSession, SceneDatabase, passage_chunks, scene_id
 
 
 class Encoder:
@@ -13,6 +13,12 @@ class Encoder:
 
     def __init__(self):
         self.inputs = []
+
+    def embed_documents(self, texts):
+        return self.embed(texts)
+
+    def embed_queries(self, texts):
+        return self.embed(texts)
 
     def embed(self, texts):
         self.inputs.extend(texts)
@@ -45,9 +51,10 @@ def test_ineligible_scene_cannot_affect_ranking_or_be_read_by_guessed_id(tmp_pat
         session = RetrievalSession(database, source)
         encoder.inputs.clear()
         matches = session.search_context(limit=1)
-        assert [match["id"] for match in matches] == [scene_id(source.blocks[0])]
+        assert [match["scene_id"] for match in matches] == [scene_id(source.blocks[0])]
         assert encoder.inputs == [source.encounter[0]["content"]]
-        for sid in [scene_id(hidden), scene_id(incompatible), "invented"]:
+        for sid in [scene_id(hidden), scene_id(incompatible),
+                    passage_chunks(hidden)[0]["id"], "invented"]:
             with pytest.raises(ValueError, match="not eligible"):
                 session.read_context([sid])
         expected = session.search_context()
@@ -175,15 +182,111 @@ def test_local_transformer_encoder_loads_and_masks_padding_without_downloads(tmp
     model = BertModel(BertConfig(vocab_size=10, hidden_size=8, num_hidden_layers=1,
                                  num_attention_heads=2, intermediate_size=16))
     model.save_pretrained(model_path)
-    encoder = TransformersEmbedder.from_pretrained(model_path)
+    encoder = TransformersEmbedder.from_pretrained(model_path, max_length=512, device="cpu")
+    encoder.tokenizer.padding_side = "right"
     alone = encoder.embed(["starship"])[0]
     padded = encoder.embed(["starship", "a starship arrives old story"])[0]
     assert len(alone) == 8
     assert torch.allclose(torch.tensor(alone), torch.tensor(padded), atol=1e-6)
-    assert encoder.identity == TransformersEmbedder.from_pretrained(model_path).identity
+    reloaded = TransformersEmbedder.from_pretrained(model_path, max_length=512, device="cpu")
+    assert encoder.identity == reloaded.identity
     source = pool()
     with SceneDatabase.create(tmp_path / "scenes.db", source.blocks + source.references,
                               encoder) as database:
         matches = RetrievalSession(database, source).search_context(limit=2)
         assert len(matches) == 2
         assert all(-1.00001 <= match["score"] <= 1.00001 for match in matches)
+
+
+def test_search_finds_late_passages_and_expands_only_the_eligible_parent(tmp_path):
+    source = pool()
+    source.blocks = [block("parent", "An opening without a match", 1)]
+    source.blocks[0]["passages"].extend(
+        {"line": line, "text": "An unrelated passage " * 100, "role": "passage"}
+        for line in range(2, 12))
+    source.blocks[0]["passages"].append(
+        {"line": 12, "text": "The starship waits at the final port.", "role": "passage"})
+    with SceneDatabase.create(tmp_path / "chunks.db", source.blocks + source.references,
+                              Encoder()) as database:
+        session = RetrievalSession(database, source)
+        hit = session.search_context("starship", kind="history", limit=1)[0]
+        assert hit["lines"] == [12]
+        assert hit["passage_index"] == 11
+        assert hit["scene_id"] == scene_id(source.blocks[0])
+        assert session.read_context([hit["id"]])[0]["text"] == hit["excerpt"]
+        parent = session.read_context([hit["scene_id"]])[0]
+        assert parent["lines"] == list(range(1, 13))
+        assert "opening without" in parent["text"]
+        assert "final port" in parent["text"]
+
+
+@pytest.mark.parametrize("mask,last_values", [
+    ([[1, 1, 0], [1, 1, 1]], [2.0, 3.0]),
+    ([[0, 1, 1], [1, 1, 1]], [3.0, 3.0]),
+])
+def test_qwen_pooling_uses_last_nonpadding_token_and_instructs_only_queries(mask, last_values):
+    from types import SimpleNamespace
+
+    import torch
+
+    from endless_voices.retrieval import TransformersEmbedder
+
+    calls = []
+
+    def tokenizer(texts, **kwargs):
+        calls.append((texts, kwargs))
+        return {"attention_mask": torch.tensor(mask)}
+
+    class Model:
+        config = SimpleNamespace(max_position_embeddings=32)
+        dtype = torch.float32
+        device = torch.device("cpu")
+
+        def eval(self):
+            return self
+
+        def __call__(self, **kwargs):
+            return SimpleNamespace(last_hidden_state=torch.tensor([
+                [[1.0, 1.0], [2.0, 1.0], [3.0, 1.0]],
+                [[1.0, 1.0], [2.0, 1.0], [3.0, 1.0]],
+            ]))
+
+    encoder = TransformersEmbedder(tokenizer, Model(), "fixture", max_length=32,
+                                   query_instruction="Find relevant authored passages.")
+    actual = encoder.embed_documents(["first document", "second document"])
+    expected = torch.nn.functional.normalize(torch.tensor([[v, 1.0] for v in last_values]), dim=1)
+    assert torch.allclose(torch.tensor(actual), expected)
+    assert calls[-1][0] == ["first document", "second document"]
+    encoder.embed_queries(["first query", "second query"])
+    assert calls[-1][0] == [
+        "Instruct: Find relevant authored passages.\nQuery:first query",
+        "Instruct: Find relevant authored passages.\nQuery:second query"]
+    assert all(call[1]["truncation"] is False for call in calls)
+    encoder.max_length = 2
+    with pytest.raises(ValueError, match="Document contains 3 tokens.*no text was truncated"):
+        encoder.embed_documents(["first document", "second document"])
+    with pytest.raises(ValueError, match="Instructed query contains 3 tokens.*no text"):
+        encoder.embed_queries(["first query", "second query"])
+
+
+@pytest.mark.parametrize("damage", ["missing", "changed"])
+def test_incomplete_or_changed_passages_cannot_silently_change_retrieval(tmp_path, damage):
+    import json
+    import sqlite3
+
+    source = pool()
+    source.blocks[0]["passages"][0]["role"] = "option"
+    chunk = passage_chunks(source.blocks[0])[0]
+    assert chunk["text"] == "parent\nPlayer choice: A starship departs."
+    path = tmp_path / "passages.db"
+    SceneDatabase.create(path, source.blocks + source.references, Encoder()).close()
+    with sqlite3.connect(path) as connection:
+        if damage == "missing":
+            connection.execute("DELETE FROM passages WHERE id = ?", (chunk["id"],))
+        else:
+            changed = {**chunk, "text": "Different authored text"}
+            connection.execute("UPDATE passages SET chunk = ? WHERE id = ?",
+                               (json.dumps(changed), chunk["id"]))
+    with SceneDatabase(path, Encoder()) as database:
+        with pytest.raises(ValueError, match="missing an eligible passage|differs from its parent"):
+            RetrievalSession(database, source)

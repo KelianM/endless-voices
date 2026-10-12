@@ -18,8 +18,12 @@ and the interpreted histories established by [ADR 9](0009-build-examples-from-co
 Save each example's eligible context independently of its fixed sampled prompt. Bind retrieval
 tools to that pool, applying eligibility before similarity ranking or scene reads.
 
-Index interpreted scenes in a static database. Distinct interpretations remain distinct
-entries. Mission history and independent writing references retain their different meanings.
+Index complete authored passages in a static database, retaining each passage's interpreted
+parent scene. Authorize every passage through its parent scene and allow agents to expand
+a passage into that scene. Distinct interpretations remain distinct entries. Use a retrieval
+encoder's prescribed pooling and query instruction format. Reject inputs beyond the encoder's
+token limit instead of silently dropping text. Mission history and independent writing
+references retain their different meanings.
 Keep fixed sampling as one context policy and expose tool schemas and dispatch for callers
 that run an agent loop.
 
@@ -30,6 +34,13 @@ re-embedding repeated scenes, while saved pools preserve the builder's branch an
 decisions. Exact pool membership prevents excluded scenes from influencing search ranking.
 Filtering only after a global search was rejected because excluded scenes could displace
 eligible results.
+
+The initial prototype indexed one vector per scene using mean pooling and a truncated scene
+prefix. That approach was replaced because passages near a scene's end could not influence
+retrieval, and generic mean pooling did not follow the chosen encoder's retrieval interface.
+Passage indexing retains every authored passage but increases the number of vectors. Several
+results can come from the same scene. An unusually long passage or query now causes an
+explicit error rather than producing a vector for incomplete text.
 
 Prepared bundles retain more eligible text than fixed prompts require. Rebuilding the corpus
 or changing the encoder requires a corresponding index. Retrieval inherits the interpreter's
