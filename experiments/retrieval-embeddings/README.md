@@ -86,9 +86,3 @@ Different reviewers assessed the two modes. The preference counts do not measure
 improvement, general model quality or generated dialogue quality. Original run artifacts
 remain under ignored `outputs/retrieval-embedding-comparison/`; the commands above reproduce
 retrieval, while another qualitative review may reach different judgments.
-
-Run the experiment checks separately from the system tests:
-
-```sh
-pytest -q experiments/retrieval-embeddings
-```

@@ -80,11 +80,11 @@ recorded investigations live in [experiments/](experiments/README.md).
 
 ```sh
 pytest -q
-ruff check src tests experiments
+ruff check src tests
 ```
 
 Command parsing lives in `src/endless_voices/cli/`; reusable behavior lives in the rest
-of the package. Investigation-specific runners, inputs and tests live in `experiments/`.
+of the package. Ad-hoc investigation runners, inputs and findings live in `experiments/`.
 
 Lasting decisions are recorded in [ADRs](docs/adr/README.md). See [NOTICE.md](NOTICE.md) for
 source-data licensing; full upstream notices travel with the LFS datasets.
