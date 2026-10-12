@@ -2,13 +2,13 @@
 
 `src/endless_voices/dataset/` contains the implementation. `data/dataset/` is its built output.
 `data/sources/source-statistics.json` pins the game-source revision and file hashes used by
-`scripts/fetch_sources.py`; raw sources and model caches remain in ignored `data/local/`.
+`endless-voices fetch-sources`; raw sources and model caches remain in ignored `data/local/`.
 Experiment outputs belong in ignored `outputs/`.
 
-The maintained preparation entry point is `endless_voices.dataset`. `DatasetBuilder` parses verified game source, constructs state-consistent targets and history, applies mission ownership and the context budget, and publishes one prepared bundle.
+The maintained preparation entry point is `endless-voices prepare-dataset`. `DatasetBuilder` parses verified game source, constructs state-consistent targets and history, applies mission ownership and the context budget, and publishes one prepared bundle.
 
 ```sh
-python -m endless_voices.dataset \
+endless-voices prepare-dataset \
   --source data/local/endless-sky-7140eb2a29ce \
   --inventory data/sources/source-statistics.json \
   --config data/dataset/config.json \

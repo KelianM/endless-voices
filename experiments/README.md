@@ -13,7 +13,8 @@ Move reusable behavior into `src/` when the system needs it; do not copy it into
 The repository separates these responsibilities:
 
 - `src/endless_voices/`: reusable system behavior.
-- `scripts/`: maintained commands for preparing, inspecting and evaluating system artifacts.
+- `src/endless_voices/cli/`: supported commands that parse arguments and call system behavior.
+- `scripts/`, if needed: development utilities or short sequences of existing CLI commands.
 - `configs/`: reusable system configuration.
 - `docs/` and `tests/`: system documentation and regression tests.
 - `experiments/<question>/`: investigation-specific code, configuration, notes and tests.

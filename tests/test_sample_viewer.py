@@ -1,16 +1,12 @@
 """Protect split selection, literal sample text and generation-run matching in the reader."""
 
-import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
-spec = importlib.util.spec_from_file_location(
-    "view_samples", Path(__file__).parents[1] / "scripts/view_samples.py"
-)
-viewer = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(viewer)
+from endless_voices import view_samples as viewer
+
 FIXTURE = Path(__file__).parent / "fixtures/contracts/manifest.json"
 
 

@@ -1,11 +1,9 @@
 """Prepare, verify and run a benchmark from one shared context selection."""
 
-import argparse
 import json
 import re
 import shutil
 from pathlib import Path
-from types import SimpleNamespace
 
 from endless_voices import artifacts, hosted_judge, providers
 from endless_voices import assessment as assess
@@ -80,6 +78,8 @@ def prepare(root, dataset, config):
     for p in (Path(__file__), Path(screen.__file__),
               Path(providers.__file__), Path(artifacts.__file__)):
         shutil.copy2(p, root / p.name)
+    cli_source = Path(__file__).with_name("cli") / "benchmark.py"
+    shutil.copy2(cli_source, root / "cli-benchmark.py")
     files = [p for p in root.rglob("*") if p.is_file()]
     screen.save(root / "selection.json", {
         "ids": ids, "split": "validation", "manifest_sha256": screen.sha(manifest),
@@ -247,59 +247,3 @@ def verify_trials(root, save=True):
         screen.save(root / "trial-verification.json", verification)
     elif verification != screen.read(root / "trial-verification.json"):
         raise ValueError("Trial verification changed")
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["prepare", "preflight", "local-smoke", "local",
-                                          "hosted", "export", "judge", "report"])
-    parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--dataset", type=Path)
-    parser.add_argument("--config", type=Path, default=Path("configs/benchmark.json"))
-    parser.add_argument("--model", choices=["gemma31b", "qwen30b"],
-                        help="Local model for local and local-smoke stages")
-    args = parser.parse_args()
-    root = args.root
-    if args.stage == "prepare":
-        if args.dataset is None:
-            parser.error("prepare requires --dataset")
-        prepare(root, args.dataset, args.config)
-        return
-    checked_inputs(root)
-    plan = screen.read(root / "plan.json")
-    if args.stage == "preflight":
-        from transformers import AutoTokenizer
-        tokenizers = {name: AutoTokenizer.from_pretrained(
-            screen.read(root / f"{name}-config.json")["path"], local_files_only=True)
-            for name in plan["local_configs"]}
-        preflight(root, tokenizers)
-    elif args.stage == "local-smoke":
-        if args.model not in plan["local_configs"]:
-            parser.error("Choose a selected local model with --model")
-        local_smoke(root, args.model)
-    elif args.stage == "local":
-        if args.model not in plan["local_configs"]:
-            parser.error("Choose a selected local model with --model")
-        screen.local(root, root / f"{args.model}-config.json")
-    elif args.stage == "hosted":
-        screen.hosted(root, models=[m for m in plan["generators"]
-                                    if m not in plan["local_configs"]],
-                      budget=plan["generation_budget_usd"],
-                      timeout_seconds=plan.get("api_timeout_seconds", 1800))
-    elif args.stage == "export":
-        export(root)
-    elif args.stage == "judge":
-        if not (root / "trial-verification.json").exists():
-            raise ValueError("Verified trials are required")
-        verify_trials(root, save=False)
-        hosted_judge.run(SimpleNamespace(public=root / "assessment/public", output=root / "judge",
-                                        env_file=Path(".env"), models=[plan["judge"]],
-                                        budget=plan["judge_budget_usd"], limit=1000,
-                                        timeout_seconds=plan.get("api_timeout_seconds", 1800)))
-    else:
-        assess.report(root / "assessment", [root / "judge" / plan["judge"] / "review.json"],
-                      root / "report")
-
-
-if __name__ == "__main__":
-    main()

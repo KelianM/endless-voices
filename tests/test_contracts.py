@@ -245,7 +245,7 @@ def test_optional_length_check_has_line_error(manifest, split):
 
 
 def test_cli_offline_and_actionable_failure(manifest):
-    command = [sys.executable, "-m", "endless_voices.contracts", str(manifest)]
+    command = [sys.executable, "-m", "endless_voices", "validate", str(manifest)]
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["validation"]["records"] == 1

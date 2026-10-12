@@ -1,15 +1,11 @@
 """Fetch the pinned Endless Sky text sources and verify their committed SHA-256 hashes."""
 
-import argparse
 import hashlib
-import json
 import re
 import subprocess
 import tempfile
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = REPO_ROOT / "data/sources/source-statistics.json"
 UPSTREAM = "https://github.com/endless-sky/endless-sky.git"
 
 
@@ -56,23 +52,3 @@ def fetch(destination, manifest):
         git(checkout, "checkout", "--quiet", "--detach", "FETCH_HEAD")
         verify(checkout, manifest)
         checkout.rename(destination)
-
-
-def main():
-    manifest = json.loads(MANIFEST.read_text())
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--destination", type=Path,
-        default=REPO_ROOT / "data/local" / f"endless-sky-{manifest['revision'][:12]}",
-        help="Checkout location; defaults to the gitignored data/local directory.",
-    )
-    args = parser.parse_args()
-    try:
-        fetch(args.destination.resolve(), manifest)
-    except (ValueError, OSError, subprocess.CalledProcessError) as error:
-        parser.exit(1, f"Fetch failed: {error}\nExisting files were not overwritten.\n")
-    print(f"Verified {len(manifest['files'])} source files at {args.destination.resolve()}")
-
-
-if __name__ == "__main__":
-    main()

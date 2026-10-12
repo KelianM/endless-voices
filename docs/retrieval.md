@@ -8,7 +8,7 @@ Rebuild a dataset with the [preparation command](../data/README.md), then create
 passage index with a locally cached embedding model:
 
 ```sh
-python -m endless_voices.dataset.index_context \
+endless-voices index-context \
   --dataset outputs/prepared-scenes \
   --output outputs/context.sqlite
 ```

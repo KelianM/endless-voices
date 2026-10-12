@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
 """Build a standalone HTML reader for curated samples and optional generated responses."""
 
-import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -87,24 +85,3 @@ def build_viewer(manifest: Path, output: Path, split="train", run_directory: Pat
     with output.open("x", encoding="utf-8") as handle:
         handle.write(document)
     return len(records)
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--manifest", type=Path, default=Path("data/dataset/manifest.json")
-    )
-    parser.add_argument("--split", choices=["train", "validation", "test", "all"], default="train")
-    parser.add_argument("--run", type=Path, help="Optional generation run directory")
-    parser.add_argument("--output", type=Path, required=True, help="New standalone HTML file")
-    args = parser.parse_args()
-    try:
-        count = build_viewer(args.manifest, args.output, args.split, args.run)
-    except (ValueError, OSError, KeyError, TypeError) as error:
-        parser.exit(1, f"{error}\n")
-    print(f"Saved {count} samples to {args.output.resolve()}")
-    print(f"Open in a browser: {args.output.resolve().as_uri()}")
-
-
-if __name__ == "__main__":
-    main()

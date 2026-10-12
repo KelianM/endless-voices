@@ -1,6 +1,5 @@
 """Protect selected-context benchmarks using synthetic generation evidence."""
 
-import importlib.util
 import json
 from copy import deepcopy
 from pathlib import Path
@@ -8,14 +7,9 @@ from pathlib import Path
 import pytest
 from prepared_fixtures import write_empty_pools
 
+from endless_voices import benchmark_generators as benchmark
 from endless_voices import generation_backends as backends
 from endless_voices.context import ContextPool, FullContext
-
-spec = importlib.util.spec_from_file_location(
-    "benchmark_generators", "scripts/benchmark_generators.py"
-)
-benchmark = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(benchmark)
 
 
 class Counter:
@@ -201,13 +195,21 @@ def test_four_model_lineup_accepts_both_provider_completion_formats(recorded):
 
 
 def test_prepare_cli_passes_the_prepared_dataset(monkeypatch, tmp_path):
-    import sys
+    from endless_voices.cli import benchmark as cli
 
     dataset = tmp_path / 'dataset'
     output = tmp_path / 'benchmark'
     calls = []
-    monkeypatch.setattr(sys, 'argv', ['benchmark_generators.py', 'prepare',
-                                     '--root', str(output), '--dataset', str(dataset)])
     monkeypatch.setattr(benchmark, 'prepare', lambda *args: calls.append(args))
-    benchmark.main()
+    cli.main(['prepare', '--root', str(output), '--dataset', str(dataset)])
     assert calls == [(output, dataset, Path('configs/benchmark.json'))]
+
+
+def test_preparation_records_cli_source_after_split(recorded):
+    from endless_voices.cli import benchmark as cli
+
+    snapshot = recorded / "cli-benchmark.py"
+    assert snapshot.read_bytes() == Path(cli.__file__).read_bytes()
+    snapshot.write_text("changed CLI orchestration")
+    with pytest.raises(ValueError, match="Benchmark preparation changed: cli-benchmark.py"):
+        benchmark.checked_inputs(recorded)

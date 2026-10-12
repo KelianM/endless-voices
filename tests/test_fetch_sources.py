@@ -1,17 +1,11 @@
 """Offline checks for verified reuse and failure-safe fetches."""
 
 import hashlib
-import importlib.util
 import subprocess
-from pathlib import Path
 
 import pytest
 
-spec = importlib.util.spec_from_file_location(
-    "fetch_sources", Path(__file__).parents[1] / "scripts" / "fetch_sources.py"
-)
-fetcher = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(fetcher)
+from endless_voices import fetch_sources as fetcher
 
 
 @pytest.fixture
@@ -74,3 +68,21 @@ def test_failed_download_does_not_publish_destination(tmp_path, monkeypatch):
     with pytest.raises(subprocess.CalledProcessError):
         fetcher.fetch(destination, {"revision": "a" * 40, "files": []})
     assert list(tmp_path.iterdir()) == []
+
+
+def test_cli_reuses_explicit_paths_outside_project(checkout, tmp_path):
+    import json
+    import sys
+
+    root, manifest = checkout
+    declaration = tmp_path / "manifest.json"
+    declaration.write_text(json.dumps(manifest))
+    working_directory = tmp_path / "working"
+    working_directory.mkdir()
+    result = subprocess.run(
+        [sys.executable, "-m", "endless_voices", "fetch-sources",
+         "--manifest", str(declaration), "--destination", str(root)],
+        cwd=working_directory, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert f"Verified 1 source files at {root}" in result.stdout

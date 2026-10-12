@@ -15,7 +15,10 @@ git lfs install --local
 git lfs pull
 ```
 
-Run commands from the repository root. Dataset payloads, source inventory and upstream
+Use `endless-voices --help` to list supported commands and
+`endless-voices <command> --help` for command options. `python -m endless_voices` uses
+the same CLI. Relative configuration and data paths resolve from the working directory;
+the examples below run from the repository root. Dataset payloads, source inventory and upstream
 licensing are stored in LFS. Raw source caches, model weights, secrets and run outputs
 are ignored. Normal Git contains code, configuration, tests, code documentation,
 dataset descriptions and architecture decisions.
@@ -38,8 +41,8 @@ Dataset sizes, provenance and limitations belong in that README.
 Edit `configs/train.toml` with a model path, prepared dataset directory and split and sequence limit, then run:
 
 ```sh
-train --config configs/train.toml
-chat --config configs/train.toml --adapter outputs/example-adapter
+endless-voices train --config configs/train.toml
+endless-voices chat --config configs/train.toml --adapter outputs/example-adapter
 ```
 
 The trainer uses Transformers and PEFT LoRA with float32 base weights. It is not a quantized
@@ -50,7 +53,7 @@ Training uses the tokenizer's chat template. `data.loss = "continuation"` trains
 assistant passage; `"all"` trains all non-padding tokens. Inputs exceeding `data.max_length`
 fail rather than being truncated. The model's tokenizer determines the required sequence limit.
 
-`generate --help` describes saved-response generation. `scripts/view_samples.py --help`
+`endless-voices generate --help` describes saved-response generation. `endless-voices view-samples --help`
 describes the existing sample explorer.
 
 ## Benchmark
@@ -58,7 +61,7 @@ describes the existing sample explorer.
 The benchmark reads a prepared validation dataset so generators and judges share selected context:
 
 ```sh
-python scripts/benchmark_generators.py prepare \
+endless-voices benchmark prepare \
   --dataset outputs/prepared-scenes --root outputs/benchmark \
   --config configs/benchmark.json
 ```
@@ -77,8 +80,11 @@ recorded investigations live in [experiments/](experiments/README.md).
 
 ```sh
 pytest -q
-ruff check src scripts tests experiments
+ruff check src tests experiments
 ```
+
+Command parsing lives in `src/endless_voices/cli/`; reusable behavior lives in the rest
+of the package. Investigation-specific runners, inputs and tests live in `experiments/`.
 
 Lasting decisions are recorded in [ADRs](docs/adr/README.md). See [NOTICE.md](NOTICE.md) for
 source-data licensing; full upstream notices travel with the LFS datasets.

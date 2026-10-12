@@ -129,7 +129,7 @@ save_strategy = "no"
 use_cpu = true
 ''')
     subprocess.run(
-        [sys.executable, "-m", "endless_voices.train", "--config", str(config)],
+        [sys.executable, "-m", "endless_voices", "train", "--config", str(config)],
         check=True,
         capture_output=True,
         text=True,
@@ -146,7 +146,7 @@ use_cpu = true
             [
                 sys.executable,
                 "-m",
-                "endless_voices.chat",
+                "endless_voices", "chat",
                 "--config",
                 str(config),
                 "--device",
@@ -172,7 +172,7 @@ def test_contract_cli_local_tokenizer(tmp_path: Path, tokenizer: PreTrainedToken
     command = [
         sys.executable,
         "-m",
-        "endless_voices.contracts",
+        "endless_voices", "validate",
         str(manifest),
         "--tokenizer",
         str(local),

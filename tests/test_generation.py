@@ -17,6 +17,7 @@ from tokenizers.pre_tokenizers import Whitespace
 from transformers import GenerationConfig, GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from endless_voices import generate as gen
+from endless_voices.cli.generate import parse_args
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -71,7 +72,7 @@ def args(tmp_path, base):
     (dataset / "manifest.json").write_text(json.dumps(manifest))
     config = tmp_path / "model.toml"
     config.write_text(f'[model]\nname_or_path = "{base}"\n')
-    return gen.parse_args(
+    return parse_args(
         [
             "--config",
             str(config),
@@ -271,7 +272,7 @@ def test_real_tiny_model_and_lora_cli_use_identical_context(args, base, tmp_path
             [
                 sys.executable,
                 "-m",
-                "endless_voices.generate",
+                "endless_voices", "generate",
                 "--config",
                 args.config,
                 "--manifest",

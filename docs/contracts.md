@@ -32,7 +32,7 @@ all tokens before the final target; `loss = "all"` includes the saved prompt and
 Neither mode silently truncates overlong examples. The collator masks padding without masking
 real end-of-sequence tokens when PAD and EOS share an ID.
 
-Run `validate data/dataset/manifest.json` for structural verification and coverage. Optional
+Run `endless-voices validate data/dataset/manifest.json` for structural verification and coverage. Optional
 `--tokenizer /path/to/local/tokenizer --max-length 9216` checks complete sequence lengths without
 downloading weights or a tokenizer. The generation runner separately budgets prompt and output.
 

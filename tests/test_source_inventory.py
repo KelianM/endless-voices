@@ -1,13 +1,7 @@
 """Hand-counted fixtures for descriptive source statistics, not game execution."""
 
-import importlib.util
-from pathlib import Path
 
-spec = importlib.util.spec_from_file_location(
-    "inventory_sources", Path(__file__).parents[1] / "scripts" / "inventory_sources.py"
-)
-inventory = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(inventory)
+from endless_voices import inventory_sources as inventory
 
 
 def test_dialogue_structure_and_disjoint_word_categories():
