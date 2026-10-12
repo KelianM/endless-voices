@@ -3,6 +3,7 @@
 import importlib.util
 import json
 from argparse import Namespace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -10,7 +11,7 @@ import pytest
 from endless_voices.artifacts import file_hash
 
 spec = importlib.util.spec_from_file_location(
-    "compare_retrieval_embeddings", "scripts/compare_retrieval_embeddings.py")
+    "retrieval_embedding_experiment", Path(__file__).with_name("run.py"))
 comparison = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(comparison)
 

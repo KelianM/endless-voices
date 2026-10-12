@@ -126,7 +126,7 @@ def run(args):
         "torch": torch.__version__, "transformers": transformers.__version__,
         "git_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
         "runner_sha256": file_hash(Path(__file__)),
-        "retrieval_source_sha256": file_hash(Path(__file__).resolve().parents[1]
+        "retrieval_source_sha256": file_hash(Path(__file__).resolve().parents[2]
                                              / "src/endless_voices/retrieval.py"),
     }
     save(args.output / "results.json", {"metadata": metadata, "queries": results})

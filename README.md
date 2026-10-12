@@ -71,13 +71,13 @@ results, enforce configured budgets and retain failures without silently retryin
 
 [Evaluation behavior](docs/evaluation.md) describes blinding and reporting. The judge instruction
 is maintained in `configs/judge-instructions.md`. Experiment outputs stay in ignored `outputs/`;
-historical experiments are recoverable from Git history.
+recorded investigations live in [experiments/](experiments/README.md).
 
 ## Development
 
 ```sh
 pytest -q
-ruff check src scripts tests
+ruff check src scripts tests experiments
 ```
 
 Lasting decisions are recorded in [ADRs](docs/adr/README.md). See [NOTICE.md](NOTICE.md) for
