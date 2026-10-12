@@ -126,7 +126,7 @@ class Selection:
     omitted: list[dict]
     token_counts: dict[str, int]
     provenance: dict
-    pool: ContextPool | None = field(default=None, repr=False, compare=False)
+    pool: ContextPool = field(repr=False, compare=False)
 
     def evidence(self):
         """Return selection settings and source coordinates without duplicating text."""

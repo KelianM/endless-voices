@@ -5,7 +5,7 @@ import math
 import sqlite3
 from copy import deepcopy
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from endless_voices.context import digest, distances, render
 
@@ -21,8 +21,9 @@ class Embedder(Protocol):
 
     identity: str
 
-    def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
-    def embed_queries(self, texts: list[str]) -> list[list[float]]: ...
+    def embed(
+        self, texts: list[str], *, kind: Literal["document", "query"]
+    ) -> list[list[float]]: ...
 
 
 def _model_fingerprint(path):
@@ -111,9 +112,15 @@ class TransformersEmbedder:
         return cls(tokenizer, model, model_id, max_length=max_length, batch_size=batch_size,
                    query_instruction=query_instruction)
 
-    def _embed(self, texts, kind):
+    def embed(self, texts, *, kind: Literal["document", "query"]):
+        """Return normalized passage or instructed query vectors without truncation."""
         import torch
 
+        if kind not in {"document", "query"}:
+            raise ValueError("Embedding kind must be document or query")
+        if kind == "query":
+            texts = [f"Instruct: {self.query_instruction}\nQuery:{text}" for text in texts]
+        label = "Document" if kind == "document" else "Instructed query"
         vectors = []
         for start in range(0, len(texts), self.batch_size):
             batch = self.tokenizer(texts[start:start + self.batch_size], padding=True,
@@ -121,7 +128,7 @@ class TransformersEmbedder:
             lengths = batch["attention_mask"].sum(dim=1)
             if (lengths > self.max_length).any():
                 longest = int(lengths.max())
-                raise ValueError(f"{kind} contains {longest} tokens; embedding limit is "
+                raise ValueError(f"{label} contains {longest} tokens; embedding limit is "
                                  f"{self.max_length}. Split the passage or shorten the query "
                                  "explicitly; no text was truncated.")
             batch = {key: value.to(self.model.device) for key, value in batch.items()}
@@ -137,18 +144,6 @@ class TransformersEmbedder:
             vectors.extend(pooled.cpu().tolist())
         return vectors
 
-    def embed_documents(self, texts):
-        """Return normalized passage vectors without adding a query instruction."""
-        return self._embed(texts, "Document")
-
-    def embed_queries(self, texts):
-        """Return normalized instructed query vectors without dropping query tokens."""
-        return self._embed([f"Instruct: {self.query_instruction}\nQuery:{text}" for text in texts],
-                           "Instructed query")
-
-    def embed(self, texts):
-        """Return plain document vectors for callers of the original encoder interface."""
-        return self.embed_documents(texts)
 
 
 def scene_id(block):
@@ -210,7 +205,7 @@ class SceneDatabase:
         chunks = [chunk for sid in sorted(documents) for chunk in passage_chunks(documents[sid])]
         if not chunks:
             raise ValueError("Cannot index an empty passage corpus")
-        vectors = list(embedder.embed_documents([chunk["text"] for chunk in chunks]))
+        vectors = list(embedder.embed([chunk["text"] for chunk in chunks], kind="document"))
         if len(vectors) != len(chunks):
             raise ValueError("Embedder returned the wrong number of passage vectors")
         vectors = [_vector(vector) for vector in vectors]
@@ -353,7 +348,7 @@ class RetrievalSession:
             query = "\n\n".join(message["content"] for message in self._pool.encounter)
         if not isinstance(query, str) or not query.strip():
             raise ValueError("query must be nonempty text")
-        embedded = list(self.database.embedder.embed_queries([query]))
+        embedded = list(self.database.embedder.embed([query], kind="query"))
         if len(embedded) != 1:
             raise ValueError("Embedder returned the wrong number of query vectors")
         vector = _vector(embedded[0], self.database.dimension)

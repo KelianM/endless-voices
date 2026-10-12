@@ -580,10 +580,9 @@ def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(t
     class Encoder:
         identity = "fixture"
 
-        def embed_documents(self, texts):
+        def embed(self, texts, *, kind):
             return [[1.0, float(len(text))] for text in texts]
 
-        embed_queries = embed_documents
 
     source = corpus(tmp_path, STORY)
     builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}), Counter())

@@ -102,10 +102,10 @@ answer quality.
 
 ## Compare embedding models
 
-`scripts/compare_retrieval_embeddings.py` freezes real interpreter pools and the query plan
-in `configs/retrieval-comparison.json` before running either model. The current plan covers
-Hai and Quarg writing references plus Acorn Delights mission history. Both models search
-every eligible passage in the selected pools.
+`scripts/compare_retrieval_embeddings.py` handles preparation, passage or scene retrieval,
+index reuse and blinded review. The query plan in `configs/retrieval-comparison.json` covers
+Hai and Quarg references plus Acorn Delights history. Freeze the queries and eligible pools
+once, before running either model:
 
 ```sh
 python scripts/compare_retrieval_embeddings.py prepare \
@@ -114,18 +114,50 @@ python scripts/compare_retrieval_embeddings.py prepare \
   --inventory data/sources/source-statistics.json \
   --source data/local/endless-sky-7140eb2a29ce \
   --output outputs/retrieval-comparison/frozen.json
+```
+
+Every run requires an explicit `--mode`: `passage` returns matching passages; `scene` returns
+distinct full parent scenes. `--limit` counts the chosen result type. Supply the same cached
+`--tokenizer` directory for both models so returned-text counts use a common tokenizer.
+The encoder's own tokenizer still determines its embedding inputs.
+
+```sh
+python scripts/compare_retrieval_embeddings.py run \
+  --input outputs/retrieval-comparison/frozen.json \
+  --model /path/to/cached/model-one --revision exact-model-revision \
+  --tokenizer /path/to/cached/Qwen3-Embedding-0.6B \
+  --mode passage --limit 3 --device mps --dtype float16 --batch-size 4 \
+  --output outputs/retrieval-comparison/model-one-passages
 
 python scripts/compare_retrieval_embeddings.py run \
   --input outputs/retrieval-comparison/frozen.json \
-  --model /path/to/cached/model-snapshot --revision exact-model-revision \
-  --device mps --dtype float16 --batch-size 4 \
-  --output outputs/retrieval-comparison/model-one
+  --model /path/to/cached/model-one --revision exact-model-revision \
+  --tokenizer /path/to/cached/Qwen3-Embedding-0.6B \
+  --mode scene --limit 3 --device mps --dtype float16 --batch-size 4 \
+  --index outputs/retrieval-comparison/model-one-passages/context.sqlite \
+  --output outputs/retrieval-comparison/model-one-scenes
 ```
 
-Repeat `run` with the second cached model and a different output directory, preserving the
-frozen input and encoding settings. `blind --help` describes creating review packets from
-the two result files. The comparison runner explicitly disables scene expansion. Reviewers
-score each of the first three passages for relevance and
-choose a preferred result set before opening the separate model key. Timing, source hashes
-and exact model revisions accompany the saved results. A small handwritten query set measures
-usefulness on those encounters; the results do not establish retrieval accuracy across the game.
+Without `--index`, the run builds an index from the frozen pools. With `--index`, the run
+opens an existing index without re-embedding; the encoder fingerprint must match. Repeat
+both commands for the second cached model with separate output directories. Model files and
+the common counting tokenizer are loaded locally without downloads.
+
+```sh
+python scripts/compare_retrieval_embeddings.py blind \
+  --input outputs/retrieval-comparison/frozen.json \
+  --first outputs/retrieval-comparison/model-one-scenes/results.json \
+  --second outputs/retrieval-comparison/model-two-scenes/results.json \
+  --output outputs/retrieval-comparison/scene-review
+```
+
+The blinding command requires matching modes, frozen inputs, source hashes, encoding settings,
+result limits and counting-tokenizer identities. Results missing the explicit format or mode
+are rejected. The `review/` directory contains combined and per-query packets with complete
+text and source evidence; scores, timing and model identities are omitted. Reviewers score
+relevance and choose a result set before opening `key.json` in the parent directory.
+
+Timing, exact model revisions, index hashes and returned-text counts accompany every run.
+A scene comparison can return substantially more text than a passage comparison with the
+same result limit. A small handwritten query set measures usefulness on those encounters;
+the results do not establish retrieval accuracy across the game.

@@ -64,45 +64,68 @@ def prepare(args):
 def run(args):
     import torch
     import transformers
+    from transformers import AutoTokenizer
 
+    from endless_voices.retrieval import RetrievalSession
+
+    if args.mode not in {"passage", "scene"}:
+        raise ValueError("mode must be passage or scene")
     frozen = json.loads(args.input.read_text())
     pools = {name: ContextPool(**fields) for name, fields in frozen["pools"].items()}
     scenes = {scene_id(block): block for pool in pools.values()
               for block in pool.blocks + pool.references}
-    args.output.mkdir(parents=True, exist_ok=True)
+    args.output.mkdir(parents=True, exist_ok=False)
     started = time.perf_counter()
+    tokenizer = AutoTokenizer.from_pretrained(args.tokenizer, local_files_only=True)
+    tokenizer_identity = digest({
+        "backend": tokenizer.backend_tokenizer.to_str(),
+        "special_tokens": tokenizer.special_tokens_map, "add_special_tokens": True,
+    })
     embedder = TransformersEmbedder.from_pretrained(
         args.model, device=args.device, dtype=args.dtype,
         max_length=args.max_length, batch_size=args.batch_size)
     loaded = time.perf_counter()
-    database = SceneDatabase.create(args.output / "context.sqlite", scenes.values(), embedder)
+    index = args.index or args.output / "context.sqlite"
+    database = (SceneDatabase(index, embedder) if args.index else
+                SceneDatabase.create(index, scenes.values(), embedder))
     indexed = time.perf_counter()
     results = []
     with database:
         for query in frozen["plan"]["queries"]:
-            from endless_voices.retrieval import RetrievalSession
-
             session = RetrievalSession(database, pools[query["mission"]])
             before = time.perf_counter()
-            matches = session.search_context(query["query"], limit=args.limit, expand_scenes=False)
+            matches = session.search_context(
+                query["query"], limit=args.limit, expand_scenes=args.mode == "scene")
             elapsed = time.perf_counter() - before
+            documents = [{**match, **document} for match, document in zip(
+                matches, session.read_context([match["id"] for match in matches]), strict=True)]
+            for document in documents:
+                document.pop("excerpt", None)
             results.append({
                 "query_id": query["id"], "query": query["query"],
-                "matches": matches, "seconds": elapsed,
-                "passages": session.read_context([match["id"] for match in matches]),
+                "documents": documents, "seconds": elapsed,
+                "token_counts": [len(tokenizer.encode(document["text"], add_special_tokens=True))
+                                 for document in documents],
+                "word_counts": [len(document["text"].split()) for document in documents],
             })
     ended = time.perf_counter()
     metadata = {
+        "format": "retrieval-comparison-run-v2", "mode": args.mode,
         "input_sha256": file_hash(args.input), "model": str(args.model),
         "model_revision": args.revision, "embedder": embedder.identity,
         "device": str(embedder.model.device), "dtype": str(embedder.model.dtype),
+        "query_instruction": embedder.query_instruction,
         "max_length": args.max_length, "batch_size": args.batch_size, "limit": args.limit,
-        "result_unit": "passage",
+        "tokenizer": str(args.tokenizer), "tokenizer_identity": tokenizer_identity,
+        "index": str(index), "index_sha256": file_hash(index), "reused_index": bool(args.index),
         "load_seconds": loaded - started, "index_seconds": indexed - loaded,
         "query_seconds": sum(result["seconds"] for result in results),
+        "total_tokens": sum(sum(result["token_counts"]) for result in results),
+        "total_words": sum(sum(result["word_counts"]) for result in results),
         "total_seconds": ended - started, "platform": platform.platform(),
         "torch": torch.__version__, "transformers": transformers.__version__,
         "git_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+        "runner_sha256": file_hash(Path(__file__)),
         "retrieval_source_sha256": file_hash(Path(__file__).resolve().parents[1]
                                              / "src/endless_voices/retrieval.py"),
     }
@@ -110,37 +133,61 @@ def run(args):
     print(json.dumps(metadata))
 
 
+def review_document(document):
+    """Return complete retrieved text and source evidence without model or ranking signals."""
+    fields = ("id", "scene_id", "kind", "mission", "heading", "path", "lines", "source_kind",
+              "depth", "usage", "passage_index", "text")
+    result = {field: document[field] for field in fields if field in document}
+    if "matched_passage" in document:
+        result["matched_passage"] = {field: document["matched_passage"][field]
+                                     for field in ("id", "line", "passage_index")}
+    return result
+
+
 def blind(args):
     frozen = json.loads(args.input.read_text())
     first, second = (json.loads(path.read_text()) for path in (args.first, args.second))
-    if any(result["metadata"]["input_sha256"] != file_hash(args.input)
-           for result in (first, second)):
-        raise ValueError("Both runs must use the same frozen inputs")
-    for setting in ("dtype", "max_length", "batch_size", "limit", "retrieval_source_sha256"):
+    settings = ("mode", "input_sha256", "device", "dtype", "max_length", "batch_size", "limit",
+                "retrieval_source_sha256", "runner_sha256", "query_instruction",
+                "tokenizer_identity")
+    for result in (first, second):
+        metadata = result["metadata"]
+        if metadata.get("format") != "retrieval-comparison-run-v2":
+            raise ValueError("Expected an explicit comparison run format")
+        if any(setting not in metadata for setting in settings):
+            raise ValueError("Comparison run is missing required settings")
+        if metadata["mode"] not in {"passage", "scene"}:
+            raise ValueError("Comparison mode must be passage or scene")
+        if metadata["input_sha256"] != file_hash(args.input):
+            raise ValueError("Both runs must use the same frozen inputs")
+    for setting in settings:
         if first["metadata"][setting] != second["metadata"][setting]:
             raise ValueError(f"Comparison setting differs: {setting}")
-    if any(result["metadata"].get("result_unit", "passage") != "passage"
-           for result in (first, second)):
-        raise ValueError("Blinded passage comparison requires passage results")
+    mode = first["metadata"]["mode"]
     packets, key = [], {}
     for query, one, two in zip(frozen["plan"]["queries"], first["queries"],
                                second["queries"], strict=True):
-        if query["id"] != one["query_id"] or query["id"] != two["query_id"]:
-            raise ValueError("Query order differs")
+        if any(query["id"] != result["query_id"] or query["query"] != result["query"]
+               for result in (one, two)):
+            raise ValueError("Query order or text differs")
         ordered = [("first", one), ("second", two)]
-        if int(digest([args.seed, query["id"]]), 16) % 2:
+        if int(digest([args.seed, mode, query["id"]]), 16) % 2:
             ordered.reverse()
-        packet = {**query, "results": {}, "rubric": (
-            "Score each of the first three passages: 0 irrelevant, 1 loosely useful, "
-            "2 directly useful. Choose A, B or tie for the query; reward useful variety "
-            "and penalize repeated evidence. Distinguish independent references from "
-            "events in the selected history. Do not infer model identity.")}
+        packet = {**query, "mode": mode, "results": {}, "rubric": (
+            f"Score each returned {mode}: 0 irrelevant, 1 loosely useful, 2 directly useful. "
+            "Choose A, B or tie for the query; reward useful variety and penalize repeated "
+            "or irrelevant evidence. Consider the full returned text. Distinguish independent "
+            "references from events in the selected history. Do not infer model identity.")}
         key[query["id"]] = {}
         for label, (source, result) in zip(("A", "B"), ordered, strict=True):
             key[query["id"]][label] = source
-            packet["results"][label] = result["passages"][:3]
+            packet["results"][label] = [review_document(document)
+                                         for document in result["documents"]]
         packets.append(packet)
-    save(args.output / "blind.json", packets)
+    args.output.mkdir(parents=True, exist_ok=False)
+    save(args.output / "review" / "blind.json", packets)
+    for index, packet in enumerate(packets, 1):
+        save(args.output / "review" / f"query-{index:03}.json", packet)
     save(args.output / "key.json", {"first": first["metadata"],
                                      "second": second["metadata"], "mapping": key})
 
@@ -152,9 +199,11 @@ def main():
     for name in ("plan", "config", "inventory", "source", "output"):
         prep.add_argument("--" + name, type=Path, required=True)
     run_parser = commands.add_parser("run")
-    for name in ("input", "model", "output"):
+    for name in ("input", "model", "tokenizer", "output"):
         run_parser.add_argument("--" + name, type=Path, required=True)
     run_parser.add_argument("--revision", required=True)
+    run_parser.add_argument("--mode", choices=["passage", "scene"], required=True)
+    run_parser.add_argument("--index", type=Path)
     run_parser.add_argument("--device", default="auto")
     run_parser.add_argument("--dtype", default="auto")
     run_parser.add_argument("--max-length", type=int, default=32768)

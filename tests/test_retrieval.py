@@ -14,13 +14,7 @@ class Encoder:
     def __init__(self):
         self.inputs = []
 
-    def embed_documents(self, texts):
-        return self.embed(texts)
-
-    def embed_queries(self, texts):
-        return self.embed(texts)
-
-    def embed(self, texts):
+    def embed(self, texts, *, kind):
         self.inputs.extend(texts)
         return [[1.0, 0.0] if "starship" in text else [0.0, 1.0] for text in texts]
 
@@ -143,7 +137,7 @@ def test_fixed_sampler_retains_all_eligible_material_for_later_retrieval():
 @pytest.mark.parametrize("vector", [[0, 0], [float("nan"), 1], [float("inf"), 1]])
 def test_invalid_embeddings_fail_before_creating_an_index(tmp_path, vector):
     class InvalidEncoder(Encoder):
-        def embed(self, texts):
+        def embed(self, texts, *, kind):
             return [vector for text in texts]
 
     path = tmp_path / "scenes.db"
@@ -189,8 +183,8 @@ def test_local_transformer_encoder_loads_and_masks_padding_without_downloads(tmp
     model_path = save_local_encoder(tmp_path / "encoder")
     encoder = TransformersEmbedder.from_pretrained(model_path, max_length=512, device="cpu")
     encoder.tokenizer.padding_side = "right"
-    alone = encoder.embed(["starship"])[0]
-    padded = encoder.embed(["starship", "a starship arrives old story"])[0]
+    alone = encoder.embed(["starship"], kind="document")[0]
+    padded = encoder.embed(["starship", "a starship arrives old story"], kind="document")[0]
     assert len(alone) == 8
     assert torch.allclose(torch.tensor(alone), torch.tensor(padded), atol=1e-6)
     reloaded = TransformersEmbedder.from_pretrained(model_path, max_length=512, device="cpu")
@@ -258,20 +252,24 @@ def test_qwen_pooling_uses_last_nonpadding_token_and_instructs_only_queries(mask
 
     encoder = TransformersEmbedder(tokenizer, Model(), "fixture", max_length=32,
                                    query_instruction="Find relevant authored passages.")
-    actual = encoder.embed_documents(["first document", "second document"])
+    with pytest.raises(TypeError, match="kind"):
+        encoder.embed(["missing input kind"])
+    with pytest.raises(ValueError, match="kind must be document or query"):
+        encoder.embed(["invalid input kind"], kind="passage")
+    actual = encoder.embed(["first document", "second document"], kind="document")
     expected = torch.nn.functional.normalize(torch.tensor([[v, 1.0] for v in last_values]), dim=1)
     assert torch.allclose(torch.tensor(actual), expected)
     assert calls[-1][0] == ["first document", "second document"]
-    encoder.embed_queries(["first query", "second query"])
+    encoder.embed(["first query", "second query"], kind="query")
     assert calls[-1][0] == [
         "Instruct: Find relevant authored passages.\nQuery:first query",
         "Instruct: Find relevant authored passages.\nQuery:second query"]
     assert all(call[1]["truncation"] is False for call in calls)
     encoder.max_length = 2
     with pytest.raises(ValueError, match="Document contains 3 tokens.*no text was truncated"):
-        encoder.embed_documents(["first document", "second document"])
+        encoder.embed(["first document", "second document"], kind="document")
     with pytest.raises(ValueError, match="Instructed query contains 3 tokens.*no text"):
-        encoder.embed_queries(["first query", "second query"])
+        encoder.embed(["first query", "second query"], kind="query")
 
 
 @pytest.mark.parametrize("damage", ["missing", "changed"])
@@ -299,7 +297,7 @@ def test_incomplete_or_changed_passages_cannot_silently_change_retrieval(tmp_pat
 
 def test_scene_expansion_returns_neighboring_answer_and_counts_distinct_scenes(tmp_path):
     class RankedEncoder(Encoder):
-        def embed(self, texts):
+        def embed(self, texts, *, kind):
             return [[0.8, 0.6] if "other vessel" in text else
                     [1.0, 0.0] if "starship" in text else [0.0, 1.0] for text in texts]
 
@@ -429,9 +427,9 @@ def test_index_created_during_embedding_is_not_overwritten(tmp_path):
     path = tmp_path / "scenes.db"
 
     class RacingEncoder(Encoder):
-        def embed_documents(self, texts):
+        def embed(self, texts, *, kind):
             path.write_bytes(b"Another writer's index")
-            return super().embed_documents(texts)
+            return super().embed(texts, kind=kind)
 
     with pytest.raises(FileExistsError):
         SceneDatabase.create(path, pool().blocks, RacingEncoder())

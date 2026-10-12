@@ -185,8 +185,6 @@ def write_dataset(output, built, config, corpus):
 
         scenes, pools = {}, {}
         for record, selection, _ in built:
-            if selection.pool is None:
-                raise ValueError("Prepared examples require eligible retrieval pools")
             fields = asdict(selection.pool)
             for kind in ("blocks", "references"):
                 for block in fields[kind]:

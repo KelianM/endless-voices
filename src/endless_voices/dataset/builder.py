@@ -585,8 +585,7 @@ class ExampleBuilder:
             target_lines = {p.line for p in route.paragraphs}
             if any(p.line in target_lines for p in route.prefix):
                 raise ValueError("Target source paragraph appears in its own encounter")
-            eligible_blocks = (selection.pool.blocks + selection.pool.references
-                               if selection.pool is not None else selection.selected)
+            eligible_blocks = selection.pool.blocks + selection.pool.references
             for b in eligible_blocks:
                 if b["path"] == node.get("source_path", mission.path) and any(
                     p["line"] in target_lines for p in b["passages"]
