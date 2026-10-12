@@ -106,7 +106,8 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
     assert {p.name for p in output.iterdir()} == {
-        "train.jsonl", "manifest.json", "config.json", "provenance.json", "licensing"}
+        "train.jsonl", "manifest.json", "config.json", "provenance.json", "licensing",
+        "retrieval.json"}
     manifest = json.loads((output / "manifest.json").read_text())
     assert manifest["build"]["git_revision"]
     assert manifest["build"]["source_hashes"]
@@ -571,3 +572,63 @@ def test_repeated_dialog_entries_preserve_all_paragraphs_in_later_context(tmp_pa
     assert len(rows) == 1
     prompt = "\n".join(m["content"] for m in rows[0][0]["messages"][:-1])
     assert "First paragraph.\n\nSecond paragraph." in prompt
+
+
+def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(tmp_path):
+    from endless_voices.retrieval import SceneDatabase
+
+    class Encoder:
+        identity = "fixture"
+
+        def embed(self, texts):
+            return [[1.0, float(len(text))] for text in texts]
+
+    source = corpus(tmp_path, STORY)
+    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}), Counter())
+    output = tmp_path / "prepared"
+    builder.build(output)
+    dataset = SceneDataset.load(output, "train")
+    saved = json.loads((output / "retrieval.json").read_text())
+    for index, record in enumerate(dataset):
+        pool = dataset.context_pool(index)
+        assert pool.sample_id == record["metadata"]["id"]
+        assert record["messages"][-1]["content"] not in json.dumps(pool.__dict__)
+        if pool.blocks:
+            original = pool.blocks[0]["passages"][0]["text"]
+            pool.blocks[0]["passages"][0]["text"] = "Changed by caller"
+            assert dataset.context_pool(index).blocks[0]["passages"][0]["text"] == original
+    assert len(saved["scenes"]) < sum(
+        len(p["blocks"]) + len(p["references"]) for p in saved["pools"].values())
+    with SceneDatabase.create(tmp_path / "context.sqlite", saved["scenes"].values(),
+                              Encoder()) as database:
+        index = next(i for i in range(len(dataset)) if dataset.context_pool(i).blocks)
+        session = dataset.retrieval_session(index, database)
+        matches = session.call_tool("search_context", {})
+        assert matches
+        passages = session.call_tool("read_context", {"ids": [m["id"] for m in matches]})
+        assert all(dataset.target(index) not in passage["text"] for passage in passages)
+
+
+def test_retrieval_sidecar_tampering_is_rejected(tmp_path):
+    source = corpus(tmp_path, STORY)
+    output = tmp_path / "prepared"
+    DatasetBuilder(source, config({"Later": spec()}), Counter()).build(output)
+    path = output / "retrieval.json"
+    path.write_text(path.read_text() + " ")
+    with pytest.raises(ValueError, match="Dataset artifact differs: retrieval.json"):
+        SceneDataset.load(output, "train")
+
+
+def test_older_bundles_keep_fixed_prompts_without_retrieval(tmp_path):
+    source = corpus(tmp_path, STORY)
+    output = tmp_path / "prepared"
+    DatasetBuilder(source, config({"Later": spec()}), Counter()).build(output)
+    original = SceneDataset.load(output, "train").prompt(0)
+    manifest = json.loads((output / "manifest.json").read_text())
+    del manifest["artifacts"]["retrieval.json"]
+    (output / "manifest.json").write_text(json.dumps(manifest))
+    (output / "retrieval.json").unlink()
+    dataset = SceneDataset.load(output, "train")
+    assert dataset.prompt(0) == original
+    with pytest.raises(ValueError, match="rebuild it"):
+        dataset.context_pool(0)

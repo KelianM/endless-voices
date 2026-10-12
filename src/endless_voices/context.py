@@ -126,6 +126,7 @@ class Selection:
     omitted: list[dict]
     token_counts: dict[str, int]
     provenance: dict
+    pool: ContextPool | None = field(default=None, repr=False, compare=False)
 
     def evidence(self):
         """Return selection settings and source coordinates without duplicating text."""
@@ -168,6 +169,7 @@ def result(pool, counter, config, full, sampled, ds, references=()):
          "full_missions": sorted(full), "sampled_missions": sorted(sampled),
          "game_variables": dict(pool.variables),
          "variable_policy": "mission-scoped"},
+        pool=deepcopy(pool),
     )
 
 

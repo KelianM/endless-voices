@@ -27,6 +27,9 @@ dataset descriptions and architecture decisions.
 interpreter. `SceneDataset` provides fixed indexed records to training and benchmarking.
 See [dataset preparation](data/dataset/README.md#how-this-dataset-is-produced) and [record validation](docs/contracts.md).
 
+[Context retrieval](docs/retrieval.md) exposes the same eligible history and writing references
+through scene search and read tools. Saved prompts retain the fixed sampler baseline.
+
 The [current dataset](data/dataset/README.md) contains training, validation and test splits.
 Dataset sizes, provenance and limitations belong in that README.
 

@@ -432,16 +432,17 @@ class ContextSampler:
                       if str(Path(block["path"]).parent) in directories)
         return blocks
 
-    def select(
-        self, sample_id, conversation_id, mission, history, prefix, lore, counter, split, task
+    def pool(
+        self, sample_id, conversation_id, mission, history, prefix, lore, split, task
     ):
+        """Build the interpreted eligibility boundary shared by selection and retrieval."""
         values = mission_values(mission.node, self.corpus.planet_systems, self.player)
         encounter = "\n\n".join(render(p.text, values)[0] for p in prefix)
         system = (
             SCENE_INSTRUCTIONS[task]
             + ("\n\n" + lore if lore else "") + "\n\nEarlier passages:\n"
         )
-        pool = ContextPool(
+        return ContextPool(
             sample_id,
             conversation_id,
             mission.name,
@@ -452,6 +453,12 @@ class ContextSampler:
             values,
             self.references(mission, split, history),
         )
+
+    def select(
+        self, sample_id, conversation_id, mission, history, prefix, lore, counter, split, task
+    ):
+        """Apply the fixed baseline to the same pool exposed to retrieval tools."""
+        pool = self.pool(sample_id, conversation_id, mission, history, prefix, lore, split, task)
         return self.strategy.select(pool, counter)
 
 
@@ -578,11 +585,13 @@ class ExampleBuilder:
             target_lines = {p.line for p in route.paragraphs}
             if any(p.line in target_lines for p in route.prefix):
                 raise ValueError("Target source paragraph appears in its own encounter")
-            for b in selection.selected:
+            eligible_blocks = (selection.pool.blocks + selection.pool.references
+                               if selection.pool is not None else selection.selected)
+            for b in eligible_blocks:
                 if b["path"] == node.get("source_path", mission.path) and any(
                     p["line"] in target_lines for p in b["passages"]
                 ):
-                    raise ValueError("Target source paragraph appears in sampled history")
+                    raise ValueError("Target source paragraph appears in eligible context")
             ref = {
                 "reference": "https://github.com/endless-sky/endless-sky/blob/"
                 + self.corpus.revision
