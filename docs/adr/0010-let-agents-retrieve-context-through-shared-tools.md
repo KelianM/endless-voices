@@ -6,47 +6,35 @@
 
 ## Context
 
-Fixed mission depth and seeded sampling choose a model's context before generation. Mission
-distance approximates relevance, but the model cannot request evidence for a particular gap
-in continuity, lore or writing style. Comparing larger agents with smaller fine-tuned models
-also requires a way to explore whether retrieval can compensate for knowledge the model has
-not learned.
-
-Changing the selection policy should not change which material is permitted. Semantic
-relevance cannot establish that an event happened in the selected history or that a passage
-belongs to an allowed split.
+Fixed mission depth and seeded sampling choose a model's context before generation. The model
+cannot request missing history or examples of the game's writing. Comparing larger agents
+with smaller fine-tuned models needs both fixed context and agent-directed retrieval over
+the same permitted material.
 
 ## Decision
 
-Make context selection a policy over shared eligible material. Retain the fixed sampler from
-[ADR 8](0008-infer-scene-writing-from-sampled-game-context.md) as a reproducible baseline,
-and expose tools for agent-directed retrieval of mission history and writing references.
-Agents can request history by prerequisite depth, search semantically and read selected
-passages or scenes. The initial agent messages contain the continuation instruction and
-visible encounter; an omitted search query uses that encounter.
-
-Keep the context database static. Preparation saves each example's eligible scene pool using
-the state interpretation from [ADR 9](0009-build-examples-from-consistent-game-state.md).
-Fixed sampling and retrieval use that same pool. Tools enforce eligibility before ranking
-or reading, preserving split ownership, interpreted branches and target exclusion. Independent
-writing references remain distinct from events established in the current playthrough.
-
-Provide tool schemas, dispatch and retrieval traces independently of a model provider.
-The caller owns the agent loop and its budgets. The current generation and benchmark runners
-continue to consume fixed prompts; the tools enable dynamic selection without claiming an
-integrated agent evaluation. The shared machinery lives in `context.py` and `retrieval.py`.
+- **Agents choose context through tools:** retrieve history by prerequisite depth, search
+  semantically and read selected passages or scenes. The initial input contains the writing
+  instruction and visible encounter.
+- **The fixed sampler remains the baseline,** using the same eligible material as retrieval.
+  The sampling policy from [ADR 8](0008-infer-scene-writing-from-sampled-game-context.md)
+  remains reproducible.
+- **Preparation determines eligibility.** Each example saves its permitted scenes using the
+  state interpretation from [ADR 9](0009-build-examples-from-consistent-game-state.md).
+  Tools enforce branch, split and target boundaries before ranking or reading; excluded
+  scenes cannot displace eligible results.
+- **History and writing references stay distinct.** A reference demonstrates the game's
+  writing without asserting that its events happened in the current playthrough.
+- **The caller runs the agent loop and sets its budgets.** The shared tools provide schemas,
+  dispatch and a trace of retrieval choices independently of the model provider.
 
 ## Consequences
 
-Agents can choose evidence according to the current writing task, while the fixed baseline
-remains available over the same permitted material. Retaining fixed sampling as the only
-policy was rejected because that policy cannot test adaptive context selection.
-
-Shared eligibility makes the available evidence comparable, but does not equalize retrieved
-text, token use, latency or answer quality. Retrieval traces expose the agent's choices;
-retrieval alone does not establish a fair end-to-end model comparison.
-
-Prepared datasets retain more text than fixed prompts need. Saved pools inherit the
-interpreter's limitations and do not support arbitrary live game saves. Filtering only after
-a global search was rejected because excluded scenes could displace eligible results even
-when the excluded text was never returned.
+- **Agents can seek evidence the fixed sampler misses.** Retrieval choices become part of
+  the model's performance, alongside the model's use of the returned text.
+- **Equal access does not mean equal cost.** Models can retrieve different amounts of text
+  and make different numbers of calls; the shared pool alone does not equalize a comparison.
+- **Prepared bundles retain more text than fixed prompts need.** Saved pools inherit the
+  interpreter's limitations and do not represent arbitrary live game saves.
+- **Existing generation and benchmark runs still use fixed prompts.** The retrieval tools
+  are available, but those runners do not execute an agent loop.
