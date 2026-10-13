@@ -75,8 +75,9 @@ Open the database with the same model and encoding settings used to build it.
   first, then scenes ranked by similarity to the visible encounter. `context.depth` controls
   nearby history. The default input budget is 8,192 tokens.
 - `dynamic` lets the model request history, semantic search and scene reads before writing.
-  The model emits JSON tool requests during a bounded selection phase, then receives the
-  selected scenes for the final continuation. `context.max_tool_calls` bounds selection turns.
+  The model emits JSON tool requests until it chooses to finish, then receives the selected
+  scenes for the final continuation. There is no retrieval-turn cap; context budgets still
+  apply, and hosted requests remain subject to the run’s spend ceiling.
 
 Both policies use the same eligible scene pool. Search returns whole scenes ranked by their
 strongest passage; the lower-level retrieval API also supports passage-only results. Runs

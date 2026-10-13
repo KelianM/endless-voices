@@ -289,6 +289,7 @@ class RetrievalSession:
     def __init__(self, database, pool):
         self.database = database
         self._pool = deepcopy(pool)
+        self.mission = pool.mission
         self._allowed = {}
         self._chunks = {}
         self.trace = []

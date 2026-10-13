@@ -19,8 +19,8 @@ two policies over the same permitted material, with budgets that fit each model.
   from [ADR 9](0009-build-examples-from-consistent-game-state.md) determines permitted scenes.
   Retrieval enforces branch, split and target boundaries before ranking or reading.
 - **Fit whole scenes within the configured input budget.** Local runs reserve output space
-  within the model's context ceiling. Hosted dynamic runs may use larger budgets. Bound the
-  number of model-directed retrieval turns as well as the selected text.
+  within the model's context ceiling. Hosted dynamic runs may use larger budgets. The model chooses
+  when to finish retrieval; hosted calls remain subject to the run’s spend ceiling.
 - **Keep history and writing references distinct.** A reference demonstrates the game's
   writing without asserting that its events happened in the current playthrough.
 - **Save selected messages and retrieval traces with the run.** Training selects static
@@ -31,6 +31,8 @@ two policies over the same permitted material, with budgets that fit each model.
 
 - **Retrieval choices become part of model performance.** Dynamic selection can find useful
   scenes the static heuristic misses, but adds model calls and may choose worse context.
+- **Context limits do not prevent repeated calls.** Queries can repeat without adding scenes.
+  A fixed turn cap was rejected because it cuts off useful retrieval as well as repetition.
 - **Equal access does not mean equal cost.** Models can use different context lengths and
   retrieval turns; a shared pool does not equalize resource use.
 - **Old sampled-prompt results need a new baseline.** This replaces the saved selection and

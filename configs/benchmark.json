@@ -20,7 +20,6 @@
     "tokenizer": "data/local/hub/models--mlx-community--gemma-4-31b-it-4bit/snapshots/696d436c404745a59f30e4939a658162b0a9e57f",
     "max_input_tokens": 8192,
     "depth": 4,
-    "max_tool_calls": 8,
     "dynamic_max_input_tokens": {
       "gpt-6-luna": 65536,
       "claude-sonnet-5-5": 65536

@@ -18,13 +18,10 @@ def open_database(settings):
 
 
 def select_context(session, settings, counter, ask=None):
-    """Return final context messages and a trace of bounded model-directed retrieval."""
+    """Return final context messages and a trace of model-directed retrieval."""
     limit = settings["max_input_tokens"]
     if type(limit) is not int or limit <= 0:
         raise ValueError("max_input_tokens must be positive")
-    calls = settings.get("max_tool_calls", 8)
-    if type(calls) is not int or calls <= 0:
-        raise ValueError("max_tool_calls must be positive")
     if settings["mode"] == "static":
         messages = session.static_messages(counter, limit, settings.get("depth", 4))
         return messages, {
@@ -34,15 +31,20 @@ def select_context(session, settings, counter, ask=None):
     if settings["mode"] != "dynamic" or ask is None:
         raise ValueError("Dynamic context requires a model callback")
     instruction = (
-        "Select context for the encounter. Reply only with JSON: "
+        f"Select context for mission {session.mission!r}. Do not write the passage yet. "
+        "This call is only for context selection. Reply only with JSON: "
         '{"name":"search_context","arguments":{...}} to call a tool, '
         'or {"name":"finish","arguments":{}} when ready. '
         "Retrieved scenes that fit are included automatically. "
-        "Choose additional tools using previous results. Available tools: "
+        "Use mission history for continuity, especially before writing an opening. "
+        "Search writing references only for missing facts or voice examples. "
+        "Finish once the selected context supports the next passage; exhaustive coverage "
+        "is unnecessary. If a search adds no useful evidence, finish unless a specific "
+        "unanswered question needs a different tool or query. Available tools: "
         + json.dumps(session.tool_schemas)
     )
     session.trace.clear()
-    selected, turns, previous = [], [], None
+    selected, turns, progress = [], [], []
 
     def selector(ids, feedback):
         messages = session.messages_for(ids)
@@ -50,16 +52,18 @@ def select_context(session, settings, counter, ask=None):
         messages[-1] = {
             **messages[-1],
             "content": messages[-1]["content"]
-            + "\n\nChoose the next context tool. "
-            + json.dumps(feedback or {}),
+            + "\n\nRetrieval so far: "
+            + json.dumps([*progress, feedback] if feedback is not None else progress)
+            + '\nDo not write the passage. Reply only with a JSON tool call, or '
+            + '{"name":"finish","arguments":{}} if the context is sufficient.',
         }
         return messages
 
-    for turn in range(calls):
-        messages = selector(selected, previous)
+    while True:
+        messages = selector(selected, None)
         if counter.messages(messages) > limit:
             raise ValueError("Retrieval instructions and encounter exceed the input budget")
-        response = ask(messages, turn)
+        response = ask(messages, len(turns))
         entry = {"messages": messages, "response": response}
         turns.append(entry)
         try:
@@ -72,25 +76,30 @@ def select_context(session, settings, counter, ask=None):
                 break
             documents = session.call_tool(call["name"], call["arguments"])
             accepted, omitted = [], 0
+            before = set(selected)
+
+            def feedback():
+                return {**call, "added_scenes": len(set(accepted) - before),
+                        "already_selected_scenes": len(set(accepted) & before),
+                        "omitted_scenes": omitted}
             for document in documents:
                 sid = document["scene_id"]
                 candidate = selected if sid in selected else [*selected, sid]
-                feedback = {"accepted_scene_ids": [*accepted, sid], "omitted_scenes": omitted}
-                if counter.messages(selector(candidate, feedback)) <= limit:
+                accepted.append(sid)
+                if counter.messages(selector(candidate, feedback())) <= limit:
                     selected = candidate
-                    accepted.append(sid)
                 else:
+                    accepted.pop()
                     omitted += 1
-            previous = {"accepted_scene_ids": accepted, "omitted_scenes": omitted}
-            while counter.messages(selector(selected, previous)) > limit and selected:
+            while counter.messages(selector(selected, feedback())) > limit and selected:
                 removed = selected.pop()
                 accepted = [sid for sid in accepted if sid != removed]
                 omitted += 1
-                previous = {"accepted_scene_ids": accepted, "omitted_scenes": omitted}
-            entry["result"] = previous
+            entry["result"] = feedback()
+            progress.append(entry["result"])
         except (ValueError, TypeError, KeyError) as error:
-            previous = {"error": str(error)}
-            entry["result"] = previous
+            entry["result"] = {"response": response, "error": str(error)}
+            progress.append(entry["result"])
     return session.messages_for(selected), {
         "turns": turns,
         "tools": session.trace,

@@ -201,13 +201,14 @@ def test_local_runner_preserves_limits_cache_and_partial_failures(tmp_path, monk
         assert saved["messages"] == prompt["messages"]
 
 
-def test_dynamic_selection_repeats_tools_without_leaking_oversized_scenes():
-    # A large first result must not prevent a later useful scene or exceed the model budget.
+def test_dynamic_selection_waits_for_finish_without_leaking_oversized_scenes():
+    # Retrieval must continue past eight turns while oversized scenes stay out of the prompt.
     from endless_voices.context_generation import select_context
 
     class Session:
         trace = []
         tool_schemas = []
+        mission = "Current mission"
 
         def messages_for(self, ids):
             return [
@@ -226,21 +227,26 @@ def test_dynamic_selection_repeats_tools_without_leaking_oversized_scenes():
 
     requests = []
     responses = iter(
-        ['{"name":"search_context","arguments":{}}', '{"name":"finish","arguments":{}}']
+        ['{"name":"search_context","arguments":{}}'] * 9
+        + ['{"name":"finish","arguments":{}}']
     )
 
     def ask(messages, turn):
         requests.append(messages)
-        assert sum(len(m["content"]) for m in messages) <= 1000
+        assert sum(len(m["content"]) for m in messages) <= 3500
         return next(responses)
 
     messages, trace = select_context(
         Session(),
-        {"mode": "dynamic", "max_input_tokens": 1000},
+        {"mode": "dynamic", "max_input_tokens": 3500},
         SimpleNamespace(messages=lambda ms: sum(len(m["content"]) for m in ms)),
         ask,
     )
-    assert len(requests) == 2
+    assert "Current mission" in requests[0][0]["content"]
+    assert '"added_scenes": 1' in requests[1][-1]["content"]
+    assert '"name": "search_context"' in requests[1][-1]["content"]
+    assert '"added_scenes": 0' in requests[2][-1]["content"]
+    assert len(requests) == 10
     assert trace["selected_scene_ids"] == ["small"]
     assert "useful lore" in requests[1][-1]["content"]
     assert "Choose the next" not in messages[-1]["content"]
@@ -277,6 +283,7 @@ def test_hosted_dynamic_budget_can_exceed_shared_static_budget(tmp_path, monkeyp
     class Session:
         trace = []
         tool_schemas = []
+        mission = "Current mission"
 
         def messages_for(self, ids):
             return [{"role": "system", "content": "Lore " + ("x" * 9000 if ids else "")},
@@ -286,7 +293,7 @@ def test_hosted_dynamic_budget_can_exceed_shared_static_budget(tmp_path, monkeyp
             return [{"scene_id": "large"}]
 
     (tmp_path / "selection.json").write_text(json.dumps({"context": {
-        "mode": "dynamic", "max_input_tokens": 8192, "max_tool_calls": 2,
+        "mode": "dynamic", "max_input_tokens": 8192,
         "tokenizer": "fake", "dynamic_max_input_tokens": {"gpt-6-luna": 16000}}}))
     backends.save(tmp_path / "prompts.json", [{"sample_id": "one",
                                               "messages": Session().messages_for([])}])
