@@ -1,4 +1,8 @@
-# Prepared scene dataset
+# Published scene dataset
+
+This directory contains the previous prepared release, with sampled prompts saved in its
+records. Rebuild from [the preparation command](../../README.md#prepare-data) before using
+the current retrieval flow. The coverage figures below describe the published release.
 
 The dataset contains authored passages from cached Human, Hai and Quarg game sources. Whole missions and known text-sharing variants stay in one split. Training context excludes held-out missions; every input excludes its target source passages and reference scenes from sibling variants.
 
@@ -8,7 +12,9 @@ The dataset contains authored passages from cached Human, Hai and Quarg game sou
 | Validation | 250 | 57 | 36,411 |
 | Test | 360 | 58 | 54,544 |
 
-Training contains 1,834 distinct target texts. The cached Qwen tokenizer measures median input lengths of 8,188 training tokens, 8,187 validation tokens and 8,189 test tokens, with an 8,192-token input ceiling. Training inputs range from 3,784 to 8,192 tokens. The longest complete sequence across all splits contains 8,818 tokens; the training configuration allows 9,216. Supervised counts include the final assistant framing and end tokens; prompt and reference tokens are masked. Recheck lengths with the training model's tokenizer.
+Training contains 1,834 distinct target texts. Supervised token counts include the final
+assistant framing and end tokens, measured with the cached Qwen tokenizer. Runtime context
+lengths depend on the selected policy and the model's tokenizer.
 
 | Source region | Train | Validation | Test |
 |---|---:|---:|---:|
@@ -20,44 +26,35 @@ Identity labels group source regions, not individual speakers. Species is marked
 
 `metadata.task` is derived from the current conversation prefix. Training has 480 scene openings and 1,367 continuations; validation has 76 openings and 174 continuations; test has 74 openings and 286 continuations. Each task selects its shared minimal instruction before context budgeting.
 
-Context preserves the current encounter, authored location lore and nearby eligible mission history. Older missions and independent writing references fill the remaining input budget. References are separate internally consistent scenes, not one continuous player history. Training has a median preserved core of 839 tokens; independent references supply much of the remaining input. Unknown starting conditions and travel durations are constrained possibilities rather than a reconstructed game save.
+Eligible context contains authored location lore, compatible mission history and independent
+writing references. References are separate scenes, not one continuous player history.
+Unknown starting conditions and travel durations are constrained possibilities rather than
+a reconstructed game save.
 
 All 462 selected missions produced targets, yielding 2,457 examples across the three splits. No selected mission is excluded for an extraction failure. The selection does not cover every mission in the three regions.
 
 Unresolved runtime substitutions remain literal markers under the game-variable policy: 200 training targets, 29 validation targets and 71 test targets contain markers. Player-name and ship-name substitutions use the configured neutral values. No missing game facts are filled with model-generated text.
 
-`train.jsonl`, `validation.jsonl` and `test.jsonl` contain the saved inputs and authored targets. `provenance.json` retains source coordinates, selected context and state witnesses. `config.json` records mission ownership, target selection and sampling settings. `manifest.json` records source and implementation hashes; `licensing/` preserves upstream notices. Load through `SceneDataset.load(root, split)` to verify all published artifacts.
+The published `train.jsonl`, `validation.jsonl` and `test.jsonl` retain the old sampled inputs.
+New builds save only instructions, visible encounters and authored targets in these records;
+`retrieval.json` stores eligible scenes once and records each example's pool. Provenance,
+configuration, manifest hashes and upstream licensing accompany both formats.
 
 Verification checked split separation, source-span exclusion, task/instruction agreement, token budgets, training mask boundaries and 2,025 distinct state witnesses. Two test examples contain an earlier, separately authored occurrence of their target paragraph in the same conversation. Source-span exclusion preserves these valid repeated passages. No complete target text is shared across splits. Existing development material remains part of these source regions; this release is not a claim of a pristine research test set or measured fine-tuning improvement.
 
 ## How this dataset is produced
 
-[`DatasetBuilder`](../../src/endless_voices/dataset/builder.py) owns preparation. The builder supplies the parsed corpus, split ownership, interpreter and context strategy to the example builder. Target extraction and context sampling share the same dialogue interpreter.
+[`DatasetBuilder`](../../src/endless_voices/dataset/builder.py) uses the same interpreter for
+targets, history and references. Each reachable target gets one reproducible compatible
+history; mutually exclusive histories are never combined into one transcript.
 
-```text
-DatasetBuilder
-  ├─ GameCorpus: verified source text and mission structure
-  ├─ mission split ownership
-  └─ ExampleBuilder
-       ├─ DialogueInterpreter: reachable targets and state constraints
-       └─ ContextSampler
-            ├─ DialogueInterpreter: compatible history and reference scenes
-            └─ ContextStrategy: select whole passages within the input budget
-  → saved SceneDataset
-       ├─ training loader and collator → batches
-       └─ benchmark → fixed context and authored target
-```
+Training context excludes held-out missions. Validation can use training context, and test
+can use training and validation context. Unselected prerequisite missions remain eligible
+unless assigned to a held-out split. References exclude the target mission and known sibling
+variants. The prerequisite graph follows positive completion requirements, not arbitrary OR
+relationships.
 
-The interpreter preserves full authored passages through the next player choice or endpoint, including narration and embedded questions. Each distinct reachable target sequence becomes an example with one reproducibly selected compatible history. Assignments constrain later branches. Equivalent routes retain one complete state witness rather than every menu permutation; mutually exclusive histories are never combined into one transcript.
-
-Mission configuration controls target selection and split ownership. Missions sharing a named conversation stay in one split. Training context excludes held-out missions; validation can use training context, and test can use training and validation context. Unselected prerequisite missions remain eligible unless assigned to a held-out split. The prerequisite graph follows positive completion requirements naming actual missions; the graph does not reconstruct arbitrary OR dependencies.
-
-Context selection preserves the current encounter, location lore and nearby eligible history. Whole older prerequisite missions fill the remaining budget first. Independent references then supply complete conversations from related source files and authored ship, outfit and government descriptions. References exclude the target mission, known sibling variants and held-out missions. Each reference conversation uses the longest of eight seeded complete routes to avoid a pool dominated by brief refusals. References have their own consistent states and are labelled separately from preceding events.
-
-A current conversation prefix selects the continuation instruction; no prefix selects the opening instruction. Earlier mission history and independent references do not change that distinction. Preparation saves the instruction and selected context once for training, generation and judging. DataLoader workers do not interpret or resample game text. An oversized mandatory context fails preparation rather than being truncated.
-
-The state model handles dialogue conditions, assignments, arithmetic, random draws, payments, outfit requirements, scheduled events and mission event effects. Prerequisite history samples a compatible event timeline; target extraction retains distinct reachable continuations. Literal dialog paragraphs and static phrase references retain source attribution. Shop, fleet and map changes are recorded effects, not a full simulation of the game world. Unsupported operations and exceeded exploration limits fail preparation explicitly. [ADR 9](../../docs/adr/0009-build-examples-from-consistent-game-state.md) explains the state model's design and limits.
-
-The [design overview](../../docs/design.md) explains dataset loading and consumer boundaries.
-See [training usage](../../README.md#train-and-chat) for loss settings; training on all saved
-messages is not a deduplicated full-corpus export.
+The interpreter handles supported dialogue conditions, assignments and mission effects.
+Shop, fleet and map changes are recorded effects, not a full game simulation.
+[ADR 9](../../docs/adr/0009-build-examples-from-consistent-game-state.md) records those limits.
+The [design overview](../../docs/design.md) explains runtime context selection and consumers.

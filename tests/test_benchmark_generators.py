@@ -1,34 +1,28 @@
 """Protect selected-context benchmarks using synthetic generation evidence."""
 
 import json
+from contextlib import nullcontext
 from copy import deepcopy
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from prepared_fixtures import write_empty_pools
 
 from endless_voices import benchmark_generators as benchmark
 from endless_voices import generation_backends as backends
-from endless_voices.context import ContextPool, FullContext
-
-
-class Counter:
-    def text(self, text):
-        return len(text)
-
-    def messages(self, messages):
-        return sum(len(m["content"]) for m in messages)
+from endless_voices.context import ContextPool
 
 
 @pytest.fixture
-def recorded(tmp_path, request):
+def recorded(tmp_path, request, monkeypatch):
     models = getattr(request, "param", ["gemma31b", "gpt-6-luna"])
     dataset = tmp_path / "dataset"
     dataset.mkdir()
     template = json.loads(
         Path("tests/fixtures/contracts/validation.jsonl").read_text().splitlines()[0]
     )
-    records, selections = {}, []
+    records, pools = {}, []
     for sid in ["one", "two", "three", "four"]:
         row = deepcopy(template)
         row["metadata"]["id"] = sid
@@ -43,7 +37,7 @@ def recorded(tmp_path, request):
             [],
             {},
         )
-        selections.append(FullContext().select(pool, Counter()))
+        pools.append(pool)
     local = tmp_path / "local.json"
     backends.save(local, {"label": "gemma31b"})
     locals_ = {"gemma31b": str(local)}
@@ -63,14 +57,26 @@ def recorded(tmp_path, request):
             "judge_budget_usd": 0.5,
         },
     )
+    index = tmp_path / "context.sqlite"
+    index.write_text("synthetic index")
+    plan = backends.read(config)
+    plan["context"] = {"mode": "static", "index": str(index), "tokenizer": "fake",
+                       "max_input_tokens": 8192, "depth": 4}
+    config.write_text(json.dumps(plan))
+    from transformers import AutoTokenizer
+    monkeypatch.setattr(AutoTokenizer, "from_pretrained", lambda *a, **kw: SimpleNamespace(
+        apply_chat_template=lambda messages, **kw: list(range(
+            sum(len(m["content"]) for m in messages)))))
+    monkeypatch.setattr(benchmark.context_generation, "open_database", lambda _: nullcontext(
+        SimpleNamespace(embedder=SimpleNamespace(embed=lambda *a, **kw: [[1, 0]]), dimension=2)))
     root = tmp_path / "run"
-    for row, selection in zip(records.values(), selections, strict=True):
-        row['messages'] = selection.training_messages(
-            'She nods. "A complete source reply for ' + row['metadata']['id'] + '."')
+    for row, pool in zip(records.values(), pools, strict=True):
+        row["messages"] = [*pool.messages(), {"role": "assistant", "content":
+            'She nods. "A complete source reply for ' + row['metadata']['id'] + '."'}]
     (dataset / 'validation.jsonl').write_text(
         ''.join(json.dumps(r) + '\n' for r in records.values()))
     backends.save(dataset / 'manifest.json', {
-        'format': 'scene-dataset-v1', 'split_unit': 'mission', 'splits': ['validation'],
+        'format': 'scene-dataset-v2', 'split_unit': 'mission', 'splits': ['validation'],
         'artifacts': {str(p.relative_to(dataset)): backends.sha(p)
                       for p in dataset.rglob('*') if p.is_file()}})
     write_empty_pools(dataset)
@@ -202,7 +208,7 @@ def test_prepare_cli_passes_the_prepared_dataset(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(benchmark, 'prepare', lambda *args: calls.append(args))
     cli.main(['prepare', '--root', str(output), '--dataset', str(dataset)])
-    assert calls == [(output, dataset, Path('configs/benchmark.json'))]
+    assert calls == [(output, dataset, Path('configs/benchmark.json'), None)]
 
 
 def test_preparation_records_cli_source_after_split(recorded):
@@ -212,4 +218,38 @@ def test_preparation_records_cli_source_after_split(recorded):
     assert snapshot.read_bytes() == Path(cli.__file__).read_bytes()
     snapshot.write_text("changed CLI orchestration")
     with pytest.raises(ValueError, match="Benchmark preparation changed: cli-benchmark.py"):
+        benchmark.checked_inputs(recorded)
+
+
+def test_dynamic_export_keeps_common_judge_evidence_and_verifies_selected_scenes(recorded):
+    # A dynamic generator may use less context, but must not change the judge's reference.
+    selection = backends.read(recorded / "selection.json")
+    selection["context"]["mode"] = "dynamic"
+    records = backends.read(recorded / "records.json")
+    for row in records.values():
+        row["messages"][0]["content"] += "\nCommon static evidence for judging."
+    (recorded / "records.json").write_text(json.dumps(records))
+    selection["artifacts_sha256"]["records.json"] = backends.sha(recorded / "records.json")
+    (recorded / "selection.json").write_text(json.dumps(selection))
+    for model in selection["models"]:
+        folder = recorded / model
+        for sid in ("one", "two", "four"):
+            if model == "gpt-6-luna":
+                messages = backends.read(folder / f"{sid}.request.json")["body"]["input"]
+                backends.save(folder / f"{sid}.prompt.json", {"messages": messages})
+            backends.save(folder / f"{sid}.retrieval.json", {"selected_scene_ids": []})
+    benchmark.export(recorded)
+    private = backends.read(recorded / "assessment/private.json")
+    for row in private["trials"]:
+        trial = backends.read(recorded / "assessment" / row["path"])
+        assert trial["context"] == records[row["sample_id"]]["messages"][:-1]
+
+
+@pytest.mark.parametrize("artifact", ["dataset", "index"])
+def test_prepared_run_rejects_replaced_retrieval_inputs(recorded, artifact):
+    selection = backends.read(recorded / "selection.json")
+    path = (Path(selection["dataset_source"]) / "manifest.json" if artifact == "dataset"
+            else Path(selection["context"]["index"]))
+    path.write_text(path.read_text() + "\n")
+    with pytest.raises(ValueError, match="changed"):
         benchmark.checked_inputs(recorded)

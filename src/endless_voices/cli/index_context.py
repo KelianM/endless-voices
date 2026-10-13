@@ -14,7 +14,7 @@ def main(argv=None):
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--model", default=DEFAULT_EMBEDDING_MODEL)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
-    parser.add_argument("--dtype", default="auto",
+    parser.add_argument("--dtype", default="float16",
                         choices=["auto", "float32", "float16", "bfloat16"])
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--max-length", type=int, default=32768)

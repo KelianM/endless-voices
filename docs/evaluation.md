@@ -1,7 +1,8 @@
 # Response evaluation
 
 The benchmark asks a judge to identify the authored game continuation from an original/generated
-pair with shared context. The judge supplies a choice, confidence, recognition flag and free-text
+pair with common static context. Dynamic generators may retrieve different evidence;
+the benchmark keeps the judge's reference context fixed across generators. The judge supplies a choice, confidence, recognition flag and free-text
 reason. Origin detection measures distinguishability, not storytelling quality.
 
 Preparation verifies saved contexts and response provenance before exporting trials. Public trials

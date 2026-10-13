@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from endless_voices.context import ContextPool, MissionDepth
+from endless_voices.context import ContextPool
 from endless_voices.retrieval import RetrievalSession, SceneDatabase, passage_chunks, scene_id
 
 
@@ -115,23 +115,50 @@ def test_saved_vectors_require_the_same_embedding_space(tmp_path):
         SceneDatabase.create(path, source.blocks, encoder)
 
 
-def test_fixed_sampler_retains_all_eligible_material_for_later_retrieval():
-    class Counter:
-        def messages(self, messages):
-            return sum(len(message["content"]) for message in messages)
+class Counter:
+    def messages(self, messages):
+        return 20 + sum(len(message["content"]) for message in messages)
 
-        def text(self, text):
-            return len(text)
 
+def test_static_selection_prioritizes_nearby_history_then_similarity_with_wrappers(tmp_path):
     source = pool()
-    budget = Counter().messages(source.messages({"parent"}))
-    selection = MissionDepth(1, budget, "fixed").select(source, Counter())
-    assert selection.messages == source.messages({"parent"})
-    assert selection.pool == source
-    assert len(selection.omitted) == 2
-    assert "pool" not in selection.evidence()
-    source.blocks.clear()
-    assert len(selection.pool.blocks) == 2
+    source.blocks[0]["passages"][0]["text"] = "Nearby history"
+    source.references[0]["passages"][0]["text"] = "A starship reference"
+    source.blocks.append(block("huge", "starship " * 1000, 10))
+    with SceneDatabase.create(tmp_path / "scenes.db", source.blocks + source.references,
+                              Encoder()) as database:
+        session = RetrievalSession(database, source)
+        wanted = [scene_id(source.blocks[0]), scene_id(source.references[0])]
+        expected = session.messages_for(wanted)
+        budget = Counter().messages(expected)
+        selected = session.static_messages(Counter(), budget, depth=1)
+        assert selected == expected
+        assert Counter().messages(selected) == budget
+        assert "independent writing references" in selected[0]["content"]
+        assert selected[1:] == source.encounter
+        assert session.trace[-1]["result_ids"] == wanted
+        assert len(source.blocks) == 3
+
+
+def test_static_budget_rejects_oversized_encounter_without_truncation(tmp_path):
+    source = pool()
+    with SceneDatabase.create(tmp_path / "scenes.db", source.blocks, Encoder()) as database:
+        source.references = []
+        session = RetrievalSession(database, source)
+        with pytest.raises(ValueError, match="visible encounter exceed"):
+            session.static_messages(Counter(), Counter().messages(session.initial_messages()) - 1)
+        assert session.initial_messages()[1:] == source.encounter
+
+
+def test_static_selection_does_not_inherit_tool_result_limit(tmp_path):
+    source = pool()
+    source.blocks = [block("parent", f"starship {i}", i) for i in range(101)]
+    source.references = []
+    with SceneDatabase.create(tmp_path / "scenes.db", source.blocks, Encoder()) as database:
+        session = RetrievalSession(database, source)
+        assert session.static_messages(Counter()) == session.messages_for(
+            [scene_id(block) for block in source.blocks])
+        assert len(session.trace[-1]["result_ids"]) == 101
 
 
 @pytest.mark.parametrize("vector", [[0, 0], [float("nan"), 1], [float("inf"), 1]])
@@ -147,12 +174,12 @@ def test_invalid_embeddings_fail_before_creating_an_index(tmp_path, vector):
 
 
 def test_hidden_target_in_an_omitted_reference_prevents_publication(tmp_path):
-    from test_dataset_builder import Counter, config, corpus, spec
+    from test_dataset_builder import config, corpus, spec
 
     from endless_voices.dataset.builder import DatasetBuilder
 
     source = corpus(tmp_path, "mission Current\n\ton offer\n\t\tconversation\n\t\t\t`Target.`\n")
-    builder = DatasetBuilder(source, config({"Current": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Current": spec()}))
     leaked = block("other", "Hidden target " * 10000, 4,
                    reference=True, conversation=3, state={})
     builder.sampler.references = lambda *args: [leaked]

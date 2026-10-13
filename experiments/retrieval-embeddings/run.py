@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 from endless_voices.artifacts import file_hash
-from endless_voices.context import ContextPool, FullContext, digest
+from endless_voices.context import ContextPool, digest
 from endless_voices.retrieval import SceneDatabase, TransformersEmbedder, scene_id
 
 
@@ -24,26 +24,18 @@ def prepare(args):
     from endless_voices.dataset.source import GameCorpus
     from endless_voices.dataset.state import GameState
 
-    class Counter:
-        def text(self, text):
-            return len(text)
-
-        def messages(self, messages):
-            return sum(len(message["content"]) for message in messages)
-
     plan = json.loads(args.plan.read_text())
     config = json.loads(args.config.read_text())
     inventory = json.loads(args.inventory.read_text())
     corpus = GameCorpus(args.source, inventory)
-    builder = DatasetBuilder(corpus, config, Counter())
-    builder.sampler.strategy = FullContext()
+    builder = DatasetBuilder(corpus, config)
     pools = {}
     for mission in sorted({query["mission"] for query in plan["queries"]}):
         examples = builder.examples.build(
-            corpus.missions[mission], config["missions"][mission], Counter(),
+            corpus.missions[mission], config["missions"][mission],
             GameState.fixed(config.get("initial_state", {})))
-        selection = max(examples, key=lambda row: len(row[1].pool.blocks))[1]
-        pools[mission] = selection.pool.__dict__
+        pool = max(examples, key=lambda row: len(row[1].blocks))[1]
+        pools[mission] = pool.__dict__
     scenes = {scene_id(block): block for pool in pools.values()
               for block in pool["blocks"] + pool["references"]}
     payload = {

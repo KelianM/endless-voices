@@ -3,8 +3,6 @@
 import copy
 import json
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -17,7 +15,8 @@ from tokenizers.pre_tokenizers import Whitespace
 from transformers import GenerationConfig, GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from endless_voices import generate as gen
-from endless_voices.cli.generate import parse_args
+from endless_voices.cli.generate import main, parse_args
+from endless_voices.retrieval import SceneDatabase
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -57,7 +56,7 @@ def base(tmp_path, tokenizer):
 
 
 @pytest.fixture
-def args(tmp_path, base):
+def args(tmp_path, base, monkeypatch):
     dataset = tmp_path / "dataset"
     shutil.copytree(FIXTURES, dataset)
     path = dataset / "validation.jsonl"
@@ -70,8 +69,21 @@ def args(tmp_path, base):
     manifest = json.loads((dataset / "manifest.json").read_text())
     manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     (dataset / "manifest.json").write_text(json.dumps(manifest))
+    write_empty_pools(dataset)
+
+    class Encoder:
+        identity = "generation-test"
+
+        def embed(self, texts, *, kind):
+            return [[1.0] for _ in texts]
+
+    index = tmp_path / "context.db"
+    SceneDatabase.create(index, [{"heading": "Unused scene", "passages": [
+        {"line": 1, "role": "passage", "text": "Not eligible"}]}], Encoder()).close()
+    monkeypatch.setattr(gen, "open_database", lambda settings: SceneDatabase(index, Encoder()))
     config = tmp_path / "model.toml"
-    config.write_text(f'[model]\nname_or_path = "{base}"\n')
+    config.write_text(f'[model]\nname_or_path = "{base}"\n'
+                      f'[context]\nmode = "static"\nindex = "{index}"\n')
     return parse_args(
         [
             "--config",
@@ -189,7 +201,7 @@ def test_generation_failures_preserve_ids_and_partial_output(
 def test_overlong_prompt_is_recorded_without_generation(args, monkeypatch):
     model = ReplyModel()
     use_stub(monkeypatch, model)
-    args.max_context_tokens = 8
+    model.config.n_positions = 8
     assert gen.run_generation(args) == 1
     _, rows, prompts = read_run(args)
     assert rows[0]["error"]["stage"] == "prompt"
@@ -268,11 +280,8 @@ def test_real_tiny_model_and_lora_cli_use_identical_context(args, base, tmp_path
     saved = []
     for name, extra in (("base-run", []), ("adapter-run", ["--adapter", str(adapter)])):
         args.output = tmp_path / name
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "endless_voices", "generate",
+        with pytest.raises(SystemExit) as result:
+            main([
                 "--config",
                 args.config,
                 "--manifest",
@@ -287,13 +296,10 @@ def test_real_tiny_model_and_lora_cli_use_identical_context(args, base, tmp_path
                 "--max-new-tokens",
                 "4",
                 *extra,
-            ],
-            capture_output=True,
-            text=True,
-        )
+            ])
         run, rows, prompts = read_run(args)
-        assert result.returncode in (0, 1), result.stderr
-        assert "error" not in run, result.stderr
+        assert result.value.code in (0, 1)
+        assert "error" not in run
         assert rows[0].get("error", {}).get("type") in (None, "OutputLimit", "EmptyResponse")
         assert rows[0]["output_ids"]
         saved.append((run, rows, prompts))

@@ -6,35 +6,38 @@
 
 ## Context
 
-Fixed mission depth and seeded sampling choose a model's context before generation. The model
-cannot request missing history or examples of the game's writing. Comparing larger agents
-with smaller fine-tuned models needs both fixed context and agent-directed retrieval over
-the same permitted material.
+Saved sampled prompts fix the available context before a model can decide what history or
+writing examples it needs. Comparing fixed selection with agent-directed retrieval requires
+two policies over the same permitted material, with budgets that fit each model.
 
 ## Decision
 
-- **Agents choose context through tools:** retrieve history by prerequisite depth, search
-  semantically and read selected passages or scenes. The initial input contains the writing
-  instruction and visible encounter.
-- **The fixed sampler remains the baseline,** using the same eligible material as retrieval.
-  The sampling policy from [ADR 8](0008-infer-scene-writing-from-sampled-game-context.md)
-  remains reproducible.
-- **Preparation determines eligibility.** Each example saves its permitted scenes using the
-  state interpretation from [ADR 9](0009-build-examples-from-consistent-game-state.md).
-  Tools enforce branch, split and target boundaries before ranking or reading; excluded
-  scenes cannot displace eligible results.
-- **History and writing references stay distinct.** A reference demonstrates the game's
+- **Select static or dynamic context at runtime.** Both modes retrieve from the same scene
+  database. Static selection fits nearby prerequisite history first, then semantic matches.
+  Dynamic selection lets the model request history, search and reads before writing.
+- **Preparation saves encounters and eligible pools, not sampled prompts.** State interpretation
+  from [ADR 9](0009-build-examples-from-consistent-game-state.md) determines permitted scenes.
+  Retrieval enforces branch, split and target boundaries before ranking or reading.
+- **Fit whole scenes within the configured input budget.** Local runs reserve output space
+  within the model's context ceiling. Hosted dynamic runs may use larger budgets. Bound the
+  number of model-directed retrieval turns as well as the selected text.
+- **Keep history and writing references distinct.** A reference demonstrates the game's
   writing without asserting that its events happened in the current playthrough.
-- **The caller runs the agent loop and sets its budgets.** The shared tools provide schemas,
-  dispatch and a trace of retrieval choices independently of the model provider.
+- **Save selected messages and retrieval traces with the run.** Training selects static
+  context before loading the generator. Judges receive common static evidence regardless
+  of the generator's retrieval mode.
 
 ## Consequences
 
-- **Agents can seek evidence the fixed sampler misses.** Retrieval choices become part of
-  the model's performance, alongside the model's use of the returned text.
-- **Equal access does not mean equal cost.** Models can retrieve different amounts of text
-  and make different numbers of calls; the shared pool alone does not equalize a comparison.
-- **Prepared bundles retain more text than fixed prompts need.** Saved pools inherit the
-  interpreter's limitations and do not represent arbitrary live game saves.
-- **Existing generation and benchmark runs still use fixed prompts.** The retrieval tools
-  are available, but those runners do not execute an agent loop.
+- **Retrieval choices become part of model performance.** Dynamic selection can find useful
+  scenes the static heuristic misses, but adds model calls and may choose worse context.
+- **Equal access does not mean equal cost.** Models can use different context lengths and
+  retrieval turns; a shared pool does not equalize resource use.
+- **Old sampled-prompt results need a new baseline.** This replaces the saved selection and
+  random-fill policy in [ADR 8](0008-infer-scene-writing-from-sampled-game-context.md), while
+  retaining minimal instructions and authored evidence. Reproducing the old sampler was
+  rejected because the benchmark will be rerun with the shared retrieval flow.
+- **Prepared pools remain bounded by the interpreter.** Dynamic retrieval can choose among
+  permitted scenes but cannot reconstruct an arbitrary live game save.
+- **Judges do not see each generator's particular evidence.** Common static context keeps
+  the judging conditions fixed, but may omit a fact a dynamic generator retrieved.

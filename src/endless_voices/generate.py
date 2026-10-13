@@ -19,6 +19,8 @@ from transformers import AutoModelForCausalLM, GenerationConfig, set_seed
 from endless_voices.artifacts import digest, encoded, file_hash
 from endless_voices.artifacts import save_progress as write_json
 from endless_voices.common import load_config, load_tokenizer
+from endless_voices.context import TokenizerCounter
+from endless_voices.context_generation import open_database, select_context
 from endless_voices.contracts import evaluation_messages
 from endless_voices.dataset.storage import SceneDataset
 
@@ -120,8 +122,10 @@ def execution_info() -> dict:
         },
         "git_commit": head.decode().strip() if head else None,
         "git_dirty": bool(status) if status is not None else None,
-        "code_sha256": {str(p.relative_to(Path(__file__).parent)): file_hash(p)
-                        for p in Path(__file__).parent.rglob("*.py")},
+        "code_sha256": {
+            str(p.relative_to(Path(__file__).parent)): file_hash(p)
+            for p in Path(__file__).parent.rglob("*.py")
+        },
         "mps_available": torch.backends.mps.is_available(),
         "cuda_version": torch.version.cuda,
         "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
@@ -152,11 +156,9 @@ def tokenizer_signature(tokenizer) -> str:
     )
 
 
-def load_condition(args, config, run) -> tuple:
+def load_condition(args, config, run, base_path, tokenizer) -> tuple:
     source = config["model"]["name_or_path"]
     revision = config["model"].get("revision")
-    base_path, run["model"] = artifact(source, revision, args)
-    tokenizer = load_tokenizer(str(base_path))
     run["tokenizer"] = {**run["model"], "signature": tokenizer_signature(tokenizer)}
     tokenizer.save_pretrained(args.output / "tokenizer")
     adapter_path = None
@@ -246,8 +248,8 @@ def load_condition(args, config, run) -> tuple:
     return model, tokenizer, device, context_limit, generation
 
 
-def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None):
-    messages = evaluation_messages(record)
+def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None, messages=None):
+    messages = evaluation_messages(record) if messages is None else messages
     if prompt is None:
         prompt = {}
     prompt.update(
@@ -284,17 +286,59 @@ def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None
     return prompt, inputs
 
 
-def generate_response(record, model, tokenizer, device, context_limit, generation, args, prompts):
+def generate_response(
+    record,
+    model,
+    tokenizer,
+    device,
+    context_limit,
+    generation,
+    args,
+    prompts,
+    session=None,
+    settings=None,
+    context_info=None,
+):
     sample_id = record["metadata"]["id"]
     started = time.monotonic()
     result = {"sample_id": sample_id, "status": "failed", "response": None}
     stage = "prompt"
     prompt = {}
+    if context_info:
+        result["retrieval"] = context_info
+    seed = int(digest(f"{args.seed}:{sample_id}".encode())[:8], 16)
+    set_seed(seed)
     try:
+        messages = evaluation_messages(record)
+        if session is not None:
+
+            def ask(selection, turn):
+                selection_prompt, selection_inputs = prepare_prompt(
+                    record, tokenizer, context_limit, args.max_new_tokens, messages=selection
+                )
+                request = {"turn": turn, **selection_prompt}
+                result.setdefault("retrieval_requests", []).append(request)
+                with torch.inference_mode():
+                    output = model.generate(
+                        **selection_inputs.to(device),
+                        generation_config=generation,
+                        use_model_defaults=False,
+                    )
+                ids = output[0, selection_prompt["input_tokens"] :].tolist()
+                request["output_ids"] = ids
+                eos = generation.eos_token_id
+                eos = [eos] if isinstance(eos, int) else eos
+                if not ids or ids[-1] not in (eos or []):
+                    raise ValueError("Retrieval output limit or incomplete response")
+                return tokenizer.decode(ids, skip_special_tokens=True).strip()
+
+            messages, trace = select_context(session, settings, TokenizerCounter(tokenizer), ask)
+            result["retrieval"] = trace
         prompt, inputs = prepare_prompt(
-            record, tokenizer, context_limit, args.max_new_tokens, prompt
+            record, tokenizer, context_limit, args.max_new_tokens, prompt, messages
         )
-        seed = int(digest(f"{args.seed}:{sample_id}".encode())[:8], 16)
+        if context_info and "error" in context_info:
+            raise ValueError(context_info["error"])
         result.update(
             {
                 "seed": seed,
@@ -370,15 +414,62 @@ def run_generation(args) -> int:
     counts = {"ok": 0, "failed": 0}
     completed = set()
     exit_code = 0
+    database = None
     with (
         (args.output / "responses.jsonl").open("x", encoding="utf-8") as responses,
         (args.output / "prompts.jsonl").open("x", encoding="utf-8") as prompts,
     ):
         try:
-            condition = load_condition(args, config, run)
+            settings = {**config["context"], "mode": args.context_mode or config["context"]["mode"]}
+            source, run["model"] = artifact(
+                config["model"]["name_or_path"], config["model"].get("revision"), args
+            )
+            selection_tokenizer = load_tokenizer(str(source))
+            settings["max_input_tokens"] = min(
+                settings.get("max_input_tokens", 8192)
+                if settings["mode"] == "static"
+                else args.max_context_tokens,
+                args.max_context_tokens - args.max_new_tokens,
+                selection_tokenizer.model_max_length - args.max_new_tokens,
+            )
+            prepared = SceneDataset.load(args.manifest.parent, args.split)
+            database = open_database(settings)
+            indices = {record["metadata"]["id"]: i for i, record in enumerate(prepared)}
+            context_info = {}
+            if settings["mode"] == "static":
+                for record in records:
+                    sid = record["metadata"]["id"]
+                    try:
+                        messages, trace = select_context(
+                            prepared.retrieval_session(indices[sid], database),
+                            settings,
+                            TokenizerCounter(selection_tokenizer),
+                        )
+                        record["messages"] = [*messages, record["messages"][-1]]
+                        context_info[sid] = trace
+                    except ValueError as error:
+                        context_info[sid] = {"error": str(error)}
+                database.close()
+                database = None
+            run["context"] = settings
+            run["context_index_sha256"] = file_hash(settings["index"])
+            condition = load_condition(args, config, run, source, selection_tokenizer)
+            settings["max_input_tokens"] = min(
+                settings["max_input_tokens"], condition[3] - args.max_new_tokens
+            )
             write_json(args.output / "run.json", run)
             for record in records:
-                result = generate_response(record, *condition, args, prompts)
+                result = generate_response(
+                    record,
+                    *condition,
+                    args,
+                    prompts,
+                    prepared.retrieval_session(indices[record["metadata"]["id"]], database)
+                    if database is not None
+                    else None,
+                    settings,
+                    context_info.get(record["metadata"]["id"]),
+                )
                 append_json(responses, result)
                 completed.add(result["sample_id"])
                 counts[result["status"]] += 1
@@ -398,6 +489,9 @@ def run_generation(args) -> int:
                         },
                     )
                     counts["failed"] += 1
+        finally:
+            if database is not None:
+                database.close()
     run.update(
         {
             "status": "interrupted"

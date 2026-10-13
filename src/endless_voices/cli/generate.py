@@ -12,6 +12,7 @@ def parse_args(argv=None):
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
+    parser.add_argument("--context-mode", choices=["static", "dynamic"])
     parser.add_argument("--config", default="configs/generate.toml", help="Model TOML config")
     parser.add_argument("--manifest", type=Path, required=True, help="Dataset split manifest")
     parser.add_argument(
@@ -37,7 +38,7 @@ def parse_args(argv=None):
         help="Weight precision",
     )
     parser.add_argument(
-        "--max-context-tokens", type=int, default=4096, help="Total prompt and output budget"
+        "--max-context-tokens", type=int, default=9216, help="Total prompt and output budget"
     )
     parser.add_argument(
         "--max-new-tokens", type=int, default=512, help="Output cap; reaching it is a failure"
@@ -67,10 +68,10 @@ def parse_args(argv=None):
 def main(argv=None) -> None:
     args = parse_args(argv)
     from endless_voices.generate import run_generation
+
     try:
         code = run_generation(args)
     except (ValueError, OSError) as error:
         print(str(error), file=sys.stderr)
         code = 1
     raise SystemExit(code)
-

@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 import z3
 
-from endless_voices.context import ContextPool, digest, strategy_from_config
+from endless_voices.context import ContextPool, digest
 from endless_voices.contracts import validate_record
 from endless_voices.game_variables import mission_values, render
 from endless_voices.instructions import SCENE_INSTRUCTIONS, scene_task
@@ -25,17 +25,16 @@ class History:
     blocks: list[dict]
 
 
-class ContextSampler:
-    """Construct compatible histories before applying a token-budget strategy."""
+class ContextBuilder:
+    """Construct compatible histories and eligible writing references."""
 
-    def __init__(self, corpus, interpreter, assignments, strategy, player, max_routes=1000,
+    def __init__(self, corpus, interpreter, assignments, player, max_routes=1000,
                  seed="context"):
         self.corpus = corpus
         self.interpreter = interpreter
         self.assignments = assignments
         self.conversation_owners = corpus.conversation_owners(assignments)
         self.named_users = corpus.named_conversation_users()
-        self.strategy = strategy
         self.player = player
         self.max_routes = max_routes
         self.seed = seed
@@ -440,7 +439,7 @@ class ContextSampler:
         encounter = "\n\n".join(render(p.text, values)[0] for p in prefix)
         system = (
             SCENE_INSTRUCTIONS[task]
-            + ("\n\n" + lore if lore else "") + "\n\nEarlier passages:\n"
+            + ("\n\n" + lore if lore else "")
         )
         return ContextPool(
             sample_id,
@@ -454,12 +453,6 @@ class ContextSampler:
             self.references(mission, split, history),
         )
 
-    def select(
-        self, sample_id, conversation_id, mission, history, prefix, lore, counter, split, task
-    ):
-        """Apply the fixed baseline to the same pool exposed to retrieval tools."""
-        pool = self.pool(sample_id, conversation_id, mission, history, prefix, lore, split, task)
-        return self.strategy.select(pool, counter)
 
 
 class ExampleBuilder:
@@ -468,7 +461,7 @@ class ExampleBuilder:
     def __init__(self, corpus, interpreter, sampler, seed):
         self.corpus, self.interpreter, self.sampler, self.seed = corpus, interpreter, sampler, seed
 
-    def build(self, mission, specification, counter, initial):
+    def build(self, mission, specification, initial):
         split = specification["split"]
         histories, omitted = self.sampler.histories(mission, split, initial)
         histories = self.sampler.advance(histories)
@@ -578,14 +571,14 @@ class ExampleBuilder:
                 p["text"] for name in sorted(lore_names) for p in descriptions.get(name, [])
             )
             task = scene_task(has_prefix=bool(route.prefix))
-            selection = self.sampler.select(
-                sid, cid, mission, history, route.prefix, lore, counter, split, task
+            pool = self.sampler.pool(
+                sid, cid, mission, history, route.prefix, lore, split, task
             )
             target = "\n\n".join(render(p.text, values)[0] for p in route.paragraphs)
             target_lines = {p.line for p in route.paragraphs}
             if any(p.line in target_lines for p in route.prefix):
                 raise ValueError("Target source paragraph appears in its own encounter")
-            eligible_blocks = selection.pool.blocks + selection.pool.references
+            eligible_blocks = pool.blocks + pool.references
             for b in eligible_blocks:
                 if b["path"] == node.get("source_path", mission.path) and any(
                     p["line"] in target_lines for p in b["passages"]
@@ -616,7 +609,7 @@ class ExampleBuilder:
             record = {
                 "schema_version": 1,
                 "metadata": meta,
-                "messages": selection.training_messages(target),
+                "messages": [*pool.messages(), {"role": "assistant", "content": target}],
                 "evaluation": {"dimensions": ["authenticity"], "sources": [ref]},
             }
             validate_record(record)
@@ -630,15 +623,15 @@ class ExampleBuilder:
                 "omitted_history_missions": omitted,
                 "prefix_lines": [p.line for p in route.prefix],
             }
-            examples.append((record, selection, provenance))
+            examples.append((record, pool, provenance))
         return examples
 
 
 class DatasetBuilder:
     """Own parsing dependencies, split eligibility, example construction and publication."""
 
-    def __init__(self, corpus, config, counter):
-        self.corpus, self.config, self.counter = corpus, deepcopy(config), counter
+    def __init__(self, corpus, config):
+        self.corpus, self.config = corpus, deepcopy(config)
         self.interpreter = DialogueInterpreter(**config.get("interpreter", {}))
         assignments = {name: spec["split"] for name, spec in config["missions"].items()}
         groups = {}
@@ -649,11 +642,10 @@ class DatasetBuilder:
             if group is not None and group in groups and groups[group] != spec["split"]:
                 raise ValueError("Scenario variants cross mission splits")
             groups[group] = spec["split"]
-        self.sampler = ContextSampler(
+        self.sampler = ContextBuilder(
             corpus,
             self.interpreter,
             assignments,
-            strategy_from_config(config["context"]),
             config["player"],
             config.get("max_history_routes", 1000),
             seed=config["seed"],
@@ -686,7 +678,6 @@ class DatasetBuilder:
                 rows = self.examples.build(
                     mission,
                     spec,
-                    self.counter,
                     GameState.fixed(self.config.get("initial_state", {})),
                 )
                 if not rows:

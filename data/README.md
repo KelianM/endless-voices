@@ -1,31 +1,19 @@
-# Dataset preparation
+# Dataset inputs
 
-`src/endless_voices/dataset/` contains the implementation. `data/dataset/` is its built output.
 `data/sources/source-statistics.json` pins the game-source revision and file hashes used by
-`endless-voices fetch-sources`; raw sources and model caches remain in ignored `data/local/`.
-Experiment outputs belong in ignored `outputs/`.
+`endless-voices fetch-sources`. Raw sources and model caches stay in ignored `data/local/`;
+run outputs stay in ignored `outputs/`.
 
-The maintained preparation entry point is `endless-voices prepare-dataset`. `DatasetBuilder` parses verified game source, constructs state-consistent targets and history, applies mission ownership and the context budget, and publishes one prepared bundle.
+`data/dataset/config.json` records mission ownership, player substitutions and target scope.
+Omitting a mission's conversation list selects supported conversations and dialog passages.
+An empty list excludes targets while retaining split ownership. The configuration contains
+no quote selectors or per-branch routes.
 
-```sh
-endless-voices prepare-dataset \
-  --source data/local/endless-sky-7140eb2a29ce \
-  --inventory data/sources/source-statistics.json \
-  --config data/dataset/config.json \
-  --tokenizer /path/to/cached/tokenizer \
-  --splits train validation test \
-  --output outputs/prepared-scenes
-```
+[Preparation usage](../README.md#prepare-data) builds encounters, targets, eligible context
+pools, provenance and licensing. Preparation needs no tokenizer or model. Unsupported
+operations or exceeded exploration limits fail the build rather than dropping examples.
+Context selection and token budgets apply when a run consumes the prepared examples.
 
-`data/dataset/config.json` records the selected mission/conversation scope and split assignments. The configuration contains no quote selectors or per-branch routes. Omitting a mission's conversation list selects supported inline conversations, named conversations and dialog passages in that mission. An empty conversation list excludes targets while retaining split ownership. Exclusion reasons remain in the configuration.
-
-A successful build writes one JSONL file per split, source and state provenance, configuration, hashes and licensing. The manifest records the implementation Git revision and file hashes; it does not copy Python code. `SceneDataset.load(output, split)` verifies the saved artifacts and provides stable indexed records. No API calls or model weights are involved; the tokenizer is loaded locally.
-
-Preparation also writes eligible context pools in `retrieval.json`. Fixed prompts and their
-selection evidence remain available unchanged. [Context retrieval](../README.md#retrieve-context)
-describes indexing these pools and exposing per-scene tools to an agent.
-
-The [current dataset](dataset/README.md) publishes all three splits. Preparation refuses unsupported operations or context overflow for selected targets rather than publishing partial examples.
-
-
-See [how the dataset is produced](dataset/README.md#how-this-dataset-is-produced), [ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) for mission ownership and [ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) for the stateful builder.
+The [published dataset](dataset/README.md) describes source coverage and limitations.
+[ADR 7](../docs/adr/0007-split-datasets-by-source-mission.md) defines mission ownership;
+[ADR 9](../docs/adr/0009-build-examples-from-consistent-game-state.md) explains interpretation.

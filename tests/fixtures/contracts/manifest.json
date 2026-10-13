@@ -1,5 +1,5 @@
 {
-  "format": "scene-dataset-v1",
+  "format": "scene-dataset-v2",
   "split_unit": "mission",
   "splits": [
     "train",

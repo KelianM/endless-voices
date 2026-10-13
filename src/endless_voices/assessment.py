@@ -13,6 +13,7 @@ from pathlib import Path
 from endless_voices.artifacts import digest, encoded, file_hash, read_json, write_json
 from endless_voices.contracts import evaluation_messages
 from endless_voices.dataset.storage import SceneDataset
+from endless_voices.retrieval import context_messages
 from endless_voices.splits import mission_key
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -63,8 +64,12 @@ def load_run(directory, manifest, records, split):
             raise ValueError(f"Artifact hash mismatch: {name}")
     prompts = indexed(read_rows(directory / "prompts.jsonl"), ids)
     responses = indexed(read_rows(directory / "responses.jsonl"), ids)
+    prepared = SceneDataset.load(manifest.parent, split)
+    pools = {r["metadata"]["id"]: prepared.context_pool(i) for i, r in enumerate(prepared)}
     for sid, prompt in prompts.items():
-        messages = evaluation_messages(records[sid])
+        trace = responses.get(sid, {}).get("retrieval")
+        messages = (context_messages(pools[sid], trace["selected_scene_ids"])
+                    if trace is not None else evaluation_messages(records[sid]))
         if prompt["messages"] != messages or prompt["messages_sha256"] != digest(encoded(messages)):
             raise ValueError("Prompt differs from authored context")
         if "input_ids" in prompt and (
@@ -138,6 +143,15 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
     """Write an immutable organizer pack and isolated public trial files."""
     records = load_dataset(manifest, split)
     loaded = {name: load_run(path, manifest, records, split) for name, path in runs.items()}
+    contexts = {}
+    for _, prompts, _ in loaded.values():
+        for sid, prompt in prompts.items():
+            if sid in contexts and contexts[sid] != prompt["messages"]:
+                raise ValueError("Generation contexts differ; use benchmark export for shared "
+                                 "static judging evidence")
+            contexts[sid] = prompt["messages"]
+    for sid, messages in contexts.items():
+        records[sid] = {**records[sid], "messages": [*messages, records[sid]["messages"][-1]]}
     provenance = {
         name: {"run": run, "run_sha256": file_hash(runs[name] / "run.json"),
                "verified_hashes": bool(run.get("artifacts_sha256"))}
@@ -146,11 +160,12 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
     return prepare_trials(records, loaded, output, provenance, split=split, seed=seed,
                           controls=controls,
                           input_provenance={"manifest_sha256": file_hash(manifest)},
-                          licensing=manifest.parent / "licensing")
+                          licensing=manifest.parent / "licensing", shared_judge_context=True)
 
 
 def prepare_trials(records, loaded, output, run_provenance, *, split="validation", seed=None,
-                   controls=None, input_provenance=None, licensing=None):
+                   controls=None, input_provenance=None, licensing=None,
+                   shared_judge_context=False):
     """Build isolated trials from verified records and normalized generation evidence."""
     if output.exists():
         raise ValueError("Output already exists")
@@ -168,7 +183,8 @@ def prepare_trials(records, loaded, output, run_provenance, *, split="validation
         if not ids or len(set(ids)) != len(ids) or set(ids) - records.keys():
             raise ValueError("Invalid selected sample IDs")
         for sid, prompt in prompts.items():
-            if sid not in ids or prompt["messages"] != evaluation_messages(records[sid]):
+            if sid not in ids or (not shared_judge_context
+                                  and prompt["messages"] != evaluation_messages(records[sid])):
                 raise ValueError("Generator and judge context differ")
             if prompt["messages_sha256"] != digest(encoded(prompt["messages"])):
                 raise ValueError("Prompt message hash differs")

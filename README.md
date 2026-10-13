@@ -25,9 +25,21 @@ dataset descriptions and architecture decisions.
 
 ## Prepare data
 
-[Dataset preparation](data/README.md) describes the cached-source inputs and build command.
-The [current dataset](data/dataset/README.md) contains training, validation and test splits.
-Dataset sizes, provenance and limitations belong in that README.
+Prepare encounters and eligible context from cached game sources, without loading a model
+or tokenizer:
+
+```sh
+endless-voices prepare-dataset \
+  --source data/local/endless-sky-7140eb2a29ce \
+  --inventory data/sources/source-statistics.json \
+  --config data/dataset/config.json \
+  --splits train validation test \
+  --output outputs/prepared-scenes
+```
+
+[Dataset inputs](data/README.md) explains source and mission selection. The
+[published dataset](data/dataset/README.md) records release coverage and limitations;
+rebuild that older bundle before using the current retrieval flow.
 
 Validate a prepared bundle with:
 
@@ -37,6 +49,7 @@ endless-voices validate outputs/prepared-scenes/manifest.json
 
 Add `--tokenizer /path/to/local/tokenizer --max-length 9216` to check complete sequence
 lengths against a 9,216-token limit without downloading a tokenizer or model weights.
+Validation checks the saved encounter and target; runtime selection checks retrieved context.
 
 ## Retrieve context
 
@@ -53,35 +66,25 @@ The default encoder is `Qwen/Qwen3-Embedding-0.6B`, which must already be cached
 directory. Indexing does not download models. Passages and queries exceeding the encoder's
 token limit fail without truncation. See `index-context --help` for device and encoding options.
 
-Create a retrieval session for an example:
+Set `context.index` in the generation, training or benchmark configuration to this database.
+Open the database with the same model and encoding settings used to build it.
 
-```python
-from endless_voices.dataset.storage import SceneDataset
-from endless_voices.retrieval import SceneDatabase, TransformersEmbedder
+`context.mode` selects the context policy:
 
-dataset = SceneDataset.load("outputs/prepared-scenes", "validation")
-embedder = TransformersEmbedder.from_pretrained()
+- `static` fits complete scenes into `context.max_input_tokens`: nearby prerequisite history
+  first, then scenes ranked by similarity to the visible encounter. `context.depth` controls
+  nearby history. The default input budget is 8,192 tokens.
+- `dynamic` lets the model request history, semantic search and scene reads before writing.
+  The model emits JSON tool requests during a bounded selection phase, then receives the
+  selected scenes for the final continuation. `context.max_tool_calls` bounds selection turns.
 
-with SceneDatabase("outputs/context.sqlite", embedder) as database:
-    session = dataset.retrieval_session(0, database)
-    messages = session.initial_messages()
-    tools = session.tool_schemas
-    matches = session.call_tool("search_context", {"query": "departure and farewell"})
-    trace = session.trace
-```
-
-`search_context` returns distinct full scenes by default; `expand_scenes=False` returns
-passages. The result limit counts the chosen result type. Omit the query to search using
-the visible encounter. `get_history` takes a prerequisite `depth`; `read_context` takes
-passage or scene `ids`. Results distinguish mission history from independent writing references.
-
-Open an index with the same model files and encoding settings used to build it. The caller
-runs the model's tool loop, appends results, enforces token and spending budgets, and saves
-the trace. Generation and benchmarking currently use fixed saved prompts.
+Both policies use the same eligible scene pool. Search returns whole scenes ranked by their
+strongest passage; the lower-level retrieval API also supports passage-only results. Runs
+save actual prompts and retrieval traces. Prepared datasets do not save sampled prompts.
 
 ## Train and chat
 
-Edit `configs/train.toml` with a model path, prepared dataset directory and split and sequence limit, then run:
+Edit `configs/train.toml` with model, dataset and context-index paths, then run:
 
 ```sh
 endless-voices train --config configs/train.toml
@@ -92,7 +95,9 @@ The trainer uses Transformers and PEFT LoRA with float32 base weights. It is not
 31B training recipe. Adapter files are saved separately from base weights. Pin the model revision
 and record dependencies with each run.
 
-Training uses the tokenizer's chat template. `data.loss = "continuation"` trains the final
+Training selects static context before loading the generator and reserves space for the
+authored target within `data.max_length`. Selected messages and traces are saved in
+`training_contexts.jsonl`. Training uses the tokenizer's chat template. `data.loss = "continuation"` trains the final
 assistant passage; `"all"` trains all non-padding tokens. Inputs exceeding `data.max_length`
 fail rather than being truncated. The model's tokenizer determines the required sequence limit.
 
@@ -101,13 +106,25 @@ describes the existing sample explorer.
 
 ## Benchmark
 
-The benchmark reads a prepared validation dataset so generators and judges share selected context:
+Prepare a benchmark from a rebuilt validation dataset and indexed context:
 
 ```sh
 endless-voices benchmark prepare \
   --dataset outputs/prepared-scenes --root outputs/benchmark \
-  --config configs/benchmark.json
+  --config configs/benchmark.json --context-mode static
 ```
+
+Use `--context-mode dynamic` when preparing a separate dynamic run. The run configuration
+fixes the mode for subsequent stages. `context.tokenizer` names the cached tokenizer used
+to select the common static context; `context.max_input_tokens` sets its 8,192-token budget.
+Hosted dynamic budgets are set per model in `context.dynamic_max_input_tokens`, measured
+with the same reference tokenizer rather than provider billing token counts. Local
+configuration sets `max_input_tokens`; input plus `max_output_tokens` must fit
+`context_ceiling`. Larger hosted budgets do not enlarge the local Gemma prompt.
+
+Judges receive the same static evidence in both modes, so a generator's retrieval choices
+do not change the judge's reference context. Dynamic requests and returned context are
+recorded separately for inspection.
 
 The same command exposes `preflight`, `local-smoke`, `local`, `hosted`, `export`, `judge` and
 `report` stages. Inspect `--help` and the configuration before running model stages. Local MLX

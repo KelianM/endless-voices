@@ -151,6 +151,20 @@ def scene_id(block):
     return "scene-" + digest(block)
 
 
+def context_messages(pool, ids):
+    """Render authorized scenes in source order with independent references labeled."""
+    if not isinstance(ids, list) or any(not isinstance(sid, str) for sid in ids):
+        raise ValueError("ids must be a list of scene IDs")
+    selected = set(ids)
+    allowed = {scene_id(block) for block in pool.blocks + pool.references}
+    if selected - allowed:
+        raise ValueError("Scene is not eligible for this encounter")
+    return pool.messages(
+        [block for block in pool.blocks if scene_id(block) in selected],
+        [block for block in pool.references if scene_id(block) in selected],
+    )
+
+
 def _vector(values, dimension=None):
     try:
         vector = [float(value) for value in values]
@@ -291,7 +305,7 @@ class RetrievalSession:
 
     def initial_messages(self):
         """Return the fixed instructions and visible encounter without sampled passages."""
-        return self._pool.messages(set())
+        return self._pool.messages()
 
     def _document(self, sid, *, full=False, score=None):
         chunk = self._chunks.get(sid)
@@ -338,10 +352,16 @@ class RetrievalSession:
 
     def search_context(self, query=None, kind="all", limit=5, expand_scenes=True):
         """Rank passages and return distinct full scenes, or passages when expansion is disabled."""
-        if kind not in {"all", "history", "reference"}:
-            raise ValueError("kind must be all, history or reference")
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("limit must be an integer from 1 to 100")
+        documents = self._rank(query, kind, expand_scenes)[:limit]
+        return self._record("search_context", {
+            "query": query, "kind": kind, "limit": limit, "expand_scenes": expand_scenes,
+        }, documents)
+
+    def _rank(self, query=None, kind="all", expand_scenes=True):
+        if kind not in {"all", "history", "reference"}:
+            raise ValueError("kind must be all, history or reference")
         if type(expand_scenes) is not bool:
             raise ValueError("expand_scenes must be a boolean")
         if query is None:
@@ -374,11 +394,39 @@ class RetrievalSession:
             else:
                 document = self._document(sid, score=score)
             documents.append(document)
-            if len(documents) == limit:
-                break
-        return self._record("search_context", {
-            "query": query, "kind": kind, "limit": limit, "expand_scenes": expand_scenes,
-        }, documents)
+        return documents
+
+    def messages_for(self, ids):
+        """Render selected eligible scenes in source order with references labeled."""
+        return context_messages(self._pool, ids)
+
+    def static_messages(self, counter, max_input_tokens=8192, depth=4):
+        """Fit whole scenes by nearby mission depth, then semantic similarity."""
+        if type(depth) is not int or depth < 0:
+            raise ValueError("depth must be a nonnegative integer")
+        if type(max_input_tokens) is not int or max_input_tokens <= 0:
+            raise ValueError("max_input_tokens must be a positive integer")
+        messages = self.initial_messages()
+        if counter.messages(messages) > max_input_tokens:
+            raise ValueError("Instructions and visible encounter exceed the input token budget")
+        ranked = self._rank()
+        ranked.sort(key=lambda doc: (
+            0 if doc["kind"] == "history" and doc["depth"] is not None
+            and doc["depth"] <= depth else 1,
+            doc["depth"] if doc["kind"] == "history" and doc["depth"] is not None
+            and doc["depth"] <= depth else math.inf,
+            -doc["score"], doc["id"],
+        ))
+        selected = []
+        for document in ranked:
+            candidate = self.messages_for([doc["id"] for doc in selected] + [document["id"]])
+            if counter.messages(candidate) <= max_input_tokens:
+                selected.append(document)
+                messages = candidate
+        self._record("static_context", {"depth": depth, "max_input_tokens": max_input_tokens},
+                     selected)
+        self.trace[-1]["input_tokens"] = counter.messages(messages)
+        return messages
 
     def read_context(self, ids):
         """Return complete authorized passages or parent scenes by their IDs."""

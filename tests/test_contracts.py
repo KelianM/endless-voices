@@ -17,7 +17,7 @@ from endless_voices.contracts import (
     validate_manifest,
     validate_record,
 )
-from endless_voices.data import load_conversations
+from endless_voices.dataset.storage import SceneDataset
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -40,11 +40,11 @@ def rewrite(manifest, split, records):
     manifest.write_text(json.dumps(contents))
 
 
-def test_valid_manifest_and_loader_compatibility():
+def test_valid_manifest_and_dataset_loading():
     counts = validate_manifest(FIXTURES / "manifest.json")
     assert counts["train"]["identities"] == {"invented-archive-guild": 1}
     assert counts["test"]["records"] == 1
-    assert load_conversations(str(FIXTURES)) == [record()["messages"]]
+    assert SceneDataset.load(FIXTURES, "train")[0]["messages"] == record()["messages"]
 
 
 @pytest.mark.parametrize("key", list(record()["metadata"]))
@@ -335,4 +335,4 @@ def test_training_checks_other_published_splits_before_loading(manifest):
     row["metadata"]["sources"][0] = copy.deepcopy(record()["metadata"]["sources"][0])
     rewrite(manifest, "validation", [row])
     with pytest.raises(ValueError, match="mission .*crosses splits"):
-        load_conversations(manifest.parent, "train")
+        SceneDataset.load(manifest.parent, "train")

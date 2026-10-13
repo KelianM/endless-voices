@@ -11,7 +11,7 @@ from .storage import SceneDataset
 
 
 def index_context(dataset, output, model=DEFAULT_EMBEDDING_MODEL, *, device="auto",
-                  dtype="auto", batch_size=4, max_length=32768, cache_dir="data/local/hub"):
+                  dtype="float16", batch_size=4, max_length=32768, cache_dir="data/local/hub"):
     """Build an index of eligible passages and return its scene count and path."""
     datasets = SceneDataset.load_all(dataset)
     scenes = {}

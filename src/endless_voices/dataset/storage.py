@@ -17,7 +17,7 @@ from endless_voices.splits import mission_key
 
 
 class SceneDataset(Sequence):
-    """Provide stable indexed records without resampling their contexts."""
+    """Provide prepared encounters, targets and eligible context pools."""
 
     def __init__(self, records, pools):
         self.records = deepcopy(records)
@@ -39,7 +39,7 @@ class SceneDataset(Sequence):
         """Verify artifacts and cross-split ownership, returning each published split."""
         root = Path(root).resolve()
         manifest = json.loads((root / "manifest.json").read_text())
-        if manifest.get("format") != "scene-dataset-v1" or manifest.get("split_unit") != "mission":
+        if manifest.get("format") != "scene-dataset-v2" or manifest.get("split_unit") != "mission":
             raise ValueError("Unsupported prepared dataset format")
         splits = manifest.get("splits")
         if (not isinstance(splits, list) or not splits
@@ -175,13 +175,14 @@ def write_dataset(output, built, config, corpus):
                 "".join(json.dumps(r[0], ensure_ascii=False) + "\n" for r in rows)
             )
         save(root / "provenance.json", {
-            record["metadata"]["id"]: {**provenance, "context": selection.evidence()}
-            for record, selection, provenance in built})
+            record["metadata"]["id"]: {
+                **provenance, "context": {"pool_sha256": digest(asdict(pool))}}
+            for record, pool, provenance in built})
         from endless_voices.retrieval import scene_id
 
         scenes, pools = {}, {}
-        for record, selection, _ in built:
-            fields = asdict(selection.pool)
+        for record, pool, _ in built:
+            fields = asdict(pool)
             for kind in ("blocks", "references"):
                 for block in fields[kind]:
                     scenes[scene_id(block)] = block
@@ -203,7 +204,7 @@ def write_dataset(output, built, config, corpus):
         save(
             root / "manifest.json",
             {
-                "format": "scene-dataset-v1",
+                "format": "scene-dataset-v2",
                 "split_unit": "mission",
                 "splits": splits,
                 "solver_version": z3.get_version_string(),

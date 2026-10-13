@@ -8,20 +8,12 @@ import pytest
 from torch.utils.data import DataLoader
 
 from endless_voices.assessment import load_dataset
+from endless_voices.context import render
 from endless_voices.contracts import validate_manifest
-from endless_voices.data import load_conversations
 from endless_voices.dataset.builder import DatasetBuilder
 from endless_voices.dataset.source import GameCorpus
 from endless_voices.dataset.storage import SceneDataset
 from endless_voices.generate import select_samples
-
-
-class Counter:
-    def messages(self, messages):
-        return sum(len(m["content"]) for m in messages)
-
-    def text(self, text):
-        return len(text)
 
 
 def corpus(tmp_path, text):
@@ -57,12 +49,6 @@ def config(missions):
         "missions": missions,
         "seed": "fixture",
         "player": {},
-        "context": {
-            "name": "mission-depth",
-            "depth": 4,
-            "max_input_tokens": 8000,
-            "seed": "fixture",
-        },
     }
 
 
@@ -101,7 +87,7 @@ mission Later
 
 def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path):
     source = corpus(tmp_path, STORY)
-    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}))
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
@@ -115,11 +101,8 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
     assert set(evidence) == {row["metadata"]["id"] for row in dataset}
     for row in dataset:
         context = evidence[row["metadata"]["id"]]["context"]
-        assert context["messages_sha256"]
-        assert all({"mission", "path", "lines"} <= set(block)
-                   for block in context["selected"] + context["omitted"])
+        assert set(context) == {"pool_sha256"}
     assert validate_manifest(output / "manifest.json")["train"]["records"] == len(dataset)
-    assert load_conversations(output) == [row["messages"] for row in dataset]
     selected, _ = select_samples(Namespace(
         manifest=output / "manifest.json", split="train", sample_ids=None, limit=None))
     assert selected == list(dataset)
@@ -135,7 +118,9 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
         assert row["metadata"]["task"] == "scene_opening"
         assert row["messages"][0]["content"].startswith("Write the opening passage of a scene,")
         assert row["messages"][1]["content"] == "Write the opening passage of a scene."
-        prompt = json.dumps(row["messages"][:-1])
+        assert "childhood" not in json.dumps(row["messages"][:-1])
+        pool = dataset.context_pool(next(i for i, r in enumerate(dataset) if r == row))
+        prompt = json.dumps(pool.blocks)
         target = row["messages"][-1]["content"]
         assert ("An Earth childhood." in prompt) == ("Earth" in target)
         assert ("A Mars childhood." in prompt) == ("Mars" in target)
@@ -154,11 +139,12 @@ def test_history_eligibility_excludes_heldout_not_unselected_missions(tmp_path, 
     missions = {"Later": spec()}
     if owner is not None:
         missions["Earlier"] = {**spec(owner), "conversations": []}
-    builder = DatasetBuilder(source, config(missions), Counter())
+    builder = DatasetBuilder(source, config(missions))
     builder.build(tmp_path / "prepared")
     dataset = SceneDataset.load(tmp_path / "prepared", "train")
     assert len(dataset) == 2
-    assert all(("childhood" in json.dumps(dataset.prompt(i))) == (owner in (None, "train"))
+    assert all(("childhood" in json.dumps(dataset.context_pool(i).blocks))
+               == (owner in (None, "train"))
                for i in range(len(dataset)))
     notes = json.loads((tmp_path / "prepared/provenance.json").read_text())
     assert all(n["omitted_history_missions"] == ([] if owner in (None, "train") else ["Earlier"])
@@ -167,7 +153,7 @@ def test_history_eligibility_excludes_heldout_not_unselected_missions(tmp_path, 
 
 def test_failed_interpretation_does_not_publish_a_partial_dataset(tmp_path):
     source = corpus(tmp_path, STORY.replace("set earth", "ship Sparrow"))
-    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}))
     with pytest.raises(ValueError, match="unsupported operation"):
         builder.build(tmp_path / "prepared")
     assert not (tmp_path / "prepared").exists()
@@ -175,7 +161,7 @@ def test_failed_interpretation_does_not_publish_a_partial_dataset(tmp_path):
 
 def test_dataset_rejects_modified_target_files(tmp_path):
     source = corpus(tmp_path, STORY)
-    DatasetBuilder(source, config({"Earlier": spec()}), Counter()).build(tmp_path / "prepared")
+    DatasetBuilder(source, config({"Earlier": spec()})).build(tmp_path / "prepared")
     (tmp_path / "prepared/train.jsonl").write_text("tampered")
     with pytest.raises(ValueError, match="artifact differs"):
         SceneDataset.load(tmp_path / "prepared", "train")
@@ -199,7 +185,7 @@ def test_mission_assignments_apply_between_display_and_first_response(tmp_path):
 				accept
 """
     source = corpus(tmp_path, text)
-    builder = DatasetBuilder(source, config({"Example": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Example": spec()}))
     builder.build(tmp_path / "prepared")
     dataset = SceneDataset.load(tmp_path / "prepared", "train")
     assert {dataset.target(i) for i in range(len(dataset))} == {
@@ -212,7 +198,7 @@ def test_unhandled_requested_conversation_cannot_silently_disappear(tmp_path):
     source = corpus(tmp_path, STORY)
     selection = spec()
     selection["conversations"] = [999]
-    builder = DatasetBuilder(source, config({"Earlier": selection}), Counter())
+    builder = DatasetBuilder(source, config({"Earlier": selection}))
     with pytest.raises(ValueError, match="unreachable or use unsupported"):
         builder.build(tmp_path / "prepared")
 
@@ -231,11 +217,11 @@ mission Later
 \t\t\t`The next passage.`
 \t\t\t\taccept
 '''
-    builder = DatasetBuilder(corpus(tmp_path, text), config({"Later": spec()}), Counter())
+    builder = DatasetBuilder(corpus(tmp_path, text), config({"Later": spec()}))
     builder.build(tmp_path / "prepared")
     dataset = SceneDataset.load(tmp_path / "prepared", "train")
     assert len(dataset) == 1
-    history = dataset.prompt(0)[0]["content"]
+    history = "\n\n".join(map(render, dataset.context_pool(0).blocks))
     assert 'She returns with the papers.\n\n"We can leave," she says.' in history
     assert dataset.target(0) == "The next passage."
 
@@ -245,7 +231,7 @@ def test_context_samples_event_timing_without_collapsing_current_mission_outcome
     from endless_voices.dataset.source import tree
     from endless_voices.dataset.state import GameState, apply
 
-    builder = DatasetBuilder(corpus(tmp_path, STORY), config({"Later": spec()}), Counter())
+    builder = DatasetBuilder(corpus(tmp_path, STORY), config({"Later": spec()}))
     state = GameState.fixed({"ready": 0})
     state.events = {"change": tree('event change\n\tset ready')[0]}
     history = History(apply(tree('event change 1'), state), [])
@@ -300,20 +286,19 @@ mission Reference
                                  "Variant": {**spec(), "scenario_group": "variants",
                                              "conversations": []},
                                  "Heldout": spec("validation"),
-                             }), Counter())
+                             }))
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
-    evidence = json.loads((output / "provenance.json").read_text())
-    for row in dataset:
-        prompt = json.dumps(row["messages"][:-1])
+    for index, row in enumerate(dataset):
+        pool = dataset.context_pool(index)
+        prompt = json.dumps(pool.blocks + pool.references)
         assert "Own later answer." not in prompt
         if row["messages"][-1]["content"] == "Current answer.":
             assert "Current answer." not in prompt
         assert "Held-out answer." not in prompt
         assert ("An Earth childhood." in prompt) != ("A Mars childhood." in prompt)
-        references = [b for b in evidence[row["metadata"]["id"]]["context"]["selected"]
-                      if b.get("reference")]
+        references = pool.references
         assert len(references) == 1 and references[0]["mission"] == "Reference"
         assert references[0]["state"]["current_values"]["earth"] == int(
             "An Earth childhood." in prompt)
@@ -322,7 +307,7 @@ mission Reference
 def test_shared_completion_flag_is_a_condition_not_a_missing_mission(tmp_path):
     story = STORY.replace('has "Earlier: done"',
                           'has "Earlier: done"\n\t\thas "Shared outcome: done"')
-    builder = DatasetBuilder(corpus(tmp_path, story), config({"Later": spec()}), Counter())
+    builder = DatasetBuilder(corpus(tmp_path, story), config({"Later": spec()}))
     output = tmp_path / "prepared"
     builder.build(output)
     assert builder.sampler.graph["Later"] == ["Earlier"]
@@ -346,11 +331,11 @@ mission Later
 \t\t\t`The next task begins.`
 \t\t\t\taccept
 '''
-    builder = DatasetBuilder(corpus(tmp_path, text), config({"Later": spec()}), Counter())
+    builder = DatasetBuilder(corpus(tmp_path, text), config({"Later": spec()}))
     builder.build(tmp_path / "prepared")
     rows = SceneDataset.load(tmp_path / "prepared", "train")
     assert len(rows) == 1
-    assert "The earlier task is finished." in rows.prompt(0)[0]["content"]
+    assert "The earlier task is finished." in json.dumps(rows.context_pool(0).blocks)
 
 
 def test_on_enter_applies_effects_before_later_passage(tmp_path):
@@ -368,7 +353,7 @@ def test_on_enter_applies_effects_before_later_passage(tmp_path):
 \t\t\tlabel arrival
 \t\t\t`The journey is complete.`
 '''
-    builder = DatasetBuilder(corpus(tmp_path, text), config({"Journey": spec()}), Counter())
+    builder = DatasetBuilder(corpus(tmp_path, text), config({"Journey": spec()}))
     builder.build(tmp_path / "prepared")
     targets = {row["messages"][-1]["content"]
                for row in SceneDataset.load(tmp_path / "prepared", "train")}
@@ -387,7 +372,7 @@ def test_named_failure_runs_cleanup_once_after_current_actions(tmp_path):
 mission Current
 '''
     source = corpus(tmp_path, text)
-    builder = DatasetBuilder(source, config({"Current": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Current": spec()}))
     state = GameState.fixed({"Earlier: active": 1, "cleanup": 0})
     routes = builder.sampler.event(tree('fail Earlier\nset after'),
                                    [History(state, [])], source.missions["Current"], "accept")
@@ -409,7 +394,7 @@ def test_unique_mission_owned_counter_starts_at_zero_without_replacing_prior_sta
 \t\t\t`An answer.`
 '''
     source = corpus(tmp_path, text)
-    builder = DatasetBuilder(source, config({"Counter": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Counter": spec()}))
     absent = GameState()
     builder.sampler.enter(absent, source.missions["Counter"])
     assert absent.snapshot()["current_values"]["questions"] == 0
@@ -434,11 +419,11 @@ mission Training
 '''
     source = corpus(tmp_path, text)
     builder = DatasetBuilder(source, config({"Training": spec(),
-                             "HeldOut": spec("validation")}), Counter())
+                             "HeldOut": spec("validation")}))
     builder.build(tmp_path / "prepared")
     rows = SceneDataset.load(tmp_path / "prepared", "train")
     assert len(rows) == 1
-    assert "Held-out authored passage." not in json.dumps(rows.prompt(0))
+    assert "Held-out authored passage." not in json.dumps(rows.context_pool(0).__dict__)
 
 
 def test_shared_conversation_scratch_flags_default_zero_but_scores_remain_external(tmp_path):
@@ -468,7 +453,7 @@ mission Second
 \t\t\t\tdecline
 '''
     source = corpus(tmp_path, text)
-    builder = DatasetBuilder(source, config({"First": spec(), "Second": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"First": spec(), "Second": spec()}))
     state = GameState()
     builder.sampler.enter(state, source.missions["Second"])
     assert state.snapshot()["current_values"]["discussed"] == 0
@@ -487,7 +472,7 @@ def test_history_projection_retains_correlated_future_choices_and_whole_witness(
     from endless_voices.dataset.state import GameState
 
     sampler = DatasetBuilder(corpus(tmp_path, "mission Target\n"),
-                             config({"Target": spec()}), Counter()).sampler
+                             config({"Target": spec()})).sampler
     sampler.history_variables = {"future"}
     histories = []
     for irrelevant, positive in [(0, True), (1, True), (2, False)]:
@@ -519,7 +504,7 @@ mission Target
 \t\t\tlabel end
 \t\t\t`End.`
 ''')
-    sampler = DatasetBuilder(source, config({"Target": spec()}), Counter()).sampler
+    sampler = DatasetBuilder(source, config({"Target": spec()})).sampler
     assert {"live", "carry", "prior", "Target: active"} <= sampler.future_variables(["Target"])
 
 
@@ -545,14 +530,14 @@ def test_final_targets_do_not_require_materializing_unused_terminal_histories(tm
 \t\t\t`Right ending.`
 \t\t\t\taccept
 ''')
-    builder = DatasetBuilder(source, config({"Target": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Target": spec()}))
     builder.sampler.max_routes = 1
-    rows = builder.examples.build(source.missions["Target"], spec(), Counter(), GameState())
+    rows = builder.examples.build(source.missions["Target"], spec(), GameState())
     assert {row[0]["messages"][-1]["content"] for row in rows} == {
         "Left ending.", "Right ending."}
     source.missions["Target"].node["children"][0]["tokens"] = ["on", "offer"]
     with pytest.raises(ValueError, match="History route limit"):
-        builder.examples.build(source.missions["Target"], spec(), Counter(), GameState())
+        builder.examples.build(source.missions["Target"], spec(), GameState())
 
 
 def test_repeated_dialog_entries_preserve_all_paragraphs_in_later_context(tmp_path):
@@ -567,10 +552,10 @@ def test_repeated_dialog_entries_preserve_all_paragraphs_in_later_context(tmp_pa
 \t\t\t`Final passage.`
 \t\t\t\taccept
 ''')
-    builder = DatasetBuilder(source, config({"Target": spec()}), Counter())
-    rows = builder.examples.build(source.missions["Target"], spec(), Counter(), GameState())
+    builder = DatasetBuilder(source, config({"Target": spec()}))
+    rows = builder.examples.build(source.missions["Target"], spec(), GameState())
     assert len(rows) == 1
-    prompt = "\n".join(m["content"] for m in rows[0][0]["messages"][:-1])
+    prompt = "\n\n".join(map(render, rows[0][1].blocks))
     assert "First paragraph.\n\nSecond paragraph." in prompt
 
 
@@ -585,7 +570,7 @@ def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(t
 
 
     source = corpus(tmp_path, STORY)
-    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}), Counter())
+    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}))
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
@@ -613,7 +598,7 @@ def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(t
 def test_retrieval_sidecar_tampering_is_rejected(tmp_path):
     source = corpus(tmp_path, STORY)
     output = tmp_path / "prepared"
-    DatasetBuilder(source, config({"Later": spec()}), Counter()).build(output)
+    DatasetBuilder(source, config({"Later": spec()})).build(output)
     path = output / "retrieval.json"
     path.write_text(path.read_text() + " ")
     with pytest.raises(ValueError, match="Dataset artifact differs: retrieval.json"):
@@ -623,10 +608,21 @@ def test_retrieval_sidecar_tampering_is_rejected(tmp_path):
 def test_prepared_dataset_requires_hashed_retrieval_pools(tmp_path):
     source = corpus(tmp_path, STORY)
     output = tmp_path / "prepared"
-    DatasetBuilder(source, config({"Later": spec()}), Counter()).build(output)
+    DatasetBuilder(source, config({"Later": spec()})).build(output)
     manifest = json.loads((output / "manifest.json").read_text())
     del manifest["artifacts"]["retrieval.json"]
     (output / "manifest.json").write_text(json.dumps(manifest))
     (output / "retrieval.json").unlink()
     with pytest.raises(ValueError, match="require a retrieval.json artifact hash"):
+        SceneDataset.load(output, "train")
+
+
+def test_saved_prompt_bundles_require_rebuilding(tmp_path):
+    source = corpus(tmp_path, STORY)
+    output = tmp_path / "prepared"
+    DatasetBuilder(source, config({"Later": spec()})).build(output)
+    manifest = json.loads((output / "manifest.json").read_text())
+    manifest["format"] = "scene-dataset-v1"
+    (output / "manifest.json").write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="Unsupported prepared dataset format"):
         SceneDataset.load(output, "train")
