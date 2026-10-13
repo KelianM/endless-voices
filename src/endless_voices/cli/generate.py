@@ -12,7 +12,6 @@ def parse_args(argv=None):
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--context-mode", choices=["static", "dynamic"])
     parser.add_argument("--config", default="configs/generate.toml", help="Model TOML config")
     parser.add_argument("--manifest", type=Path, required=True, help="Dataset split manifest")
     parser.add_argument(

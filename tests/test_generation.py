@@ -29,6 +29,7 @@ def tokenizer():
         tokenizer_object=backend, unk_token="<unk>", eos_token="<eos>", pad_token="<eos>"
     )
     tokenizer.chat_template = (
+        "{# <tool_call> #}"
         "{% for m in messages %}{{ m['role'] + ': ' + m['content'] + eos_token }}{% endfor %}"
         "{% if add_generation_prompt %}assistant: {% endif %}"
     )
@@ -83,7 +84,7 @@ def args(tmp_path, base, monkeypatch):
     monkeypatch.setattr(gen, "open_database", lambda settings: SceneDatabase(index, Encoder()))
     config = tmp_path / "model.toml"
     config.write_text(f'[model]\nname_or_path = "{base}"\n'
-                      f'[context]\nmode = "static"\nindex = "{index}"\n')
+                      f'[context]\nindex = "{index}"\n')
     return parse_args(
         [
             "--config",
@@ -144,7 +145,7 @@ def test_only_final_target_withheld_and_provenance_saved(args, monkeypatch):
     args.max_context_tokens = 512
     assert gen.run_generation(args) == 0
     run, rows, prompts = read_run(args)
-    assert prompts[0]["messages"] == record["messages"][:-1]
+    assert prompts[0]["messages"] == gen.dynamic_messages(record["messages"][:-1], 0)
     assert any(message["role"] == "assistant" for message in prompts[0]["messages"])
     assert "evaluation" not in prompts[0] and "metadata" not in prompts[0]
     assert rows[0]["response"] == "hello"
@@ -205,13 +206,13 @@ def test_overlong_prompt_is_recorded_without_generation(args, monkeypatch):
     assert gen.run_generation(args) == 1
     _, rows, prompts = read_run(args)
     assert rows[0]["error"]["stage"] == "prompt"
-    assert "exceeds" in rows[0]["error"]["message"]
-    assert prompts[0]["input_tokens"] > 8
+    assert "input budget" in rows[0]["error"]["message"]
+    assert not prompts
     assert not model.inputs
 
 
 def test_template_cannot_silently_drop_system_or_history(args, monkeypatch, base, tokenizer):
-    tokenizer.chat_template = "{{ messages[-1]['content'] }}"
+    tokenizer.chat_template = "{# <tool_call> #}{{ messages[-1]['content'] }}"
     tokenizer.save_pretrained(base)
     model = ReplyModel()
     use_stub(monkeypatch, model)
@@ -304,6 +305,7 @@ def test_real_tiny_model_and_lora_cli_use_identical_context(args, base, tmp_path
         assert rows[0]["output_ids"]
         saved.append((run, rows, prompts))
     assert saved[0][2] == saved[1][2]
+    assert saved[0][1][0]["retrieval_requests"] == saved[1][1][0]["retrieval_requests"]
     assert saved[0][1][0]["output_ids"] == saved[1][1][0]["output_ids"]
     assert saved[0][0]["model"] == saved[1][0]["model"]
     assert saved[1][0]["adapter"]["files_sha256"]["adapter_model.safetensors"]

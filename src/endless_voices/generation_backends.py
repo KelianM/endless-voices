@@ -86,11 +86,7 @@ def local(root, config):
         tokenizer_config={"trust_remote_code": False, **cfg.get("tokenizer_options", {})},
     )
     settings = read(root / "selection.json")["context"]
-    database, prepared, indices = (
-        benchmark_sessions(root, settings)
-        if settings.get("mode") == "dynamic"
-        else (None, None, {})
-    )
+    database, prepared, indices = benchmark_sessions(root, settings)
     try:
         settings = {
             **settings,
@@ -103,10 +99,9 @@ def local(root, config):
         for prompt in read(root / "prompts.json"):
             started = time.monotonic()
             row = {"sample_id": prompt["sample_id"], "status": "failed", "response": ""}
-            session = (prepared.retrieval_session(indices[prompt["sample_id"]], database)
-                       if indices else None)
-            tools = session.tool_schemas if session else None
-            trace = {"tools": session.trace} if session else None
+            session = prepared.retrieval_session(indices[prompt["sample_id"]], database)
+            tools = session.tool_schemas
+            trace = {"tools": session.trace}
             actual = {}
 
             def render(messages):
@@ -124,9 +119,8 @@ def local(root, config):
                 if len(ids) + output_limit > context_limit:
                     raise ValueError("Context overflow; no truncation")
                 request_folder = folder / (prompt["sample_id"] + ".retrieval")
-                if session:
-                    request_folder.mkdir(exist_ok=True)
-                    save(request_folder / f"{turn}.prompt.json", actual)
+                request_folder.mkdir(exist_ok=True)
+                save(request_folder / f"{turn}.prompt.json", actual)
                 response, last = "", None
                 try:
                     for token in stream_generate(
@@ -144,39 +138,33 @@ def local(root, config):
                     row.update(response=response,
                                finish_reason=last.finish_reason if last else None,
                                output_tokens=last.generation_tokens if last else 0)
-                    if session:
-                        save(request_folder / f"{turn}.result.json", {
-                            "response": response, "finish_reason": row["finish_reason"],
-                            "output_tokens": row["output_tokens"],
-                        })
+                    save(request_folder / f"{turn}.result.json", {
+                        "response": response, "finish_reason": row["finish_reason"],
+                        "output_tokens": row["output_tokens"],
+                    })
                 if last is None or last.finish_reason != "stop":
                     raise ValueError("Output limit or incomplete response")
-                return (local_tool_response(tokenizer, response) if session
-                        else ({"content": response}, []))
+                return local_tool_response(tokenizer, response)
 
             try:
                 mx.random.seed(42)
-                if session:
-                    local_tool_response(tokenizer, "")
-                    _, response = tool_loop(
-                        session,
-                        dynamic_messages(session.initial_messages(), session.history_count),
-                        ask, local_tool_results,
-                        lambda messages: len(render(messages)["input_ids"])
-                        <= settings["max_input_tokens"], trace,
-                    )
-                else:
-                    response, _ = ask(prompt["messages"], 0)
+                local_tool_response(tokenizer, "")
+                _, response = tool_loop(
+                    session,
+                    dynamic_messages(session.initial_messages(), session.history_count),
+                    ask, local_tool_results,
+                    lambda messages: len(render(messages)["input_ids"])
+                    <= settings["max_input_tokens"], trace,
+                )
                 row["response"] = response["content"]
                 if not row["response"].strip():
                     raise ValueError("Empty continuation")
                 row["status"] = "ok"
             except Exception as error:
                 row["error"] = str(error)
-            if actual and (session is None or row["status"] == "ok"):
+            if actual and row["status"] == "ok":
                 save(folder / (prompt["sample_id"] + ".prompt.json"), actual)
-            if session:
-                save(folder / (prompt["sample_id"] + ".retrieval.json"), trace)
+            save(folder / (prompt["sample_id"] + ".retrieval.json"), trace)
             row.update(
                 elapsed_seconds=time.monotonic() - started, peak_memory_bytes=mx.get_peak_memory()
             )
@@ -199,27 +187,22 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
 
     settings = read(root / "selection.json")["context"]
     selected_models = [model for model in providers.RATES if models is None or model in models]
-    if settings["mode"] == "dynamic":
-        for model in selected_models:
-            cap = settings["dynamic_max_input_tokens"].get(model)
-            if type(cap) is not int or cap <= 0:
-                raise ValueError(f"Positive dynamic input budget required for {model}")
-    database, prepared, indices = (
-        benchmark_sessions(root, settings) if settings["mode"] == "dynamic" else (None, None, {})
-    )
+    for model in selected_models:
+        cap = settings["hosted_max_input_tokens"].get(model)
+        if type(cap) is not int or cap <= 0:
+            raise ValueError(f"Positive input budget required for {model}")
+    database, prepared, indices = benchmark_sessions(root, settings)
     try:
-        if indices:
-            from transformers import AutoTokenizer
+        from transformers import AutoTokenizer
 
-            from endless_voices.context import TokenizerCounter
+        from endless_voices.context import TokenizerCounter
 
-            counter = TokenizerCounter(
-                AutoTokenizer.from_pretrained(
-                    settings["tokenizer"],
-                    local_files_only=True,
-                    **settings.get("tokenizer_options", {}),
-                )
+        counter = TokenizerCounter(
+            AutoTokenizer.from_pretrained(
+                settings["tokenizer"], local_files_only=True,
+                **settings.get("tokenizer_options", {}),
             )
+        )
         for model in providers.RATES:
             if models is not None and model not in models:
                 continue
@@ -244,31 +227,11 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
                 },
             )
             for prompt in read(root / "prompts.json"):
-                sample_started = time.monotonic()
-                if indices:
-                    row = hosted_dialogue(
-                        root, folder / prompt["sample_id"], model,
-                        prepared.retrieval_session(indices[prompt["sample_id"]], database),
-                        settings["dynamic_max_input_tokens"][model], counter,
-                        key, budget, timeout_seconds,
-                    )
-                    print(model, prompt["sample_id"], row["status"], flush=True)
-                    if row["status"] != "ok":
-                        break
-                    continue
-                save(
-                    folder / (prompt["sample_id"] + ".prompt.json"),
-                    {"messages": prompt["messages"]},
-                )
-                row = hosted_request(
-                    root,
-                    folder / prompt["sample_id"],
-                    model,
-                    prompt["messages"],
-                    key,
-                    budget,
-                    timeout_seconds,
-                    started=sample_started,
+                row = hosted_dialogue(
+                    root, folder / prompt["sample_id"], model,
+                    prepared.retrieval_session(indices[prompt["sample_id"]], database),
+                    settings["hosted_max_input_tokens"][model], counter,
+                    key, budget, timeout_seconds,
                 )
                 print(model, prompt["sample_id"], row["status"], flush=True)
                 if row["status"] != "ok":
@@ -296,8 +259,7 @@ def hosted_dialogue(root, path, model, session, limit, counter, key, budget, tim
         return counter.messages([{"role": "system", "content": json.dumps(candidate)}]) <= limit
 
     def ask(body, turn):
-        row = hosted_request(root, folder / str(turn), model, None, key,
-                             budget, timeout_seconds, body=body)
+        row = hosted_request(root, folder / str(turn), body, key, budget, timeout_seconds)
         rows.append(row)
         if row["status"] != "ok":
             raise ValueError(row.get("error", "Hosted request failed"))
@@ -308,7 +270,8 @@ def hosted_dialogue(root, path, model, session, limit, counter, key, budget, tim
         body, _ = tool_loop(session, body, ask, providers.with_tool_results, fits, trace)
         row = rows[-1]
     except Exception as error:
-        row = {"status": "failed", "response": "", "error": str(error)}
+        row = {**(rows[-1] if rows else {}), "status": "failed", "error": str(error)}
+        row.setdefault("response", "")
     conversation = body.get("input") or [{"role": "system", "content": body["system"]},
                                          *body["messages"]]
     if row["status"] == "ok":
@@ -320,12 +283,11 @@ def hosted_dialogue(root, path, model, session, limit, counter, key, budget, tim
     return row
 
 
-def hosted_request(root, path, model, messages, key, budget, timeout_seconds, *,
-                   started=None, body=None):
+def hosted_request(root, path, body, key, budget, timeout_seconds):
     """Record one paid generation request and reserve its cost before sending."""
     from endless_voices import providers
 
-    body = providers.payload(model, messages) if body is None else body
+    model = body["model"]
     reserved = 0.0
     for request in root.rglob("*.request.json"):
         result = request.with_name(request.name.replace(".request.", ".result."))
@@ -336,7 +298,7 @@ def hosted_request(root, path, model, messages, key, budget, timeout_seconds, *,
         raise ValueError("Hosted screen budget exhausted")
     save(path.parent / (path.name + ".request.json"), {"body": body, "reservation_usd": reserve})
     row = {"sample_id": path.name, "status": "failed", "response": ""}
-    started = time.monotonic() if started is None else started
+    started = time.monotonic()
     try:
         response = providers.send(body, key, timeout_seconds)
         row.update(
@@ -351,8 +313,6 @@ def hosted_request(root, path, model, messages, key, budget, timeout_seconds, *,
     except Exception as error:
         row["error"] = type(error).__name__
     row["elapsed_seconds"] = time.monotonic() - started
-    previous = [read(p) for p in (path.parent / (path.name + ".retrieval")).glob("*.result.json")]
-    row.update(request_totals([*previous, row]))
     save(path.parent / (path.name + ".result.json"), row)
     return row
 

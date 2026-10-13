@@ -14,7 +14,6 @@ from endless_voices.artifacts import digest, encoded, file_hash, read_json, writ
 from endless_voices.context_generation import verify_tool_context
 from endless_voices.contracts import evaluation_messages
 from endless_voices.dataset.storage import SceneDataset
-from endless_voices.retrieval import context_messages
 from endless_voices.splits import mission_key
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,13 +67,9 @@ def load_run(directory, manifest, records, split):
     prepared = SceneDataset.load(manifest.parent, split)
     pools = {r["metadata"]["id"]: prepared.context_pool(i) for i, r in enumerate(prepared)}
     for sid, prompt in prompts.items():
-        trace = responses.get(sid, {}).get("retrieval")
-        if trace is not None and "turns" in trace:
-            messages = prompt["messages"]
-            verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
-        else:
-            messages = (context_messages(pools[sid], trace["selected_scene_ids"])
-                        if trace is not None else evaluation_messages(records[sid]))
+        trace = responses[sid]["retrieval"]
+        messages = prompt["messages"]
+        verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
         if prompt["messages"] != messages or prompt["messages_sha256"] != digest(encoded(messages)):
             raise ValueError("Prompt differs from authored context")
         if "input_ids" in prompt and (

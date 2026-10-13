@@ -25,22 +25,20 @@ before searching or reading. History represents preceding events; independent re
 supply writing examples. Search ranks a scene by its strongest passage and returns the
 whole scene ([ADR 11](adr/0011-rank-passages-and-return-their-parent-scenes.md)).
 
-[Context selection](../src/endless_voices/context_generation.py) supplies two policies over
-the same pool. Static selection fits nearby mission history, then semantic matches, within
-a token budget. Dynamic generation uses the same tool loop and instructions for local and
-hosted models, retaining the conversation between retrievals. Provider APIs and local chat
-templates supply their native call formats. Both policies record selected context and omit
-complete results that exceed the input budget
+[Context retrieval](../src/endless_voices/context_generation.py) uses the same tool loop and
+instructions for local and hosted generation, retaining the conversation between calls.
+Provider APIs and local chat templates supply their native call formats. Training and judge
+preparation select nearby history, then semantic matches, within a token budget
 ([ADR 10](adr/0010-let-agents-retrieve-context-through-shared-tools.md)).
 
 ## Training and evaluation
 
 [Training](../src/endless_voices/train.py) selects static context before loading the model,
 reserving space for the target. [Generation](../src/endless_voices/generate.py) supports
-both policies and withholds targets and private evaluation metadata from the generator.
+retrieval tools and withholds targets and private evaluation metadata from the generator.
 Runs save actual messages and retrieval traces rather than relying on later reconstruction.
 
-The benchmark supplies common static evidence to judges regardless of generator mode.
+The benchmark supplies common static evidence to judges independent of each generator’s retrieval choices.
 Blinded evaluation compares the final writing; retrieval traces show how each generator
 selected its context. [Evaluation documentation](evaluation.md) describes reporting limits.
 

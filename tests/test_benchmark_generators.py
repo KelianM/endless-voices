@@ -39,7 +39,8 @@ def recorded(tmp_path, request, monkeypatch):
         )
         pools.append(pool)
     local = tmp_path / "local.json"
-    backends.save(local, {"label": "gemma31b"})
+    backends.save(local, {"label": "gemma31b", "context_ceiling": 20000,
+                          "max_output_tokens": 1024, "max_input_tokens": 8192})
     locals_ = {"gemma31b": str(local)}
     if "qwen30b" in models:
         qwen = tmp_path / "qwen.json"
@@ -60,7 +61,7 @@ def recorded(tmp_path, request, monkeypatch):
     index = tmp_path / "context.sqlite"
     index.write_text("synthetic index")
     plan = backends.read(config)
-    plan["context"] = {"mode": "static", "index": str(index), "tokenizer": "fake",
+    plan["context"] = {"index": str(index), "tokenizer": "fake",
                        "max_input_tokens": 8192, "depth": 4}
     config.write_text(json.dumps(plan))
     from transformers import AutoTokenizer
@@ -95,7 +96,9 @@ def recorded(tmp_path, request, monkeypatch):
             },
         )
         for sid in ["one", "two", "four"]:
-            messages = records[sid]["messages"][:-1]
+            messages = benchmark.context_generation.dynamic_messages(
+                deepcopy(records[sid]["messages"][:-1]), 0)
+            backends.save(folder / f"{sid}.retrieval.json", {"selected_scene_ids": []})
             if model in locals_:
                 backends.save(
                     folder / f"{sid}.prompt.json", {"messages": messages, "input_ids": [1, 2]}
@@ -106,11 +109,15 @@ def recorded(tmp_path, request, monkeypatch):
                     if model == "claude-sonnet-5-5"
                     else {"model": model, "input": messages}
                 )
-                backends.save(folder / f"{sid}.request.json", {"body": body})
+                backends.save(folder / f"{sid}.prompt.json", {"messages": messages})
+                requests = folder / f"{sid}.retrieval"
+                requests.mkdir()
+                backends.save(requests / "0.request.json", {"body": body})
             backends.save(
                 folder / f"{sid}.result.json",
                 {
                     "sample_id": sid,
+                    "request_count": 1,
                     "status": "ok" if sid in {"one", "four"} else "failed",
                     "response": ("Simulated complete response"
                                  if sid in {"one", "four"} else "Partial"),
@@ -141,8 +148,8 @@ def test_export_uses_saved_context_once_and_reports_failures_and_missing(recorde
         "ok",
         "ok",
     ]
-    expected = {p["sample_id"]: p["messages"]
-                for p in backends.read(recorded / "prompts.json")}
+    expected = {sid: row["messages"][:-1]
+                for sid, row in backends.read(recorded / "records.json").items()}
     for r in private["trials"]:
         trial = backends.read(pack / r["path"])
         assert list(trial) == ["trial_id", "context", "A", "B"]
@@ -160,9 +167,10 @@ def test_export_uses_saved_context_once_and_reports_failures_and_missing(recorde
 def test_export_rejects_mismatched_or_incomplete_evidence(recorded, tamper):
     folder = recorded / "gpt-6-luna"
     if tamper == "context":
-        path = folder / "one.request.json"
+        path = folder / "one.retrieval/0.request.json"
         value = backends.read(path)
-        value["body"]["input"] = backends.read(folder / "four.request.json")["body"]["input"]
+        other = backends.read(folder / "four.retrieval/0.request.json")
+        value["body"]["input"] = other["body"]["input"]
     elif tamper == "completion":
         path = folder / "one.result.json"
         value = backends.read(path)
@@ -209,7 +217,7 @@ def test_prepare_cli_passes_the_prepared_dataset(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(benchmark, 'prepare', lambda *args: calls.append(args))
     cli.main(['prepare', '--root', str(output), '--dataset', str(dataset)])
-    assert calls == [(output, dataset, Path('configs/benchmark.json'), None)]
+    assert calls == [(output, dataset, Path('configs/benchmark.json'))]
 
 
 def test_preparation_records_cli_source_after_split(recorded):
@@ -225,36 +233,12 @@ def test_preparation_records_cli_source_after_split(recorded):
 def test_dynamic_export_keeps_common_judge_evidence_and_verifies_selected_scenes(recorded):
     # A dynamic generator may use less context, but must not change the judge's reference.
     selection = backends.read(recorded / "selection.json")
-    selection["context"]["mode"] = "dynamic"
     records = backends.read(recorded / "records.json")
     for row in records.values():
         row["messages"][0]["content"] += "\nCommon static evidence for judging."
     (recorded / "records.json").write_text(json.dumps(records))
     selection["artifacts_sha256"]["records.json"] = backends.sha(recorded / "records.json")
     (recorded / "selection.json").write_text(json.dumps(selection))
-    for model in selection["models"]:
-        folder = recorded / model
-        for sid in ("one", "two", "four"):
-            path = folder / f"{sid}.prompt.json"
-            if model == "gpt-6-luna":
-                body = backends.read(folder / f"{sid}.request.json")["body"]
-                messages = benchmark.context_generation.dynamic_messages(body["input"], 0)
-                backends.save(path, {"messages": messages})
-                body["input"] = messages
-                requests = folder / f"{sid}.retrieval"
-                requests.mkdir()
-                backends.save(requests / "0.request.json", {"body": body})
-                (folder / f"{sid}.request.json").unlink()
-                result_path = folder / f"{sid}.result.json"
-                result = backends.read(result_path)
-                result["request_count"] = 1
-                result_path.write_text(json.dumps(result))
-            else:
-                prompt = backends.read(path)
-                prompt["messages"] = benchmark.context_generation.dynamic_messages(
-                    prompt["messages"], 0)
-                path.write_text(json.dumps(prompt))
-            backends.save(folder / f"{sid}.retrieval.json", {"selected_scene_ids": []})
     benchmark.export(recorded)
     private = backends.read(recorded / "assessment/private.json")
     for row in private["trials"]:
@@ -290,3 +274,15 @@ def test_native_export_rejects_ineligible_tool_text():
     messages[-1]["output"] = json.dumps({"documents": [document]})
     with pytest.raises(ValueError, match="eligible scene"):
         benchmark.verify_tool_context(pool, messages, [sid])
+
+
+def test_preflight_counts_tools_against_local_input_budget(recorded):
+    # A prompt can fit the model ceiling yet exceed Gemma's configured input allowance.
+    def render(messages, *, tools, **kwargs):
+        assert len(tools) == 3 and "Retrieve context" in messages[0]["content"]
+        return "rendered"
+
+    tokenizer = SimpleNamespace(apply_chat_template=render,
+                                encode=lambda *a, **kw: [0] * 8193)
+    with pytest.raises(ValueError, match="context exceeds"):
+        benchmark.preflight(recorded, {"gemma31b": tokenizer})

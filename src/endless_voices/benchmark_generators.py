@@ -30,19 +30,10 @@ def checked_inputs(root):
         raise ValueError("Dataset sample IDs differ")
     if [p["sample_id"] for p in prompts] != selection["ids"]:
         raise ValueError("Generation prompt IDs differ")
-    if selection["context"]["mode"] == "static":
-        if prompts != [generation_prompt(row) for row in records.values()]:
-            raise ValueError("Generation prompts differ from static context")
     return selection, records, prompts
 
 
-def generation_prompt(record):
-    messages = assess.evaluation_messages(record)
-    return {"sample_id": record["metadata"]["id"], "messages": messages,
-            "messages_sha256": assess.digest(assess.encoded(messages))}
-
-
-def prepare(root, dataset, config, context_mode=None):
+def prepare(root, dataset, config):
     """Prepare a benchmark directly from verified validation records."""
     if root.exists():
         raise ValueError("Output exists; choose a new directory")
@@ -52,10 +43,6 @@ def prepare(root, dataset, config, context_mode=None):
     ids = list(records)
     plan = screen.read(config)
     context = plan["context"]
-    if context_mode is not None:
-        context["mode"] = context_mode
-    if context["mode"] not in {"static", "dynamic"}:
-        raise ValueError("Context mode must be static or dynamic")
     context["index"] = str(Path(context["index"]).resolve())
     context["tokenizer"] = str(Path(context["tokenizer"]).resolve())
     supported = {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
@@ -81,10 +68,11 @@ def prepare(root, dataset, config, context_mode=None):
         for i, (sid, row) in enumerate(records.items()):
             session = prepared.retrieval_session(i, database)
             messages, traces[sid] = context_generation.select_static_context(
-                session, {**context, "mode": "static"}, counter)
+                session, context, counter)
             row["messages"] = [*messages, row["messages"][-1]]
-            initial = messages if context["mode"] == "static" else session.initial_messages()
-            prompts.append({"sample_id": sid, "messages": initial,
+            initial = context_generation.dynamic_messages(
+                session.initial_messages(), session.history_count)
+            prompts.append({"sample_id": sid, "messages": initial, "tools": session.tool_schemas,
                             "messages_sha256": assess.digest(assess.encoded(initial))})
     unresolved_variables = {}
     for sid, row in records.items():
@@ -119,7 +107,7 @@ def prepare(root, dataset, config, context_mode=None):
         "dataset_source": str(dataset.resolve()),
         "context": context, "index_sha256": screen.sha(context["index"]),
         "models": plan["generators"],
-        "judging_context": "Shared static retrieval, independent of generator context mode",
+        "judging_context": "Common selected evidence, independent of generator retrieval",
         "candidate_order": "one balanced randomized assignment per condition; no reversed trials",
         "artifacts_sha256": {str(p.relative_to(root)): screen.sha(p) for p in files},
     })
@@ -127,7 +115,7 @@ def prepare(root, dataset, config, context_mode=None):
 
 
 def preflight(root, tokenizers):
-    """Check complete local prompts and judge request bounds before model execution."""
+    """Check initial tool-enabled prompts and judge request bounds before model execution."""
     _, records, prompts = checked_inputs(root)
     plan = screen.read(root / "plan.json")
     locals_ = {name: screen.read(root / f"{name}-config.json")
@@ -139,11 +127,13 @@ def preflight(root, tokenizers):
         counts = {}
         for name, tokenizer in tokenizers.items():
             rendered = tokenizer.apply_chat_template(
-                prompt["messages"], tokenize=False, add_generation_prompt=True,
-                enable_thinking=False)
+                prompt["messages"], tools=prompt["tools"], tokenize=False,
+                add_generation_prompt=True, enable_thinking=False)
             counts[name] = len(tokenizer.encode(rendered, add_special_tokens=False))
             local = locals_[name]
-            if counts[name] + local["max_output_tokens"] > local["context_ceiling"]:
+            limit = min(local.get("max_input_tokens", local["context_ceiling"]),
+                        local["context_ceiling"] - local["max_output_tokens"])
+            if counts[name] > limit:
                 raise ValueError(f"{name} context exceeds configured limit; no truncation")
         original = records[sid]["messages"][-1]["content"]
         trial = {"trial_id": "0" * 32, "context": assess.evaluation_messages(records[sid]),
@@ -177,15 +167,13 @@ def local_smoke(root, model):
 
 def export(root):
     """Verify raw generation evidence and create one blinded primary trial per success."""
-    selection, records, original_prompts = checked_inputs(root)
+    selection, records, _ = checked_inputs(root)
     plan = screen.read(root / "plan.json")
     ids = selection["ids"]
-    originals = {p["sample_id"]: p for p in original_prompts}
     loaded, provenance = {}, {}
     prepared = SceneDataset.load(selection["dataset_source"], "validation")
     pools = {row["metadata"]["id"]: prepared.context_pool(i)
              for i, row in enumerate(prepared)}
-    dynamic = selection["context"]["mode"] == "dynamic"
     for model in plan["generators"]:
         source = root / model
         settings = screen.read(source / "settings.json")
@@ -203,17 +191,15 @@ def export(root):
         raw_results = assess.indexed([screen.read(p) for p in source.glob("*.result.json")], ids)
         prompts, responses = {}, {}
         for sid, raw in raw_results.items():
-            if dynamic and not (source / f"{sid}.prompt.json").exists():
+            if not (source / f"{sid}.prompt.json").exists():
                 if raw["status"] == "ok":
                     raise ValueError("Success without final generation prompt")
                 responses[sid] = raw
                 continue
-            messages = originals[sid]["messages"]
-            if dynamic:
-                actual_prompt = screen.read(source / f"{sid}.prompt.json")
-                trace = screen.read(source / f"{sid}.retrieval.json")
-                messages = actual_prompt["messages"]
-                verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
+            actual_prompt = screen.read(source / f"{sid}.prompt.json")
+            trace = screen.read(source / f"{sid}.retrieval.json")
+            messages = actual_prompt["messages"]
+            verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
             prompt = {"sample_id": sid, "messages": messages,
                       "messages_sha256": assess.digest(assess.encoded(messages))}
             if model in plan["local_configs"]:
@@ -224,8 +210,7 @@ def export(root):
                               input_ids_sha256=assess.digest(assess.encoded(actual["input_ids"])))
                 complete = raw.get("finish_reason") == "stop"
             else:
-                request = (source / f"{sid}.retrieval" / f"{raw['request_count'] - 1}.request.json"
-                           if dynamic else source / f"{sid}.request.json")
+                request = source / f"{sid}.retrieval" / f"{raw['request_count'] - 1}.request.json"
                 body = screen.read(request)["body"]
                 actual = body.get("input") or [{"role": "system", "content": body["system"]},
                                                *body["messages"]]

@@ -7,34 +7,34 @@
 ## Context
 
 Saved sampled prompts fix the available context before a model can decide what history or
-writing examples it needs. Comparing fixed selection with agent-directed retrieval requires
-two policies over the same permitted material, with budgets that fit each model.
+writing examples it needs. Local and hosted models need the same opportunity to retrieve
+permitted evidence, with budgets that fit each model.
 
 ## Decision
 
-- **Select static or dynamic context at runtime.** Both modes retrieve from the same scene
-  database. Static selection fits nearby prerequisite history first, then semantic matches.
-  Dynamic generation lets local and hosted models request history, search and reads through
-  one tool loop, with shared instructions and each model's native call format.
+- **Generation retrieves context through one native tool loop.** Local and hosted models
+  receive the same instructions and eligible evidence, using their native call formats.
+- **Select context beforehand only for training and judging.** Fit nearby prerequisite
+  history first, then semantic matches. Benchmark judges receive common evidence.
 - **Preparation saves encounters and eligible pools, not sampled prompts.** State interpretation
   from [ADR 9](0009-build-examples-from-consistent-game-state.md) determines permitted scenes.
   Retrieval enforces branch, split and target boundaries before ranking or reading.
 - **Fit whole scenes within the configured input budget.** Local runs reserve output space
-  within the model's context ceiling. Hosted dynamic runs may use larger budgets. The model chooses
+  within the model's context ceiling. Hosted runs may use larger budgets. The model chooses
   when to finish retrieval; hosted calls remain subject to the run’s spend ceiling.
 - **Keep history and writing references distinct.** A reference demonstrates the game's
   writing without asserting that its events happened in the current playthrough.
-- **Save selected messages and retrieval traces with the run.** Training selects static
-  context before loading the generator. Judges receive common static evidence regardless
-  of the generator's retrieval mode.
+- **Save conversations and retrieval traces with the run.** Record the evidence the model
+  actually received, including tool results.
 
 ## Consequences
 
 - **Dynamic conversations retain tool results and reasoning between calls.** The growing
   transcript consumes the input budget. Separate JSON selection was rejected because it
   prevented tool use during composition and gave local models a different retrieval flow.
-- **Retrieval choices become part of model performance.** Dynamic selection can find useful
-  scenes the static heuristic misses, but adds model calls and may choose worse context.
+- **Retrieval choices become part of model performance.** Models decide what evidence to read
+  as well as what to write. A fixed-context generation mode was removed to avoid maintaining
+  a second flow; controlled writing-only comparisons belong in experiments.
 - **Context limits do not prevent repeated calls.** Queries can repeat without adding scenes.
   A fixed turn cap was rejected because it cuts off useful retrieval as well as repetition.
 - **Equal access does not mean equal cost.** Models can use different context lengths and

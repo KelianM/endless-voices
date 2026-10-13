@@ -34,8 +34,6 @@ def run_training(config: dict) -> None:
     data = config["data"]
     prepared = SceneDataset.load(data["path"], data.get("split", "train"))
     context = config["context"]
-    if context.get("mode", "static") != "static":
-        raise ValueError("Training uses static context")
     counter = TokenizerCounter(tokenizer)
     prepared_contexts = []
     session = None

@@ -17,8 +17,6 @@ def main(argv=None):
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--dataset", type=Path)
     parser.add_argument("--config", type=Path, default=Path("configs/benchmark.json"))
-    parser.add_argument("--context-mode", choices=["static", "dynamic"],
-                        help="Override context mode for this prepared run")
     parser.add_argument("--model", choices=["gemma31b", "qwen30b"],
                         help="Local model for local and local-smoke stages")
     args = parser.parse_args(argv)
@@ -26,7 +24,7 @@ def main(argv=None):
     if args.stage == "prepare":
         if args.dataset is None:
             parser.error("prepare requires --dataset")
-        benchmark.prepare(root, args.dataset, args.config, args.context_mode)
+        benchmark.prepare(root, args.dataset, args.config)
         return
     benchmark.checked_inputs(root)
     plan = screen.read(root / "plan.json")

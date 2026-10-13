@@ -8,6 +8,7 @@ import pytest
 from prepared_fixtures import write_empty_pools
 
 from endless_voices import assessment as a
+from endless_voices.context_generation import dynamic_messages
 from endless_voices.judge import judge_messages, parse_answer
 
 
@@ -41,7 +42,7 @@ def generation(path, manifest, statuses):
     for sid, status in zip(ids, statuses, strict=True):
         if status == "missing":
             continue
-        messages = a.evaluation_messages(records[sid])
+        messages = dynamic_messages(a.evaluation_messages(records[sid]), 0)
         prompt = {
             "sample_id": sid,
             "messages": messages,
@@ -52,7 +53,8 @@ def generation(path, manifest, statuses):
         }
         prompts.append(prompt)
         response = {k: v for k, v in prompt.items() if k not in {"messages", "input_ids"}}
-        response.update(status=status, response="Invented model reply", finish_reason="eos")
+        response.update(status=status, response="Invented model reply", finish_reason="eos",
+                        retrieval={"turns": [], "selected_scene_ids": []})
         if status == "failed":
             response.update(finish_reason="length", error={"type": "OutputLimit"})
         responses.append(response)

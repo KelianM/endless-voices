@@ -69,17 +69,15 @@ token limit fail without truncation. See `index-context --help` for device and e
 Set `context.index` in the generation, training or benchmark configuration to this database.
 Open the database with the same model and encoding settings used to build it.
 
-`context.mode` selects the context policy:
+Generation uses one retrieval loop for local and hosted models. Models call native tools
+for history, semantic search and scene reads, then continue with the results in their
+conversation. The same instructions and eligible evidence apply to every model. There is
+no retrieval-turn cap; context budgets and hosted spending budgets still apply. Local MLX
+runs use the tokenizer's tool parser; Transformers runs support Qwen's JSON-in-tool-tags
+format. Unsupported formats fail explicitly.
 
-- `static` fits complete scenes into `context.max_input_tokens`: nearby prerequisite history
-  first, then scenes ranked by similarity to the visible encounter. `context.depth` controls
-  nearby history. The default input budget is 8,192 tokens.
-- `dynamic` uses one retrieval loop for local and hosted models. Models call native tools
-  for history, semantic search and scene reads, then continue with the results in their
-  conversation. The same instructions and eligible evidence apply to every model. There
-  is no retrieval-turn cap; context budgets still apply, and hosted requests remain subject
-  to the run’s spend ceiling. Local MLX runs use the tokenizer's tool parser; Transformers
-  runs support Qwen's JSON-in-tool-tags format. Unsupported formats fail explicitly.
+Training and benchmark judges receive context selected beforehand: nearby prerequisite
+history first, then scenes ranked by similarity. `context.depth` controls nearby history.
 
 Planet descriptions retain their names and systems. Origin, destination and configured
 planet descriptions appear in the initial prompt; planets in the reference scope or named
@@ -87,7 +85,7 @@ in visible context and history are also searchable, with interpreted description
 Dynamic search excludes scenes already selected, and the prompt states when no eligible
 mission history exists.
 
-Both policies use the same eligible scene pool. Search returns whole scenes ranked by their
+All retrieval uses the same eligible scene pool. Search returns whole scenes ranked by their
 strongest passage; the lower-level retrieval API also supports passage-only results. Runs
 save actual prompts and retrieval traces. Prepared datasets do not save sampled prompts. Prerequisite-connected missions must share
 one split. Prompts identify the current mission event and its known location without
@@ -123,19 +121,18 @@ Prepare a benchmark from a rebuilt validation dataset and indexed context:
 ```sh
 endless-voices benchmark prepare \
   --dataset outputs/prepared-scenes --root outputs/benchmark \
-  --config configs/benchmark.json --context-mode static
+  --config configs/benchmark.json
 ```
 
-Use `--context-mode dynamic` when preparing a separate dynamic run. The run configuration
-fixes the mode for subsequent stages. `context.tokenizer` names the cached tokenizer used
-to select the common static context; `context.max_input_tokens` sets its 8,192-token budget.
-Hosted dynamic budgets are set per model in `context.dynamic_max_input_tokens`, measured
-with the same reference tokenizer rather than provider billing token counts. Native requests
-include tool schemas, results and reasoning in that budget. Local
-configuration sets `max_input_tokens`; input plus `max_output_tokens` must fit
-`context_ceiling`. Larger hosted budgets do not enlarge the local Gemma prompt.
+In the benchmark configuration, `context.tokenizer` and `context.max_input_tokens` control
+selection of common judge evidence. Hosted input budgets are configured per model in
+`context.hosted_max_input_tokens`, measured with that reference tokenizer rather than
+provider billing token counts. Native requests include tool schemas, results and reasoning
+in the budget. Local configurations set `max_input_tokens`; Gemma keeps 8,192 input tokens,
+and input plus `max_output_tokens` must fit `context_ceiling`. Larger hosted budgets do not
+enlarge the local prompt.
 
-Judges receive the same static evidence in both modes, so a generator's retrieval choices
+Judges receive common selected evidence, so a generator's retrieval choices
 do not change the judge's reference context. Dynamic requests and returned context are
 recorded separately for inspection.
 

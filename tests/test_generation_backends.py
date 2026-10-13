@@ -11,8 +11,26 @@ from endless_voices import providers
 
 
 @pytest.fixture(autouse=True)
-def prepared_selection(tmp_path):
-    backends.save(tmp_path / "selection.json", {"context": {"mode": "static"}})
+def prepared_selection(tmp_path, monkeypatch):
+    from transformers import AutoTokenizer
+
+    backends.save(tmp_path / "selection.json", {"context": {
+        "tokenizer": "fake", "hosted_max_input_tokens": dict.fromkeys(providers.RATES, 16000)}})
+    monkeypatch.setattr(AutoTokenizer, "from_pretrained", lambda *a, **kw: SimpleNamespace(
+        apply_chat_template=lambda messages, **kw: list(range(len(json.dumps(messages))))))
+
+    def sessions(root, settings):
+        prompts = {p["sample_id"]: p for p in backends.read(root / "prompts.json")}
+
+        def session(sid, db):
+            return SimpleNamespace(
+                history_count=0, trace=[], tool_schemas=[],
+                initial_messages=lambda: [dict(m) for m in prompts[sid]["messages"]]
+                or [{"role": "system", "content": "Encounter"}],
+            )
+        return (SimpleNamespace(close=lambda: None), SimpleNamespace(retrieval_session=session),
+                {sid: sid for sid in prompts})
+    monkeypatch.setattr(backends, "benchmark_sessions", sessions)
 
 
 def test_hosted_keeps_partial_outputs_and_never_overwrites(tmp_path, monkeypatch):
@@ -34,7 +52,7 @@ def test_hosted_keeps_partial_outputs_and_never_overwrites(tmp_path, monkeypatch
         body = json.loads(request.data)
         calls.append(body)
         if "input" in body:
-            assert body["input"] == prompts[0]["messages"]
+            assert body["input"][0]["content"].startswith("Character context")
             result = {
                 "status": "incomplete",
                 "output": [
@@ -46,7 +64,7 @@ def test_hosted_keeps_partial_outputs_and_never_overwrites(tmp_path, monkeypatch
                 ],
             }
         else:
-            assert body["system"] == "Character context"
+            assert body["system"].startswith("Character context")
             assert body["messages"] == prompts[0]["messages"][1:]
             result = {
                 "stop_reason": "max_tokens",
@@ -77,8 +95,9 @@ def test_hosted_stops_before_exceeding_shared_budget(tmp_path, monkeypatch):
     with patch.object(
         providers.urllib.request, "urlopen", side_effect=AssertionError("API called")
     ):
-        with pytest.raises(ValueError, match="budget exhausted"):
-            backends.hosted(tmp_path)
+        backends.hosted(tmp_path)
+    result = backends.read(tmp_path / "gpt-6-luna/x.result.json")
+    assert result["status"] == "failed" and "budget exhausted" in result["error"]
 
 
 def test_hosted_selection_does_not_call_unselected_model(tmp_path, monkeypatch):
@@ -127,7 +146,9 @@ def test_local_runner_preserves_limits_cache_and_partial_failures(tmp_path, monk
 
     quantized, rotating = object(), RotatingCache()
     tokenizer = SimpleNamespace(
-        apply_chat_template=lambda messages, **kwargs: messages[0]["content"],
+        chat_template="<tool_call>",
+        apply_chat_template=lambda messages, **kwargs:
+            messages[0]["content"].split("\n\nRetrieve")[0],
         encode=lambda text, **kwargs: list(range(len(text))),
     )
     limits, calls = {}, []
@@ -187,7 +208,7 @@ def test_local_runner_preserves_limits_cache_and_partial_failures(tmp_path, monk
     backends.local(tmp_path, config)
     folder = tmp_path / "local"
     overflow = backends.read(folder / "overflow.result.json")
-    assert overflow["status"] == "failed" and "no truncation" in overflow["error"]
+    assert overflow["status"] == "failed" and "input budget" in overflow["error"]
     assert backends.read(folder / "ok.result.json")["status"] == "ok"
     partial = backends.read(folder / "partial.result.json")
     assert partial["status"] == "failed" and partial["response"] == "Partial"
@@ -196,9 +217,8 @@ def test_local_runner_preserves_limits_cache_and_partial_failures(tmp_path, monk
     )
     assert (folder / "later.result.json").exists() == (failure != "memory")
     assert limits["memory"] == 20_000_000_000
-    for prompt in prompts[:3]:
-        saved = backends.read(folder / f"{prompt['sample_id']}.prompt.json")
-        assert saved["messages"] == prompt["messages"]
+    saved = backends.read(folder / "ok.prompt.json")
+    assert saved["messages"][0]["content"].startswith(prompts[1]["messages"][0]["content"])
 
 
 def test_local_native_loop_continues_after_reading_without_a_turn_cap():
@@ -258,14 +278,14 @@ def test_retrieval_requests_reserve_failed_costs_across_nested_folders(tmp_path,
         raise TimeoutError("provider may have charged")
 
     monkeypatch.setattr(providers, "send", failed)
-    messages = [{"role": "system", "content": "Select context"}]
+    body = providers.payload("gpt-6-sol", [{"role": "system", "content": "Encounter"}])
     result = backends.hosted_request(
-        tmp_path, selection / "0", "gpt-6-sol", messages, "secret", 1.0, 60
+        tmp_path, selection / "0", body, "secret", 1.0, 60
     )
     assert result["status"] == "failed"
     with pytest.raises(ValueError, match="budget exhausted"):
         backends.hosted_request(
-            tmp_path, tmp_path / "final", "gpt-6-sol", messages, "secret", 1.0, 60
+            tmp_path, tmp_path / "final", body, "secret", 1.0, 60
         )
     assert len(calls) == 1
 
@@ -298,8 +318,8 @@ def test_native_loop_reads_then_retrieves_again_with_larger_hosted_budget(
                     {"scene_id": "oversized", "text": "y" * 20000}]
 
     (tmp_path / "selection.json").write_text(json.dumps({"context": {
-        "mode": "dynamic", "max_input_tokens": 8192,
-        "tokenizer": "fake", "dynamic_max_input_tokens": {model: 16000}}}))
+        "max_input_tokens": 8192,
+        "tokenizer": "fake", "hosted_max_input_tokens": {model: 16000}}}))
     backends.save(tmp_path / "prompts.json", [{"sample_id": "one",
                                               "messages": Session().initial_messages()}])
     monkeypatch.setattr(backends, "benchmark_sessions", lambda *a: (
