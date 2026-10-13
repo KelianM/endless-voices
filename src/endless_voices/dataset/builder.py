@@ -14,6 +14,7 @@ from endless_voices.context import render as render_block
 from endless_voices.contracts import validate_record
 from endless_voices.game_variables import mission_values, render
 from endless_voices.instructions import SCENE_INSTRUCTIONS, scene_task
+from endless_voices.retrieval import scene_id
 from endless_voices.splits import check_chain_splits, check_mission_splits
 
 from .dialogue import DialogueInterpreter, Passage
@@ -152,7 +153,7 @@ class ContextBuilder:
                     if not self.continues(route.stop, phase):
                         continue
                     block = self.block(
-                        mission, (*route.prefix, *route.paragraphs), conversations[0])
+                        mission, (*route.prefix, *route.paragraphs), conversations[0], phase)
                     updated.append(History(route.state, [*history.blocks, block]))
             else:
                 blocks = list(history.blocks)
@@ -164,7 +165,7 @@ class ContextBuilder:
                         grouped.setdefault(passage["path"], []).append(
                             Passage(passage["line"], passage["text"]))
                     for path, paragraphs in grouped.items():
-                        blocks.append(self.block(mission, paragraphs, {"source_path": path}))
+                        blocks.append(self.block(mission, paragraphs, {"source_path": path}, phase))
                 updated.append(History(apply(actions, history.state), blocks))
         return self.settle_failures(self.bounded(updated))
 
@@ -199,11 +200,12 @@ class ContextBuilder:
             phase != "offer" or stop not in {"decline", "defer"}
         )
 
-    def block(self, mission, paragraphs, node=None):
+    def block(self, mission, paragraphs, node, phase):
         values = mission_values(mission.node, self.corpus.planet_systems, self.player)
         return {
             "mission": mission.name,
             "heading": mission.name,
+            "phase": phase,
             "path": (node or {}).get("source_path", mission.path),
             "passages": [{**asdict(p), "text": render(p.text, values)[0]} for p in paragraphs],
         }
@@ -406,7 +408,8 @@ class ContextBuilder:
                         route = max(routes, key=lambda r: sum(
                             len(p.text) for p in (*r.prefix, *r.paragraphs)
                         ))
-                        block = self.block(other, (*route.prefix, *route.paragraphs), node)
+                        block = self.block(
+                            other, (*route.prefix, *route.paragraphs), node, event["tokens"][1])
                         block.update(reference=True, conversation=node["line"],
                                      state=route.state.snapshot())
                         scenes.append(block)
@@ -517,7 +520,7 @@ class ExampleBuilder:
                         if (retain_histories and route.terminal
                                 and self.sampler.continues(route.stop, phase)):
                             block = self.sampler.block(
-                                mission, (*route.prefix, *route.paragraphs), node)
+                                mission, (*route.prefix, *route.paragraphs), node, phase)
                             next_histories.append(History(route.state, [*history.blocks, block]))
                         if not route.paragraphs or not route.text.strip():
                             continue
@@ -581,7 +584,16 @@ class ExampleBuilder:
                 system = self.corpus.planet_systems.get(location)
                 if system:
                     cue += f" System: {system}."
-            pool.system_prefix = SCENE_INSTRUCTIONS[task] + "\n\n" + cue
+            links = [f"{parent} -> {name}"
+                     for name in [*self.sampler.ancestors(mission.name), mission.name]
+                     for parent in self.sampler.graph[name]]
+            overview = "Mission prerequisites (arrows mean precedes):\n" + (
+                "\n".join(links) or "No prerequisite missions.")
+            overview += "\nEarlier scenes in this interpreted history (oldest first):\n"
+            overview += "\n".join(
+                f"{block['mission']} | on {block['phase']} | {scene_id(block)}"
+                for block in pool.blocks) or "No earlier scenes."
+            pool.system_prefix = SCENE_INSTRUCTIONS[task] + "\n\n" + cue + "\n\n" + overview
             if lore:
                 pool.system_prefix += "\n\n" + lore
             paths = self.sampler.reference_paths.get(mission.name, {mission.path})

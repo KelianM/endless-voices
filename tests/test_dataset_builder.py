@@ -679,6 +679,11 @@ def test_scene_cue_uses_event_location_without_completion_answer(tmp_path):
         assert "Current mission: Journey" in prompt
         if "secret" in record["messages"][-1]["content"]:
             assert "Scene: on complete. Current location: Destination." in prompt
+            from endless_voices.retrieval import scene_id
+
+            assert len(pool.blocks) == 1 and pool.blocks[0]["phase"] == "offer"
+            assert f"Journey | on offer | {scene_id(pool.blocks[0])}" in prompt
+            assert "Journey | on complete |" not in prompt
         else:
             assert "Scene: on offer. Current location: Origin." in prompt
         assert "500000" not in prompt and "reveals the secret" not in prompt

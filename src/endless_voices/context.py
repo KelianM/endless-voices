@@ -32,7 +32,8 @@ def distances(graph, start):
 
 def render(block):
     """Render an original source block without changing its passages."""
-    return block["heading"] + "\n" + "\n\n".join(
+    heading = block["heading"] + (f" — on {block['phase']}" if "phase" in block else "")
+    return heading + "\n" + "\n\n".join(
         ("Player choice: " if p["role"] == "option" else "") + p["text"]
         for p in block["passages"]
     )

@@ -39,7 +39,8 @@ def select_context(session, settings, counter, ask=None):
         'or {"name":"finish","arguments":{}} when ready. '
         "Retrieved scenes that fit are included automatically. "
         "Search excludes scenes already selected. "
-        "Use mission history for continuity, especially before writing an opening. "
+        "Use the history map and read_context IDs for mission continuity. "
+        "Earlier scenes have already happened; write at the current scene and location. "
         "Search writing references only for missing facts or voice examples. "
         "Finish once the selected context supports the next passage; exhaustive coverage "
         "is unnecessary. If a search adds no useful evidence, finish unless a specific "
