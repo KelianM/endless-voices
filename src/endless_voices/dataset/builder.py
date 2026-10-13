@@ -326,10 +326,7 @@ class ContextBuilder:
             if not self.eligible(name, split):
                 omitted.append(name)
                 continue
-            histories = self.advance(histories, sample=True)
             previous = self.corpus.missions[name]
-            for history in histories:
-                self.enter(history.state, previous)
             requirements = [
                 c
                 for n in previous.node["children"]
@@ -337,11 +334,16 @@ class ContextBuilder:
                 for c in n["children"]
             ]
             candidates = []
-            for h in histories:
-                state = h.state.assume(condition(requirements, h.state))
-                if state is not None:
-                    candidates.append(History(state, h.blocks))
-            histories = candidates
+            for history in histories:
+                timelines = sorted(history.state.advance(),
+                                   key=lambda state: digest([self.seed, state.snapshot()]))
+                for state in timelines:
+                    self.enter(state, previous)
+                    state = state.assume(condition(requirements, state))
+                    if state is not None:
+                        candidates.append(History(state, history.blocks))
+                        break
+            histories = self.bounded(candidates)
             before_visit = None
             for phase in ["offer", "accept", "enter", "visit", "complete"]:
                 if phase == "visit":

@@ -687,3 +687,30 @@ def test_scene_cue_uses_event_location_without_completion_answer(tmp_path):
         else:
             assert "Scene: on offer. Current location: Origin." in prompt
         assert "500000" not in prompt and "reveals the secret" not in prompt
+
+
+def test_history_keeps_timeline_that_allows_next_mission(tmp_path):
+    story = '''event expired
+\tset expired
+mission Earlier
+\ton complete
+\t\tevent expired 1
+mission Middle
+\tto offer
+\t\thas "Earlier: done"
+\t\tnot expired
+mission Later
+\tto offer
+\t\thas "Middle: done"
+\ton offer
+\t\tconversation
+\t\t\t`You made it in time.`
+'''
+    from endless_voices.dataset.state import GameState
+
+    builder = DatasetBuilder(corpus(tmp_path, story), config({"Later": spec()}))
+    builder.sampler.seed = "0"
+    rows = builder.examples.build(builder.corpus.missions["Later"], spec(),
+                                  GameState.fixed({"expired": 0}))
+    assert rows
+    assert all(row[0]["messages"][-1]["content"] == "You made it in time." for row in rows)
