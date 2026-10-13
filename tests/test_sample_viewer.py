@@ -17,14 +17,15 @@ def payload(output):
     )
 
 
-def test_default_export_excludes_held_out_content_and_preserves_history(tmp_path):
+def test_default_export_includes_all_splits_and_preserves_history(tmp_path):
     output = tmp_path / "samples.html"
-    assert viewer.build_viewer(FIXTURE, output) == 1
+    assert viewer.build_viewer(FIXTURE, output) == 3
     data = payload(output)
     original = json.loads((FIXTURE.parent / "train.jsonl").read_text())
     original.pop("evaluation")
     original["player_choices"] = None
-    assert data["samples"] == [original]
+    assert {row["metadata"]["split"] for row in data["samples"]} == {"train", "validation", "test"}
+    assert [row for row in data["samples"] if row["metadata"]["split"] == "train"] == [original]
     assert data["runs"] == []
     before = output.read_bytes()
     with pytest.raises(FileExistsError):

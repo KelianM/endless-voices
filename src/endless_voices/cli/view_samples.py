@@ -13,7 +13,7 @@ def main(argv=None) -> None:
     parser.add_argument(
         "--manifest", type=Path, default=Path("data/dataset/manifest.json")
     )
-    parser.add_argument("--split", choices=["train", "validation", "test", "all"], default="train")
+    parser.add_argument("--split", choices=["train", "validation", "test", "all"], default="all")
     parser.add_argument("--run", type=Path, action="append", default=[],
                         help="Saved run or benchmark model folder; repeat for comparison")
     parser.add_argument("--output", type=Path, help="New standalone HTML file")

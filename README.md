@@ -122,6 +122,9 @@ endless-voices view-samples --serve \
   --run outputs/benchmark/gpt-6-luna
 ```
 
+The reader includes all splits by default; use `--split` to narrow them. Scenes without
+saved generations remain available for browsing and live play.
+
 `--run` is optional and repeatable. Each folder can be a generation run or a benchmark's
 model folder for the same dataset. Use **Play this scene**, start before
 the target or after a saved response, then select an authored player choice when the starting scene has a choice menu, or type

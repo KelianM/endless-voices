@@ -79,7 +79,7 @@ def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
     }
 
 
-def viewer_data(manifest, split="train", run_directories=()):
+def viewer_data(manifest, split="all", run_directories=()):
     """Load verified scenes and saved runs for browsing."""
     datasets = SceneDataset.load_all(manifest.parent)
     records = [row for name, dataset in datasets.items()
@@ -101,7 +101,7 @@ def viewer_html(payload):
         "__SAMPLE_DATA__", serialized)
 
 
-def build_viewer(manifest: Path, output: Path, split="train", run_directories=()):
+def build_viewer(manifest: Path, output: Path, split="all", run_directories=()):
     """Write a standalone reader without replacing an existing file."""
     payload, _ = viewer_data(manifest, split, run_directories)
     output.parent.mkdir(parents=True, exist_ok=True)
