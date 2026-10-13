@@ -14,7 +14,7 @@ from endless_voices.context import render as render_block
 from endless_voices.contracts import validate_record
 from endless_voices.game_variables import mission_values, render
 from endless_voices.instructions import SCENE_INSTRUCTIONS, scene_task
-from endless_voices.splits import check_mission_splits
+from endless_voices.splits import check_chain_splits, check_mission_splits
 
 from .dialogue import DialogueInterpreter, Passage
 from .source import walk
@@ -544,7 +544,7 @@ class ExampleBuilder:
                                 ]
                             ),
                         )
-                        candidate = (rank, node, route, history)
+                        candidate = (rank, node, route, history, phase)
                         if key not in variants or rank < variants[key][0]:
                             variants[key] = candidate
                 if retain_histories:
@@ -558,17 +558,32 @@ class ExampleBuilder:
                 + str(sorted(set(selected_conversations) - found))
             )
         examples = []
-        for key, (_, node, route, history) in sorted(variants.items()):
+        for key, (_, node, route, history, phase) in sorted(variants.items()):
             sid = "scene-" + key[:24]
             cid = "conversation-" + digest(
                 [node.get("source_path", mission.path), node["line"]])[:24]
-            planets = self.corpus.planet_references(route.state.world)
+            planets = self.corpus.planet_references(history.state.world)
             lore = "\n\n".join(render_block(block) for block in planets
                                  if block["name"] in lore_names)
             task = scene_task(has_prefix=bool(route.prefix))
             pool = self.sampler.pool(
                 sid, cid, mission, history, route.prefix, lore, split, task
             )
+            cue = f"Current mission: {mission.name}. Scene: on {phase}."
+            location = values.get("<origin>" if phase in {"offer", "accept"} else "<planet>")
+            if phase == "enter":
+                entered = [n["tokens"][1] for n in history.state.world
+                           if n["tokens"][:1] == ["enter system"]]
+                if entered:
+                    cue += f" Current system: {entered[-1]}."
+            elif location:
+                cue += f" Current location: {location}."
+                system = self.corpus.planet_systems.get(location)
+                if system:
+                    cue += f" System: {system}."
+            pool.system_prefix = SCENE_INSTRUCTIONS[task] + "\n\n" + cue
+            if lore:
+                pool.system_prefix += "\n\n" + lore
             paths = self.sampler.reference_paths.get(mission.name, {mission.path})
             directories = {str(Path(path).parent) for path in paths}
             visible = "\n".join([pool.system_prefix, *(m["content"] for m in pool.encounter),
@@ -653,6 +668,7 @@ class DatasetBuilder:
             config.get("max_history_routes", 1000),
             seed=config["seed"],
         )
+        check_chain_splits(assignments, self.sampler.graph)
         for name, spec in config["missions"].items():
             self.sampler.reference_paths[name] = sorted({
                 corpus.missions[other].path for other, other_spec in config["missions"].items()

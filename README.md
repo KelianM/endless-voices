@@ -87,7 +87,9 @@ mission history exists.
 
 Both policies use the same eligible scene pool. Search returns whole scenes ranked by their
 strongest passage; the lower-level retrieval API also supports passage-only results. Runs
-save actual prompts and retrieval traces. Prepared datasets do not save sampled prompts.
+save actual prompts and retrieval traces. Prepared datasets do not save sampled prompts. Prerequisite-connected missions must share
+one split. Prompts identify the current mission event and its known location without
+copying the post-target state.
 
 ## Train and chat
 

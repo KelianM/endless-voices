@@ -315,7 +315,7 @@ def test_mission_manifest_rejects_distinct_conversations_in_the_same_mission(man
     validation["metadata"]["sources"][0] = copy.deepcopy(train["metadata"]["sources"][0])
     rewrite(manifest, "validation", [validation])
     contents = json.loads(manifest.read_text())
-    contents["split_unit"] = "mission"
+    contents["split_unit"] = "mission_chain"
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="mission .* crosses splits"):
         validate_manifest(manifest)

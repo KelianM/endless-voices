@@ -7,11 +7,11 @@ continuations with the original writing. The [README](../README.md) contains usa
 ## Preparation
 
 [DatasetBuilder](../src/endless_voices/dataset/builder.py) interprets pinned game sources
-into visible encounters, authored targets and compatible context. Mission ownership separates
-splits. The interpreter resolves supported branches and mission variables; the interpreter
+into visible encounters, authored targets and compatible context. Prerequisite-connected mission chains stay in one split. The interpreter resolves supported branches and mission variables; the interpreter
 does not reproduce arbitrary game saves.
 
-Prepared records contain the instruction, visible encounter and target. Eligible history and
+Prepared records contain the instruction, visible encounter and target. The prompt names
+the current mission event and its known location without exposing post-target state. Eligible history and
 writing references are saved separately, with scene text deduplicated across examples.
 [SceneDataset](../src/endless_voices/dataset/storage.py) verifies artifact hashes, pool
 consistency and ownership across every published split.

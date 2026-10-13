@@ -76,7 +76,7 @@ def recorded(tmp_path, request, monkeypatch):
     (dataset / 'validation.jsonl').write_text(
         ''.join(json.dumps(r) + '\n' for r in records.values()))
     backends.save(dataset / 'manifest.json', {
-        'format': 'scene-dataset-v2', 'split_unit': 'mission', 'splits': ['validation'],
+        'format': 'scene-dataset-v2', 'split_unit': 'mission_chain', 'splits': ['validation'],
         'artifacts': {str(p.relative_to(dataset)): backends.sha(p)
                       for p in dataset.rglob('*') if p.is_file()}})
     write_empty_pools(dataset)

@@ -134,21 +134,20 @@ def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path
 
 
 @pytest.mark.parametrize("owner", [None, "train", "validation", "test"])
-def test_history_eligibility_excludes_heldout_not_unselected_missions(tmp_path, owner):
+def test_chain_splits_reject_heldout_ancestors_but_keep_unselected_history(tmp_path, owner):
     source = corpus(tmp_path, STORY)
     missions = {"Later": spec()}
     if owner is not None:
         missions["Earlier"] = {**spec(owner), "conversations": []}
+    if owner in {"validation", "test"}:
+        with pytest.raises(ValueError, match="chain crosses splits"):
+            DatasetBuilder(source, config(missions))
+        return
     builder = DatasetBuilder(source, config(missions))
     builder.build(tmp_path / "prepared")
     dataset = SceneDataset.load(tmp_path / "prepared", "train")
-    assert len(dataset) == 2
-    assert all(("childhood" in json.dumps(dataset.context_pool(i).blocks))
-               == (owner in (None, "train"))
+    assert all("childhood" in json.dumps(dataset.context_pool(i).blocks)
                for i in range(len(dataset)))
-    notes = json.loads((tmp_path / "prepared/provenance.json").read_text())
-    assert all(n["omitted_history_missions"] == ([] if owner in (None, "train") else ["Earlier"])
-               for n in notes.values())
 
 
 def test_failed_interpretation_does_not_publish_a_partial_dataset(tmp_path):
@@ -655,3 +654,31 @@ mission Visit
     changed = source.planet_references(source.events["future"]["children"])[0]
     assert changed["passages"][0]["text"] == "A ruined planet."
     assert changed["path"] == "missions.txt"
+
+
+def test_scene_cue_uses_event_location_without_completion_answer(tmp_path):
+    # Completion payments and dialogue outcomes must not enter the scene cue.
+    from endless_voices.dataset.state import GameState
+
+    source = corpus(tmp_path, """mission Journey
+	source Origin
+	destination Destination
+	on offer
+		conversation
+			`Ready to depart.`
+				accept
+	on complete
+		payment 500000
+		conversation
+			`The passenger reveals the secret.`
+""")
+    builder = DatasetBuilder(source, config({"Journey": spec()}))
+    rows = builder.examples.build(source.missions["Journey"], spec(), GameState.fixed({}))
+    for record, pool, _ in rows:
+        prompt = json.dumps(pool.messages())
+        assert "Current mission: Journey" in prompt
+        if "secret" in record["messages"][-1]["content"]:
+            assert "Scene: on complete. Current location: Destination." in prompt
+        else:
+            assert "Scene: on offer. Current location: Origin." in prompt
+        assert "500000" not in prompt and "reveals the secret" not in prompt

@@ -58,3 +58,7 @@ The interpreter handles supported dialogue conditions, assignments and mission e
 Shop, fleet and map changes are recorded effects, not a full game simulation.
 [ADR 9](../../docs/adr/0009-build-examples-from-consistent-game-state.md) records those limits.
 The [design overview](../../docs/design.md) explains runtime context selection and consumers.
+
+The preparation configuration now groups prerequisite-connected missions into one split.
+The saved release above predates that regrouping; rebuild all splits and the retrieval index
+before using the updated configuration.

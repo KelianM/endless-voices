@@ -1,6 +1,6 @@
 {
   "format": "scene-dataset-v2",
-  "split_unit": "mission",
+  "split_unit": "mission_chain",
   "splits": [
     "train",
     "validation",

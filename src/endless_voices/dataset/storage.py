@@ -39,7 +39,8 @@ class SceneDataset(Sequence):
         """Verify artifacts and cross-split ownership, returning each published split."""
         root = Path(root).resolve()
         manifest = json.loads((root / "manifest.json").read_text())
-        if manifest.get("format") != "scene-dataset-v2" or manifest.get("split_unit") != "mission":
+        if (manifest.get("format") != "scene-dataset-v2"
+                or manifest.get("split_unit") != "mission_chain"):
             raise ValueError("Unsupported prepared dataset format")
         splits = manifest.get("splits")
         if (not isinstance(splits, list) or not splits
@@ -95,6 +96,12 @@ class SceneDataset(Sequence):
             datasets[split] = cls(rows, split_pools)
         if set(pools) != set(ids):
             raise ValueError("Retrieval pools must cover exactly the published scenes")
+        from endless_voices.splits import check_chain_splits
+
+        assignments = {pool.mission: split for split, dataset in datasets.items()
+                       for pool in dataset._pools.values()}
+        graph = {name: parents for pool in pools.values() for name, parents in pool.graph.items()}
+        check_chain_splits(assignments, graph)
         return datasets
 
     @classmethod
@@ -205,7 +212,7 @@ def write_dataset(output, built, config, corpus):
             root / "manifest.json",
             {
                 "format": "scene-dataset-v2",
-                "split_unit": "mission",
+                "split_unit": "mission_chain",
                 "splits": splits,
                 "solver_version": z3.get_version_string(),
                 "build": implementation(),
