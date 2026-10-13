@@ -49,10 +49,10 @@ def dynamic_messages(messages, history_count):
     return messages
 
 
-def tool_loop(session, conversation, ask, continue_with, fits, trace):
+def tool_loop(session, conversation, ask, continue_with, fits, trace, *, selected_ids=()):
     """Retrieve and generate until a complete response contains no tool calls."""
-    selected = set()
-    trace.update(turns=[], selected_scene_ids=[])
+    selected = set(selected_ids)
+    trace.update(turns=[], selected_scene_ids=sorted(selected))
     while True:
         if not fits(conversation):
             raise ValueError("Native conversation exceeds the dynamic input budget")

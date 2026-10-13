@@ -13,6 +13,21 @@ def sha256(path: Path) -> str:
 
 def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
     """Return display fields from a generation run belonging to the supplied dataset."""
+    if (directory.parent / "selection.json").exists():
+        selection = json.loads((directory.parent / "selection.json").read_text())
+        if selection["manifest_sha256"] != sha256(manifest):
+            raise ValueError("Benchmark belongs to a different dataset manifest")
+        if set(selection["ids"]) - known_ids:
+            raise ValueError("Benchmark contains unknown sample IDs")
+        responses = {}
+        for sid in selection["ids"]:
+            path = directory / (sid + ".result.json")
+            if path.exists():
+                row = json.loads(path.read_text())
+                responses[sid] = {k: row[k] for k in (
+                    "status", "response", "error", "elapsed_seconds") if k in row}
+        return {"name": directory.name, "selected_ids": selection["ids"],
+                "responses": responses}
     run = json.loads((directory / "run.json").read_text(encoding="utf-8"))
     if run.get("schema_version") != 1:
         raise ValueError("Unsupported generation run schema")
@@ -60,28 +75,29 @@ def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
     }
 
 
-def build_viewer(manifest: Path, output: Path, split="train", run_directory: Path | None = None):
-    """Validate the dataset and write a self-contained viewer without replacing existing files."""
-    declaration = json.loads(manifest.read_text(encoding="utf-8"))
-    requested = declaration["splits"] if split == "all" else [split]
-    records = [row for name in requested for row in SceneDataset.load(manifest.parent, name)]
-    run = (
-        load_run(run_directory, manifest, {r["metadata"]["id"] for r in records})
-        if (run_directory)
-        else None
-    )
-    records = [r for r in records if split == "all" or r["metadata"]["split"] == split]
-    if run:
-        visible_ids = {r["metadata"]["id"] for r in records}
-        run["responses"] = {k: v for k, v in run["responses"].items() if k in visible_ids}
-        run["selected_ids"] = [s for s in run["selected_ids"] if s in visible_ids]
-    records = [{key: value for key, value in row.items() if key != "evaluation"} for row in records]
-    payload = {"dataset_version": declaration["format"], "samples": records, "run": run}
-    # Escape script delimiters; sample text is rendered through textContent in the browser.
+def viewer_data(manifest, split="train", run_directories=()):
+    """Load verified scenes and saved runs for browsing."""
+    datasets = SceneDataset.load_all(manifest.parent)
+    records = [row for name, dataset in datasets.items()
+               if split == "all" or name == split for row in dataset]
+    known = {row["metadata"]["id"] for dataset in datasets.values() for row in dataset}
+    runs = [load_run(directory, manifest, known) for directory in run_directories]
+    records = [{k: v for k, v in row.items() if k != "evaluation"} for row in records]
+    return {"dataset_version": "scene-dataset-v2", "samples": records,
+            "runs": runs}, datasets
+
+
+def viewer_html(payload):
+    """Render literal scene data safely inside the reader."""
     serialized = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
-    template = Path(__file__).with_name("sample_viewer.html").read_text(encoding="utf-8")
-    document = template.replace("__SAMPLE_DATA__", serialized)
+    return Path(__file__).with_name("sample_viewer.html").read_text().replace(
+        "__SAMPLE_DATA__", serialized)
+
+
+def build_viewer(manifest: Path, output: Path, split="train", run_directories=()):
+    """Write a standalone reader without replacing an existing file."""
+    payload, _ = viewer_data(manifest, split, run_directories)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8") as handle:
-        handle.write(document)
-    return len(records)
+        handle.write(viewer_html(payload))
+    return len(payload["samples"])

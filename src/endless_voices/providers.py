@@ -1,6 +1,7 @@
 """Build native provider requests and account for hosted model usage."""
 
 import json
+import urllib.parse
 import urllib.request
 from copy import deepcopy
 
@@ -12,8 +13,6 @@ RATES = {
 
 
 def is_anthropic(model):
-    if model not in RATES:
-        raise ValueError("Unsupported hosted model")
     return model.startswith("claude-")
 
 
@@ -73,7 +72,34 @@ def payload(model, messages, schema=None, *, tools=None):
                          [{"type": "function", **f, "strict": False} for f in functions])
         if not is_anthropic(model):
             body["include"] = ["reasoning.encrypted_content"]
+    if model not in RATES:
+        body.pop("thinking", None)
+        body.pop("reasoning", None)
+        if "output_config" in body:
+            body["output_config"].pop("effort", None)
+            if not body["output_config"]:
+                body.pop("output_config")
     return body
+
+
+def list_models(provider, key):
+    """Return the account's hosted text-model IDs, following Anthropic pagination."""
+    anthropic = provider == "anthropic"
+    base = "https://api.anthropic.com/v1/models" if anthropic else "https://api.openai.com/v1/models"
+    headers = ({"x-api-key": key, "anthropic-version": "2023-06-01"} if anthropic
+               else {"Authorization": "Bearer " + key})
+    url, models = base, []
+    while True:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=20) as r:
+            page = json.load(r)
+        models.extend(row["id"] for row in page["data"])
+        if not anthropic or not page.get("has_more"):
+            break
+        url = base + "?after_id=" + urllib.parse.quote(page["last_id"], safe="")
+    excluded = ("audio", "realtime", "transcribe", "tts", "image", "search",
+                "deep-research", "instruct", "live")
+    return sorted(m for m in models if m.startswith(("claude-", "gpt-", "o1", "o3", "o4"))
+                  and not any(kind in m for kind in excluded))
 
 
 def tool_calls(model, response):
@@ -167,7 +193,8 @@ def reservation(request):
 
 def charge(model, response):
     usage = response.get("usage")
-    if not usage or not all(k in usage for k in ("input_tokens", "output_tokens")):
+    if model not in RATES or not usage or not all(
+            k in usage for k in ("input_tokens", "output_tokens")):
         return None
     incoming, cache, outgoing = RATES[model]
     if is_anthropic(model):

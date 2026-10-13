@@ -111,8 +111,36 @@ authored target within `data.max_length`. Selected messages and traces are saved
 assistant passage; `"all"` trains all non-padding tokens. Inputs exceeding `data.max_length`
 fail rather than being truncated. The model's tokenizer determines the required sequence limit.
 
-`endless-voices generate --help` describes saved-response generation. `endless-voices view-samples --help`
-describes the existing sample explorer.
+`endless-voices generate --help` describes saved-response generation.
+
+Browse prepared scenes and play continuations in the local reader:
+
+```sh
+endless-voices view-samples --serve \
+  --manifest outputs/prepared-scenes/manifest.json --split all \
+  --config configs/benchmark.json \
+  --run outputs/benchmark/gpt-6-luna
+```
+
+`--run` is optional and repeatable. Each folder can be a generation run or a benchmark's
+model folder for the same dataset. Switch to **Play a live continuation**, start before
+the target or after a saved response, then choose a suggested reply or type your own.
+Suggestions are generic prompts, not authored game choices. The original target stays
+out of live requests. Retrieval eligibility stays fixed at the scene's starting state;
+the reader does not advance game conditions or mission chains.
+
+The selector loads text-model IDs from OpenAI and Anthropic using `.env`, plus downloaded
+models in `local_configs`. Provider listings do not guarantee native tool support; rejected
+requests appear as errors. Local MLX models use `data/local/screen-env/bin/python` (override
+with `local_python` in the configuration), loading one model at a time. Local input budgets
+come from their existing configurations; Gemma stays at 8192. Hosted budgets are editable
+in the reader and default to `context.hosted_max_input_tokens`, or 65536 for unconfigured IDs.
+
+Hosted replies are billed to your API account. `--budget` optionally caps estimated spending
+for models with known prices; other models report an unavailable cost estimate. Conversation
+and request logs go to a new `outputs/play-*` folder, or `--live-output`. Browser conversations
+last until a restart or page reload; download the transcript to keep it. To export a reader
+without live generation, use `--output samples.html` instead of `--serve`.
 
 ## Benchmark
 

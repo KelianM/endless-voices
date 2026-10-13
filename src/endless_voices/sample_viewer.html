@@ -16,7 +16,7 @@ p { margin: 0 0 16px; }
 .muted { color: var(--muted); font-size: 14px; }
 .filters { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin: 24px 0 14px; }
 label { display: grid; gap: 5px; font-size: 14px; }
-select, input, button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; max-width: 100%; }
+select, input, button, textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; max-width: 100%; }
 button { cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -58,10 +58,26 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 <h2 id="character"></h2><p class="muted" id="sample-id"></p>
 <details id="instructions"><summary>Model instructions, scene and selected lore</summary><div class="copy" id="system"></div></details>
 <section><h2>Authored conversation</h2><div id="history"></div></section>
+<label id="mode-label" hidden>Conversation mode<select id="mode"><option value="browse">Browse authored and saved responses</option><option value="live">Play a live continuation</option></select></label>
+<label id="saved-run-label">Saved run<select id="saved-run"></select></label>
 <div class="comparison" id="comparison">
 <section><h2>Target response</h2><p class="muted" id="target-info"></p><div class="copy" id="target"></div></section>
-<section id="model-panel"><h2>Model response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre></section>
+<section id="model-panel"><h2>Saved response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre></section>
 </div>
+
+<section id="live-panel" hidden>
+<h2>Live continuation</h2>
+<p class="muted">Explore this scene with retrieval tools. Mission state stays at the selected scene. Suggested replies are prompts, not authored game choices.</p>
+<div class="filters">
+<label>Model<select id="live-model"></select></label>
+<label>Start from<select id="live-start"><option value="scene">Scene before target</option><option value="saved">Selected saved response</option></select></label>
+<label>Suggested reply<select id="suggestion"><option value="">Type your own…</option><option>Tell me more.</option><option>What happened?</option><option>How can I help?</option><option>I should be going.</option></select></label>
+</div>
+<label>Input token budget<input id="live-budget" type="number" min="1" step="1" value="65536"></label><p class="muted" id="model-status"></p>
+<div id="live-history"></div>
+<label>Your response<textarea id="live-text" rows="3" placeholder="Leave blank to generate the scene’s first continuation"></textarea></label>
+<nav><button id="send-live">Continue</button><button id="reset-live">Restart live conversation</button><button id="download-live">Download conversation</button><span id="live-status" class="muted" aria-live="polite"></span></nav>
+</section>
 <details><summary>Sample metadata and sources</summary><pre id="metadata"></pre></details>
 <details id="run-details" hidden><summary>Generation run</summary><pre id="run-info"></pre></details>
 </article>
@@ -73,6 +89,14 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
   const get = id => document.getElementById(id);
   const split = get('split'), identity = get('identity'), search = get('search'), select = get('sample');
   let filtered = [], index = 0;
+  let liveId = null, liveTurns = [], busy = false;
+  const runs = data.runs;
+  data.run = runs[0] || null;
+  runs.forEach((run, i) => addRun(i, run.name));
+  function addRun(i, label) {
+    const option = document.createElement('option'); option.value = i; option.textContent = label;
+    get('saved-run').append(option);
+  }
   const words = text => (text.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu) || []).length;
   const addOption = (node, value, label) => {
     const option = document.createElement('option'); option.value = value; option.textContent = label; node.append(option);
@@ -84,6 +108,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
   [...new Set(data.samples.map(s => s.metadata.identity))].sort().forEach(value => addOption(identity, value, value));
   get('dataset').textContent = data.dataset_version + ' · ' + data.samples.length + ' samples · Local reader';
   get('model-panel').hidden = !data.run;
+  get('saved-run-label').hidden = !data.run;
   get('comparison').classList.toggle('solo', !data.run);
   if (data.run) {
     get('run-details').hidden = false;
@@ -98,6 +123,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     select.disabled = !sample;
     get('position').textContent = sample ? (index + 1) + ' / ' + filtered.length : '0 / 0';
     if (!sample) return;
+    resetLive();
     select.value = sample.metadata.id;
     get('character').textContent = sample.metadata.character_role;
     get('sample-id').textContent = sample.metadata.identity + ' · ' + sample.metadata.split + ' · ' + sample.metadata.id;
@@ -115,6 +141,8 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     get('target-info').textContent = words(target) + ' words · Withheld during generation';
     get('metadata').textContent = JSON.stringify(sample.metadata, null, 2);
     if (data.run) {
+      const {responses, selected_ids, ...summary} = data.run;
+      get('run-info').textContent = JSON.stringify(summary, null, 2);
       const response = data.run.responses[sample.metadata.id];
       get('response').textContent = response && response.response ? response.response : '';
       get('failure').hidden = !(response && response.error);
@@ -134,12 +162,85 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     const query = search.value.trim().toLowerCase();
     filtered = data.samples.filter(s => (split.value === 'all' || s.metadata.split === split.value) &&
       (identity.value === 'all' || s.metadata.identity === identity.value) &&
-      [s.metadata.id, s.metadata.identity, s.metadata.character_role, ...s.metadata.topics].join(' ').toLowerCase().includes(query));
+      [s.metadata.id, s.metadata.identity, s.metadata.character_role, ...s.metadata.topics, ...s.metadata.sources.map(source => source.source_group)].join(' ').toLowerCase().includes(query));
     select.replaceChildren();
-    filtered.forEach(s => addOption(select, s.metadata.id, s.metadata.id));
+    filtered.forEach(s => addOption(select, s.metadata.id, s.metadata.sources[0].source_group + ' · ' + s.metadata.id));
     index = Math.max(0, filtered.findIndex(s => s.metadata.id === preferredId)); render();
   }
   function navigate(next) { index = next; render(); }
+  get('saved-run').onchange = () => { data.run = runs[Number(get('saved-run').value)]; render(); };
+  function resetLive() {
+    liveId = null; liveTurns = []; get('live-history').replaceChildren();
+    get('live-text').value = ''; get('live-status').textContent = '';
+    get('live-model').disabled = false; get('live-start').disabled = false;
+    updateModel();
+  }
+  function appendTurn(role, content) {
+    liveTurns.push({role, content});
+    const turn = document.createElement('div'); turn.className = 'turn';
+    const label = document.createElement('div'); label.className = 'role'; label.textContent = role;
+    const text = document.createElement('div'); text.className = 'copy'; text.textContent = content;
+    turn.append(label, text); get('live-history').append(turn);
+  }
+  function updateModel() {
+    if (!data.live) return;
+    const model = data.live.models.find(m => m.id === get('live-model').value);
+    get('live-budget').disabled = model?.provider === 'local';
+    get('live-budget').value = model?.max_input_tokens || data.live.budgets[model?.id] || 65536;
+    get('model-status').textContent = (data.live.errors || []).join(' · ');
+  }
+  if (data.live) {
+    get('mode-label').hidden = false;
+    data.live.models.forEach(model => addOption(get('live-model'), model.id, model.provider + ' · ' + model.id));
+    if (data.live.models.some(m => m.id === 'gpt-6-luna')) get('live-model').value = 'gpt-6-luna';
+    updateModel();
+    get('dataset').textContent += data.live.budget_usd == null ? ' · Hosted replies are billed to your API account' : ' · Live spending budget $' + data.live.budget_usd;
+  }
+  get('mode').onchange = () => {
+    const live = get('mode').value === 'live';
+    get('live-panel').hidden = !live; get('comparison').hidden = live;
+  };
+  get('live-model').onchange = updateModel;
+  get('suggestion').onchange = () => { get('live-text').value = get('suggestion').value; };
+  get('reset-live').onclick = resetLive;
+  get('live-start').onchange = resetLive;
+  get('download-live').onclick = () => {
+    const value = {sample_id: select.value, model: get('live-model').value, encounter: filtered[index].messages.slice(0, -1), turns: liveTurns};
+    const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], {type:'application/json'}));
+    const a = document.createElement('a'); a.href = url; a.download = 'conversation.json'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  get('send-live').onclick = async () => {
+    if (busy) return;
+    const text = get('live-text').value.trim();
+    const saved = !liveId && get('live-start').value === 'saved';
+    const response = data.run?.responses[select.value];
+    if (saved && (response?.status !== 'ok' || !response.response)) {
+      get('live-status').textContent = 'Select a saved run with a completed response first.'; return;
+    }
+    if ((liveId || saved) && !text) { get('live-status').textContent = 'Enter a reply first.'; return; }
+    busy = true;
+    const controls = [...document.querySelectorAll('button, select, input, textarea')];
+    const disabled = controls.map(control => control.disabled);
+    controls.forEach(control => { control.disabled = true; });
+    get('live-status').textContent = 'Reading context and writing… First use also loads the retrieval encoder.';
+    try {
+      const reply = await fetch('/continue', {method:'POST', headers:{
+        'Content-Type':'application/json', 'X-Viewer-Token':data.live.token},
+        body:JSON.stringify({sample_id:select.value, model:get('live-model').value,
+          session_id:liveId, text, max_input_tokens:Number(get('live-budget').value), run_index:saved ? Number(get('saved-run').value) : null})});
+      const result = await reply.json(); if (!reply.ok) throw Error(result.error || 'Request failed');
+      if (saved) appendTurn('Saved response', response.response);
+      if (text) appendTurn('You', text);
+      appendTurn(get('live-model').value, result.response); liveId = result.session_id;
+      get('live-text').value = '';
+      get('live-status').textContent = result.tool_calls + ' retrieval calls · ' + (result.cost_usd == null ? 'Cost estimate unavailable' : '$' + result.cost_usd.toFixed(4));
+    } catch (error) { get('live-status').textContent = error.message; }
+    finally {
+      busy = false; controls.forEach((control, i) => { control.disabled = disabled[i]; });
+      get('live-model').disabled = Boolean(liveId); get('live-start').disabled = Boolean(liveId);
+    }
+  };
   split.addEventListener('change', () => filter(select.value));
   identity.addEventListener('change', () => filter(select.value));
   search.addEventListener('input', () => filter(select.value));
@@ -147,7 +248,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
   get('previous').addEventListener('click', () => navigate(index - 1));
   get('next').addEventListener('click', () => navigate(index + 1));
   document.addEventListener('keydown', event => {
-    if (/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(event.target.tagName) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (busy || /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(event.target.tagName) || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key === 'ArrowLeft' && index > 0) { event.preventDefault(); navigate(index - 1); }
     if (event.key === 'ArrowRight' && index + 1 < filtered.length) { event.preventDefault(); navigate(index + 1); }
   });

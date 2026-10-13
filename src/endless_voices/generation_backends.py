@@ -288,13 +288,18 @@ def hosted_request(root, path, body, key, budget, timeout_seconds):
     from endless_voices import providers
 
     model = body["model"]
+    if budget is not None and model not in providers.RATES:
+        raise ValueError("No price configured for this model; cannot enforce a dollar budget")
     reserved = 0.0
-    for request in root.rglob("*.request.json"):
+    for request in root.rglob("*.request.json") if budget is not None else []:
         result = request.with_name(request.name.replace(".request.", ".result."))
         cost = read(result).get("estimated_cost_usd") if result.exists() else None
-        reserved += read(request)["reservation_usd"] if cost is None else cost
-    reserve = providers.reservation(body)
-    if reserved + reserve > budget:
+        amount = read(request)["reservation_usd"] if cost is None else cost
+        if amount is None:
+            raise ValueError("Earlier requests have unknown costs; cannot enforce a dollar budget")
+        reserved += amount
+    reserve = providers.reservation(body) if model in providers.RATES else None
+    if budget is not None and reserved + reserve > budget:
         raise ValueError("Hosted screen budget exhausted")
     save(path.parent / (path.name + ".request.json"), {"body": body, "reservation_usd": reserve})
     row = {"sample_id": path.name, "status": "failed", "response": ""}
