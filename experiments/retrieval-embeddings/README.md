@@ -2,7 +2,7 @@
 
 This experiment compares Qwen3-Embedding-0.6B and Qwen3-Embedding-4B for writing context,
 using passage retrieval and passage retrieval with scene expansion. The experiment is a
-consumer of the [retrieval system](../../docs/retrieval.md). Run commands from the repository
+consumer of the [retrieval system](../../README.md#retrieve-context). Run commands from the repository
 root after installing the project.
 
 `experiments/retrieval-embeddings/run.py` runs the production `RetrievalSession` against

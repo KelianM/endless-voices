@@ -22,7 +22,7 @@ endless-voices prepare-dataset \
 A successful build writes one JSONL file per split, source and state provenance, configuration, hashes and licensing. The manifest records the implementation Git revision and file hashes; it does not copy Python code. `SceneDataset.load(output, split)` verifies the saved artifacts and provides stable indexed records. No API calls or model weights are involved; the tokenizer is loaded locally.
 
 Preparation also writes eligible context pools in `retrieval.json`. Fixed prompts and their
-selection evidence remain available unchanged. [Context retrieval](../docs/retrieval.md)
+selection evidence remain available unchanged. [Context retrieval](../README.md#retrieve-context)
 describes indexing these pools and exposing per-scene tools to an agent.
 
 The [current dataset](dataset/README.md) publishes all three splits. Preparation refuses unsupported operations or context overflow for selected targets rather than publishing partial examples.

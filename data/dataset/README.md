@@ -58,4 +58,6 @@ A current conversation prefix selects the continuation instruction; no prefix se
 
 The state model handles dialogue conditions, assignments, arithmetic, random draws, payments, outfit requirements, scheduled events and mission event effects. Prerequisite history samples a compatible event timeline; target extraction retains distinct reachable continuations. Literal dialog paragraphs and static phrase references retain source attribution. Shop, fleet and map changes are recorded effects, not a full simulation of the game world. Unsupported operations and exceeded exploration limits fail preparation explicitly. [ADR 9](../../docs/adr/0009-build-examples-from-consistent-game-state.md) explains the state model's design and limits.
 
-The [prepared dataset contract](../../docs/contracts.md) defines loading, validation and training masks. Training normally applies loss only to the final passage. The `loss="all"` option also trains on saved instructions and repeated context; that option is not a deduplicated full-corpus export.
+The [design overview](../../docs/design.md) explains dataset loading and consumer boundaries.
+See [training usage](../../README.md#train-and-chat) for loss settings; training on all saved
+messages is not a deduplicated full-corpus export.
