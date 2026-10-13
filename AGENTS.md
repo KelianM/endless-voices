@@ -19,15 +19,3 @@ that one person can comfortably maintain.
 - Match reporting detail to the change. For substantial changes,
   explain the design choices and maintenance cost, not just that
   implementation and tests are complete.
-
-# ADR style
-
-- **Context:** one short paragraph stating the problem that makes
-  the decision necessary.
-- **Decision:** direct bullets, each starting with the rule in bold.
-  Attach a brief reason to the rule when the reason helps explain it.
-- **Consequences:** concrete bullets naming costs, limitations or
-  behaviour someone could be surprised by. Lead with the consequence
-  in bold; include rejected alternatives only when they explain a tradeoff.
-- State each point once. Omit tutorials, implementation inventories,
-  conversational history and commentary about the design process.
