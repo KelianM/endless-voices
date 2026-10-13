@@ -30,7 +30,7 @@ class LiveViewer:
         self.scenes = {row["metadata"]["id"]: (dataset, i)
                        for dataset in datasets.values() for i, row in enumerate(dataset)}
         self.sessions = {}
-        self.database = self.counter = self.worker = None
+        self.database = self.worker = None
         self.local_model = None
         self.local_configs = {name: json.loads(Path(path).read_text())
                               for name, path in config.get("local_configs", {}).items()}
@@ -44,11 +44,7 @@ class LiveViewer:
         if model not in self.models:
             raise ValueError("Model is not available in this viewer")
         limit = (min(local["max_input_tokens"],
-                     local["context_ceiling"] - local["max_output_tokens"]) if local else
-                 request.get("max_input_tokens", settings["hosted_max_input_tokens"].get(
-                     model, 65536)))
-        if type(limit) is not int or limit <= 0:
-            raise ValueError("Select a configured hosted model with a positive context budget")
+                     local["context_ceiling"] - local["max_output_tokens"]) if local else None)
         text = request.get("text", "")
         if not isinstance(text, str):
             raise ValueError("Reply must be text")
@@ -58,13 +54,6 @@ class LiveViewer:
             raise ValueError("Conversation does not belong to this scene and model")
         key = None if local else providers.load_key(Path(".env"), model)
         if self.database is None:
-            from transformers import AutoTokenizer
-
-            from endless_voices.context import TokenizerCounter
-
-            self.counter = TokenizerCounter(AutoTokenizer.from_pretrained(
-                settings["tokenizer"], local_files_only=True,
-                **settings.get("tokenizer_options", {})))
             self.database = open_database(settings)
         if not local:
             self.stop_worker()
@@ -146,8 +135,7 @@ class LiveViewer:
                 return len(self.local_tokenizer.apply_chat_template(
                     candidate, tools=state["session"].tool_schemas, tokenize=True,
                     add_generation_prompt=True, enable_thinking=False)) <= limit
-            return self.counter.messages([
-                {"role": "system", "content": json.dumps(candidate)}]) <= limit
+            return True
 
         body, response = tool_loop(
             state["session"], body, ask,
@@ -164,6 +152,8 @@ class LiveViewer:
         self.sessions[session_id] = state
         result = {"session_id": session_id,
                   "response": response["content"] if local else providers.text(model, response),
+                  "retrieval": trace,
+                  "usage": response.get("usage", {}),
                   "tool_calls": sum(len(t["calls"]) for t in trace["turns"]),
                   "cost_usd": (sum(r["estimated_cost_usd"] for r in rows)
                                if all(r.get("estimated_cost_usd") is not None for r in rows)
@@ -213,7 +203,7 @@ def serve(manifest, split, runs, config, output, budget, port):
     token = secrets.token_urlsafe(32)
     models, errors = available_models(config)
     data["live"] = {"token": token, "models": models, "budget_usd": budget,
-                    "errors": errors, "budgets": config["context"]["hosted_max_input_tokens"]}
+                    "errors": errors}
     application = LiveViewer(data, datasets, config, output, budget)
     document = viewer_html(data).encode()
 

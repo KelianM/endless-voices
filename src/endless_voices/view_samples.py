@@ -26,6 +26,9 @@ def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
                 row = json.loads(path.read_text())
                 responses[sid] = {k: row[k] for k in (
                     "status", "response", "error", "elapsed_seconds") if k in row}
+                trace_path = directory / (sid + ".retrieval.json")
+                if trace_path.exists():
+                    responses[sid]["retrieval"] = json.loads(trace_path.read_text())
         return {"name": directory.name, "selected_ids": selection["ids"],
                 "responses": responses}
     run = json.loads((directory / "run.json").read_text(encoding="utf-8"))
@@ -62,6 +65,7 @@ def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
                 "elapsed_seconds",
                 "input_tokens",
                 "output_tokens",
+                "retrieval",
             )
             if key in row
         }

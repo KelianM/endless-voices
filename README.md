@@ -123,20 +123,22 @@ endless-voices view-samples --serve \
 ```
 
 `--run` is optional and repeatable. Each folder can be a generation run or a benchmark's
-model folder for the same dataset. Switch to **Play a live continuation**, start before
+model folder for the same dataset. Use **Play this scene**, start before
 the target or after a saved response, then select an authored player choice when the starting scene has a choice menu, or type
 your own response. Choices come from the source interpreter and respect display conditions.
 After the first continuation, the choice menu disappears and the reply box stays blank.
 Prepared datasets must be rebuilt to include the authored choices. The original target stays
-out of live requests. Retrieval eligibility stays fixed at the scene's starting state;
+out of live requests and remains visible under **In the game**. Each live reply exposes its
+tool calls, arguments and results under **Model activity**. Retrieval eligibility stays fixed at the scene's starting state;
 the reader does not advance game conditions or mission chains.
 
 The selector loads text-model IDs from OpenAI and Anthropic using `.env`, plus downloaded
 models in `local_configs`. Provider listings do not guarantee native tool support; rejected
 requests appear as errors. Local MLX models use `data/local/screen-env/bin/python` (override
 with `local_python` in the configuration), loading one model at a time. Local input budgets
-come from their existing configurations; Gemma stays at 8192. Hosted budgets are editable
-in the reader and default to `context.hosted_max_input_tokens`, or 65536 for unconfigured IDs.
+come from their existing configurations; Gemma stays at 8192. Hosted play uses the provider’s
+context window without an additional viewer cap. Model activity shows provider-reported
+input usage for the final request. Benchmark budgets remain separately configured.
 
 Hosted replies are billed to your API account. `--budget` optionally caps estimated spending
 for models with known prices; other models report an unavailable cost estimate. Conversation

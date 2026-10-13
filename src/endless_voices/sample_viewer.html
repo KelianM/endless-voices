@@ -42,6 +42,15 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 <body>
 <main>
 <header><h1>Endless Voices</h1><p class="muted" id="dataset"></p></header>
+<section id="live-settings" hidden><h2>Play settings</h2>
+<p class="muted">Explore this scene with retrieval tools. Mission state stays at the selected scene.</p>
+<div class="filters">
+<label>Model<select id="live-model"></select></label>
+<label>Start from<select id="live-start"><option value="scene">Scene before target</option><option value="saved">Selected saved response</option></select></label>
+
+</div>
+<p class="muted" id="model-status"></p>
+</section>
 <div class="filters">
 <label>Split<select id="split"></select></label>
 <label>Identity<select id="identity"></select></label>
@@ -56,28 +65,25 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 <p id="empty" hidden>No samples match these filters.</p>
 <article id="reading">
 <h2 id="character"></h2><p class="muted" id="sample-id"></p>
+<p id="play-link" hidden><a href="#live-panel">Play this scene →</a> · <a href="#comparison">Read the game’s continuation</a></p>
 <details id="instructions"><summary>Model instructions, scene and selected lore</summary><div class="copy" id="system"></div></details>
-<section><h2>Authored conversation</h2><div id="history"></div></section>
-<label id="mode-label" hidden>Conversation mode<select id="mode"><option value="browse">Browse authored and saved responses</option><option value="live">Play a live continuation</option></select></label>
+
+
+
+
+<section id="conversation"><h2>Conversation</h2><div id="history"></div><div id="live-history"></div></section>
+<section id="live-panel" hidden>
+<h2>Your next reply</h2>
+<label id="choices-label" hidden>Authored player choice<select id="player-choice"></select></label>
+<label>Your response<textarea id="live-text" rows="3" placeholder="Leave blank to generate the scene’s first continuation"></textarea></label>
+<nav><button id="send-live">Generate continuation</button><button id="reset-live">Restart live conversation</button><button id="download-live">Download conversation</button><span id="live-status" class="muted" aria-live="polite"></span></nav>
+</section>
 <label id="saved-run-label">Saved run<select id="saved-run"></select></label>
 <div class="comparison" id="comparison">
-<section><h2>Target response</h2><p class="muted" id="target-info"></p><div class="copy" id="target"></div></section>
-<section id="model-panel"><h2>Saved response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre></section>
+<section><h2>In the game</h2><p class="muted" id="target-info"></p><div class="copy" id="target"></div></section>
+<section id="model-panel"><h2>Saved response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre><div id="saved-trace"></div></section>
 </div>
 
-<section id="live-panel" hidden>
-<h2>Live continuation</h2>
-<p class="muted">Explore this scene with retrieval tools. Mission state stays at the selected scene.</p>
-<div class="filters">
-<label>Model<select id="live-model"></select></label>
-<label>Start from<select id="live-start"><option value="scene">Scene before target</option><option value="saved">Selected saved response</option></select></label>
-<label id="choices-label" hidden>Authored player choice<select id="player-choice"></select></label>
-</div>
-<label>Input token budget<input id="live-budget" type="number" min="1" step="1" value="65536"></label><p class="muted" id="model-status"></p>
-<div id="live-history"></div>
-<label>Your response<textarea id="live-text" rows="3" placeholder="Leave blank to generate the scene’s first continuation"></textarea></label>
-<nav><button id="send-live">Continue</button><button id="reset-live">Restart live conversation</button><button id="download-live">Download conversation</button><span id="live-status" class="muted" aria-live="polite"></span></nav>
-</section>
 <details><summary>Sample metadata and sources</summary><pre id="metadata"></pre></details>
 <details id="run-details" hidden><summary>Generation run</summary><pre id="run-info"></pre></details>
 </article>
@@ -115,7 +121,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     const {responses, selected_ids, ...summary} = data.run;
     get('run-info').textContent = JSON.stringify(summary, null, 2);
   }
-  function render() {
+  function render(reset = true) {
     const sample = filtered[index];
     get('reading').hidden = !sample; get('empty').hidden = Boolean(sample);
     get('previous').disabled = !sample || index === 0;
@@ -123,7 +129,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     select.disabled = !sample;
     get('position').textContent = sample ? (index + 1) + ' / ' + filtered.length : '0 / 0';
     if (!sample) return;
-    resetLive();
+    if (reset) resetLive();
     select.value = sample.metadata.id;
     get('character').textContent = sample.metadata.character_role;
     get('sample-id').textContent = sample.metadata.identity + ' · ' + sample.metadata.split + ' · ' + sample.metadata.id;
@@ -139,12 +145,14 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     showEncounter();
     const target = sample.messages[sample.messages.length - 1].content;
     get('target').textContent = target;
-    get('target-info').textContent = words(target) + ' words · Withheld during generation';
+    get('target-info').textContent = words(target) + ' words · Original authored path; custom replies may diverge. Never sent to the model.';
     get('metadata').textContent = JSON.stringify(sample.metadata, null, 2);
     if (data.run) {
       const {responses, selected_ids, ...summary} = data.run;
       get('run-info').textContent = JSON.stringify(summary, null, 2);
       const response = data.run.responses[sample.metadata.id];
+      get('saved-trace').replaceChildren();
+      showTrace(get('saved-trace'), response?.retrieval);
       get('response').textContent = response && response.response ? response.response : '';
       get('failure').hidden = !(response && response.error);
       get('failure').textContent = response && response.error ? JSON.stringify(response.error, null, 2) : '';
@@ -169,8 +177,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     index = Math.max(0, filtered.findIndex(s => s.metadata.id === preferredId)); render();
   }
   function navigate(next) { index = next; render(); }
-  get('saved-run').onchange = () => { data.run = runs[Number(get('saved-run').value)]; render(); };
+  get('saved-run').onchange = () => { data.run = runs[Number(get('saved-run').value)]; render(false); };
   function resetLive() {
+    get('send-live').textContent = 'Generate continuation';
     liveId = null; liveTurns = []; get('live-history').replaceChildren();
     get('live-text').value = ''; get('live-status').textContent = '';
     get('live-model').disabled = false; get('live-start').disabled = false;
@@ -180,7 +189,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
   function showEncounter() {
     const sample = filtered[index], last = get('history').lastElementChild?.querySelector('.copy');
     if (!sample || !last) return;
-    last.textContent = sample.player_choices && get('mode').value === 'live' && get('live-start').value === 'scene'
+    last.textContent = sample.player_choices && data.live && get('live-start').value === 'scene'
       ? sample.player_choices.prefix : sample.messages[sample.messages.length - 2].content;
   }
   function showChoices() {
@@ -195,32 +204,53 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
       get('live-text').value = choices.selected;
     }
   }
-  function appendTurn(role, content) {
-    liveTurns.push({role, content});
+  function appendTurn(role, content, retrieval, usage) {
+    liveTurns.push({role, content, retrieval, usage});
     const turn = document.createElement('div'); turn.className = 'turn';
     const label = document.createElement('div'); label.className = 'role'; label.textContent = role;
     const text = document.createElement('div'); text.className = 'copy'; text.textContent = content;
-    turn.append(label, text); get('live-history').append(turn);
+    turn.append(label, text);
+    if (retrieval) showTrace(turn, retrieval, usage);
+    get('live-history').append(turn);
+  }
+  function showTrace(parent, trace, usage = {}) {
+    const details = document.createElement('details'), summary = document.createElement('summary');
+    const turns = trace?.turns || [], count = turns.reduce((n, turn) => n + turn.calls.length, 0);
+    summary.textContent = trace ? 'Model activity · ' + count + ' tool calls' : 'Model activity · not recorded for this saved response';
+    details.append(summary);
+    if (usage.input_tokens != null) {
+      const info = document.createElement('p'); info.className = 'muted';
+      const tokens = usage.input_tokens + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+      info.textContent = tokens.toLocaleString() + ' input tokens on the final request · reported by the provider';
+      details.append(info);
+    }
+    turns.forEach(turn => turn.calls.forEach((call, i) => {
+      const item = document.createElement('details'), title = document.createElement('summary');
+      const result = turn.results[i];
+      title.textContent = call.name + (result.documents ? ' · ' + result.documents.length + ' scenes/passages returned' : '');
+      const args = document.createElement('pre'); args.textContent = typeof call.arguments === 'string' ? call.arguments : JSON.stringify(call.arguments, null, 2);
+      const output = document.createElement('pre'); output.textContent = JSON.stringify(result, null, 2);
+      item.append(title, args, output); details.append(item);
+    }));
+    parent.append(details);
   }
   function updateModel() {
     if (!data.live) return;
     const model = data.live.models.find(m => m.id === get('live-model').value);
-    get('live-budget').disabled = model?.provider === 'local';
-    get('live-budget').value = model?.max_input_tokens || data.live.budgets[model?.id] || 65536;
-    get('model-status').textContent = (data.live.errors || []).join(' · ');
+    get('model-status').textContent = (model?.provider === 'local'
+      ? 'Local input limit: ' + model.max_input_tokens.toLocaleString() + ' tokens, configured to fit local memory.'
+      : 'Context window: managed by the hosted provider for this model. No additional viewer token cap.')
+      + ' ' + (data.live.errors || []).join(' · ');
   }
   if (data.live) {
-    get('mode-label').hidden = false;
+    get('play-link').hidden = false;
+    get('live-panel').hidden = false;
+    get('live-settings').hidden = false;
     data.live.models.forEach(model => addOption(get('live-model'), model.id, model.provider + ' · ' + model.id));
     if (data.live.models.some(m => m.id === 'gpt-6-luna')) get('live-model').value = 'gpt-6-luna';
     updateModel();
     get('dataset').textContent += data.live.budget_usd == null ? ' · Hosted replies are billed to your API account' : ' · Live spending budget $' + data.live.budget_usd;
   }
-  get('mode').onchange = () => {
-    const live = get('mode').value === 'live';
-    get('live-panel').hidden = !live; get('comparison').hidden = live;
-    showEncounter();
-  };
   get('live-model').onchange = updateModel;
   get('player-choice').onchange = () => { get('live-text').value = get('player-choice').value; };
   get('reset-live').onclick = resetLive;
@@ -249,12 +279,13 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
       const reply = await fetch('/continue', {method:'POST', headers:{
         'Content-Type':'application/json', 'X-Viewer-Token':data.live.token},
         body:JSON.stringify({sample_id:select.value, model:get('live-model').value,
-          session_id:liveId, text, max_input_tokens:Number(get('live-budget').value), run_index:saved ? Number(get('saved-run').value) : null})});
+          session_id:liveId, text, run_index:saved ? Number(get('saved-run').value) : null})});
       const result = await reply.json(); if (!reply.ok) throw Error(result.error || 'Request failed');
       if (saved) appendTurn('Saved response', response.response);
       if (text) appendTurn('You', text);
-      appendTurn(get('live-model').value, result.response); liveId = result.session_id;
+      appendTurn(get('live-model').value, result.response, result.retrieval, result.usage); liveId = result.session_id;
       get('live-text').value = '';
+      get('send-live').textContent = 'Send reply';
       showChoices();
       get('live-status').textContent = result.tool_calls + ' retrieval calls · ' + (result.cost_usd == null ? 'Cost estimate unavailable' : '$' + result.cost_usd.toFixed(4));
     } catch (error) { get('live-status').textContent = error.message; }

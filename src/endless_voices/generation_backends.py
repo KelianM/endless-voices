@@ -315,6 +315,12 @@ def hosted_request(root, path, body, key, budget, timeout_seconds):
         row["status"] = "ok"
     except urllib.error.HTTPError as error:
         row["error"] = f"HTTP {error.code}"
+        try:
+            message = json.loads(error.read()).get("error", {}).get("message")
+            if isinstance(message, str):
+                row["error"] += ": " + message
+        except (ValueError, AttributeError):
+            pass
     except Exception as error:
         row["error"] = type(error).__name__
     row["elapsed_seconds"] = time.monotonic() - started
