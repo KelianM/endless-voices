@@ -279,27 +279,38 @@ def test_retrieval_requests_reserve_failed_costs_across_nested_folders(tmp_path,
     assert len(calls) == 1
 
 
-def test_hosted_dynamic_budget_can_exceed_shared_static_budget(tmp_path, monkeypatch):
+@pytest.mark.parametrize("model", ["gpt-6-luna", "claude-sonnet-5-5"])
+def test_native_loop_reads_then_retrieves_again_with_larger_hosted_budget(
+    tmp_path, monkeypatch, model,
+):
+    # Losing native reasoning or tool results prevents follow-up retrieval after reading evidence.
     from transformers import AutoTokenizer
 
     class Session:
         trace = []
-        tool_schemas = []
-        mission = "Current mission"
-        history_count = 0
+        tool_schemas = [{"type": "function", "function": {
+            "name": "search_context", "description": "Search history",
+            "parameters": {"type": "object", "properties": {}}}}]
+        history_count = 2
 
-        def messages_for(self, ids):
-            return [{"role": "system", "content": "Lore " + ("x" * 9000 if ids else "")},
+        def initial_messages(self):
+            return [{"role": "system", "content": "Lore"},
                     {"role": "user", "content": "Encounter"}]
 
         def call_tool(self, name, arguments):
-            return [{"scene_id": "large"}]
+            if name == "unknown":
+                raise ValueError("Unknown context tool")
+            if arguments:
+                assert self.selected_scene_ids == {"large"}
+                return [{"scene_id": "small", "text": "Follow-up evidence"}]
+            return [{"scene_id": "large", "text": "x" * 9000},
+                    {"scene_id": "oversized", "text": "y" * 20000}]
 
     (tmp_path / "selection.json").write_text(json.dumps({"context": {
         "mode": "dynamic", "max_input_tokens": 8192,
-        "tokenizer": "fake", "dynamic_max_input_tokens": {"gpt-6-luna": 16000}}}))
+        "tokenizer": "fake", "dynamic_max_input_tokens": {model: 16000}}}))
     backends.save(tmp_path / "prompts.json", [{"sample_id": "one",
-                                              "messages": Session().messages_for([])}])
+                                              "messages": Session().initial_messages()}])
     monkeypatch.setattr(backends, "benchmark_sessions", lambda *a: (
         SimpleNamespace(close=lambda: None),
         SimpleNamespace(retrieval_session=lambda *a: Session()), {"one": 0}))
@@ -307,20 +318,54 @@ def test_hosted_dynamic_budget_can_exceed_shared_static_budget(tmp_path, monkeyp
         apply_chat_template=lambda messages, **kw: list(range(
             sum(len(m["content"]) for m in messages)))))
     monkeypatch.setattr(providers, "load_key", lambda *a: "fake-secret")
-    replies = iter(['{"name":"search_context","arguments":{}}',
-                    '{"name":"finish","arguments":{}}', "Written continuation"])
-    calls = []
+    bodies, responses = [], []
+    anthropic = providers.is_anthropic(model)
 
     def send(body, *args):
-        calls.append(body)
-        return {"status": "completed", "usage": {"input_tokens": 100, "output_tokens": 20},
-                "output": [{"type": "message", "status": "completed", "content": [
-                    {"type": "output_text", "text": next(replies)}]}]}
+        turn = len(bodies)
+        bodies.append(body)
+        assert body["tools"][0]["name"] == "search_context"
+        if turn:
+            encoded = json.dumps(body)
+            assert "x" * 9000 in encoded and "y" * 20000 not in encoded
+            assert "secret-reasoning" in encoded
+            assert "omitted_documents" in encoded
+        calls = ([("a", "search_context", {}), ("bad", "unknown", {})] if turn == 0
+                 else [("b", "search_context", {"query": "Follow-up"})] if turn == 1 else [])
+        if anthropic:
+            parts = [{"type": "thinking", "thinking": "reason", "signature": "secret-reasoning"}]
+            parts += [{"type": "text", "text": "Reading" if calls else "Written continuation"}]
+            parts += [{"type": "tool_use", "id": id_, "name": name, "input": args}
+                      for id_, name, args in calls]
+            response = {"stop_reason": "tool_use" if calls else "end_turn", "content": parts}
+            if turn:
+                assert body["messages"][-2]["content"] == responses[-1]["content"]
+                results = body["messages"][-1]["content"]
+                assert results[0]["tool_use_id"] == ("a" if turn == 1 else "b")
+                if turn == 1:
+                    assert results[1]["is_error"]
+        else:
+            parts = [{"type": "reasoning", "id": f"r{turn}", "summary": [],
+                      "encrypted_content": "secret-reasoning"},
+                     {"type": "message", "status": "completed", "content": [
+                         {"type": "output_text", "text": "Reading" if calls
+                          else "Written continuation"}]}]
+            parts += [{"type": "function_call", "call_id": id_, "name": name,
+                       "arguments": json.dumps(args)} for id_, name, args in calls]
+            response = {"status": "completed", "output": parts}
+            if turn:
+                assert all(p in body["input"] for p in responses[-1]["output"])
+                assert body["input"][-1]["call_id"] == ("bad" if turn == 1 else "b")
+        response["usage"] = {"input_tokens": 100, "output_tokens": 20}
+        responses.append(response)
+        return response
 
     monkeypatch.setattr(providers, "send", send)
-    backends.hosted(tmp_path, models=["gpt-6-luna"], budget=1)
-    assert len(calls) == 3
-    assert 8192 < sum(len(m["content"]) for m in calls[-1]["input"]) < 16000
-    result = backends.read(tmp_path / "gpt-6-luna/one.result.json")
-    assert result["status"] == "ok"
+    backends.hosted(tmp_path, models=[model], budget=1)
+    assert len(bodies) == 3
+    assert 8192 < len(json.dumps(bodies[-1])) < 16000
+    result = backends.read(tmp_path / model / "one.result.json")
+    assert result["status"] == "ok" and result["response"] == "Written continuation"
     assert result["total_usage"]["input_tokens"] == 300
+    trace = backends.read(tmp_path / model / "one.retrieval.json")
+    assert trace["selected_scene_ids"] == ["large", "small"]

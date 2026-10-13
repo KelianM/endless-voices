@@ -1,6 +1,7 @@
 """Run local or hosted generation from saved benchmark prompts."""
 
 import importlib.metadata
+import json
 import time
 import urllib.error
 from pathlib import Path
@@ -273,49 +274,16 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
             for prompt in read(root / "prompts.json"):
                 sample_started = time.monotonic()
                 if indices:
-                    selection_folder = folder / (prompt["sample_id"] + ".retrieval")
-                    selection_folder.mkdir()
-
-                    def ask(messages, turn):
-                        result = hosted_request(
-                            root,
-                            selection_folder / str(turn),
-                            model,
-                            messages,
-                            key,
-                            budget,
-                            timeout_seconds,
-                        )
-                        if result["status"] != "ok":
-                            raise ValueError("Retrieval model request failed")
-                        return result["response"]
-
-                    limits = settings.get("dynamic_max_input_tokens", {})
-                    current = {**settings, "max_input_tokens": limits[model]}
-                    try:
-                        messages, trace = select_context(
-                            prepared.retrieval_session(indices[prompt["sample_id"]], database),
-                            current,
-                            counter,
-                            ask,
-                        )
-                        prompt = {**prompt, "messages": messages}
-                        save(folder / (prompt["sample_id"] + ".retrieval.json"), trace)
-                    except Exception as error:
-                        save(
-                            folder / (prompt["sample_id"] + ".result.json"),
-                            {
-                                "sample_id": prompt["sample_id"],
-                                "status": "failed",
-                                "response": "",
-                                "error": str(error),
-                                "elapsed_seconds": time.monotonic() - sample_started,
-                                **request_totals(
-                                    [read(p) for p in selection_folder.glob("*.result.json")]
-                                ),
-                            },
-                        )
+                    row = hosted_dialogue(
+                        root, folder / prompt["sample_id"], model,
+                        prepared.retrieval_session(indices[prompt["sample_id"]], database),
+                        settings["dynamic_max_input_tokens"][model], counter,
+                        key, budget, timeout_seconds,
+                    )
+                    print(model, prompt["sample_id"], row["status"], flush=True)
+                    if row["status"] != "ok":
                         break
+                    continue
                 save(
                     folder / (prompt["sample_id"] + ".prompt.json"),
                     {"messages": prompt["messages"]},
@@ -338,11 +306,91 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
             database.close()
 
 
-def hosted_request(root, path, model, messages, key, budget, timeout_seconds, *, started=None):
+def hosted_dialogue(root, path, model, session, limit, counter, key, budget, timeout_seconds):
+    """Generate with native retrieval tools and save the complete provider conversation."""
+    from endless_voices import providers
+
+    started = time.monotonic()
+    folder = path.parent / (path.name + ".retrieval")
+    folder.mkdir()
+    messages = session.initial_messages()
+    messages[0]["content"] += (
+        "\n\nRetrieve context as needed while composing the continuation. "
+        + (f"{session.history_count} eligible history scenes are available. "
+           if session.history_count else "No eligible mission history is available at any depth. ")
+        + "Use the mission history map and read_context IDs for continuity. "
+        "Search accepts your own queries and excludes scenes already retrieved. "
+        "Writing references are independent examples, not events in this playthrough. "
+        "Earlier scenes have already happened; write at the current scene and location. "
+        "After reading tool results, retrieve more if needed. "
+        "Your final response should contain only the finished continuation."
+    )
+    body = providers.payload(model, messages, tools=session.tool_schemas)
+    rows, turns = [], []
+    selected = set()
+
+    def fits(candidate):
+        # Include schemas, tool results and reasoning in the reference-tokenizer budget.
+        return counter.messages([{"role": "system", "content": json.dumps(candidate)}]) <= limit
+
+    row = {"status": "failed", "response": ""}
+    try:
+        while True:
+            if not fits(body):
+                raise ValueError("Native conversation exceeds the dynamic input budget")
+            row = hosted_request(root, folder / str(len(rows)), model, None, key,
+                                 budget, timeout_seconds, body=body)
+            rows.append(row)
+            if row["status"] != "ok":
+                break
+            response = row["api_response"]
+            calls = providers.tool_calls(model, response)
+            if not calls:
+                break
+            results = [{"error": "Tool result exceeds the remaining input budget"}
+                       for _ in calls]
+            for index, call in enumerate(calls):
+                try:
+                    arguments = call["arguments"]
+                    if isinstance(arguments, str):
+                        arguments = json.loads(arguments)
+                    session.selected_scene_ids = set(selected)
+                    documents = session.call_tool(call["name"], arguments)
+                    result = {"documents": [], "omitted_documents": len(documents)}
+                    results[index] = result
+                    for document in documents:
+                        result["documents"].append(document)
+                        result["omitted_documents"] -= 1
+                        candidate = providers.with_tool_results(body, response, calls, results)
+                        if not fits(candidate):
+                            result["documents"].pop()
+                            result["omitted_documents"] += 1
+                    selected.update(d["scene_id"] for d in result["documents"])
+                except (ValueError, TypeError, KeyError) as error:
+                    results[index] = {"error": str(error)}
+            turns.append({"calls": calls, "results": results})
+            body = providers.with_tool_results(body, response, calls, results)
+    except Exception as error:
+        row = {"status": "failed", "response": "", "error": str(error)}
+    conversation = body.get("input") or [{"role": "system", "content": body["system"]},
+                                         *body["messages"]]
+    if row["status"] == "ok":
+        save(path.parent / (path.name + ".prompt.json"), {"messages": conversation})
+    save(path.parent / (path.name + ".retrieval.json"), {
+        "turns": turns, "tools": session.trace, "selected_scene_ids": sorted(selected),
+    })
+    row = {**row, "sample_id": path.name, "elapsed_seconds": time.monotonic() - started,
+           **request_totals(rows), "request_count": len(rows)}
+    save(path.parent / (path.name + ".result.json"), row)
+    return row
+
+
+def hosted_request(root, path, model, messages, key, budget, timeout_seconds, *,
+                   started=None, body=None):
     """Record one paid generation request and reserve its cost before sending."""
     from endless_voices import providers
 
-    body = providers.payload(model, messages)
+    body = providers.payload(model, messages) if body is None else body
     reserved = 0.0
     for request in root.rglob("*.request.json"):
         result = request.with_name(request.name.replace(".request.", ".result."))
@@ -361,7 +409,7 @@ def hosted_request(root, path, model, messages, key, budget, timeout_seconds, *,
             estimated_cost_usd=providers.charge(model, response),
             response=providers.text(model, response),
         )
-        providers.validate(model, response)
+        providers.validate(model, response, allow_tools=bool(body.get("tools")))
         row["status"] = "ok"
     except urllib.error.HTTPError as error:
         row["error"] = f"HTTP {error.code}"

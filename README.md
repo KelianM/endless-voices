@@ -74,15 +74,16 @@ Open the database with the same model and encoding settings used to build it.
 - `static` fits complete scenes into `context.max_input_tokens`: nearby prerequisite history
   first, then scenes ranked by similarity to the visible encounter. `context.depth` controls
   nearby history. The default input budget is 8,192 tokens.
-- `dynamic` lets the model request history, semantic search and scene reads before writing.
-  The model emits JSON tool requests until it chooses to finish, then receives the selected
-  scenes for the final continuation. There is no retrieval-turn cap; context budgets still
-  apply, and hosted requests remain subject to the run’s spend ceiling.
+- `dynamic` lets the model request history, semantic search and scene reads. Hosted models
+  use native tool calls throughout generation: each result stays in the conversation, and
+  the model can retrieve again after reading it. Local models select context through JSON
+  requests before writing. There is no retrieval-turn cap; context budgets still apply,
+  and hosted requests remain subject to the run’s spend ceiling.
 
 Planet descriptions retain their names and systems. Origin, destination and configured
 planet descriptions appear in the initial prompt; planets in the reference scope or named
 in visible context and history are also searchable, with interpreted description changes.
-Dynamic search excludes scenes already selected, and the selector states when no eligible
+Dynamic search excludes scenes already selected, and the prompt states when no eligible
 mission history exists.
 
 Both policies use the same eligible scene pool. Search returns whole scenes ranked by their
@@ -128,7 +129,8 @@ Use `--context-mode dynamic` when preparing a separate dynamic run. The run conf
 fixes the mode for subsequent stages. `context.tokenizer` names the cached tokenizer used
 to select the common static context; `context.max_input_tokens` sets its 8,192-token budget.
 Hosted dynamic budgets are set per model in `context.dynamic_max_input_tokens`, measured
-with the same reference tokenizer rather than provider billing token counts. Local
+with the same reference tokenizer rather than provider billing token counts. Native requests
+include tool schemas, results and reasoning in that budget. Local
 configuration sets `max_input_tokens`; input plus `max_output_tokens` must fit
 `context_ceiling`. Larger hosted budgets do not enlarge the local Gemma prompt.
 

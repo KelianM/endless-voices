@@ -237,6 +237,13 @@ def test_dynamic_export_keeps_common_judge_evidence_and_verifies_selected_scenes
             if model == "gpt-6-luna":
                 messages = backends.read(folder / f"{sid}.request.json")["body"]["input"]
                 backends.save(folder / f"{sid}.prompt.json", {"messages": messages})
+                requests = folder / f"{sid}.retrieval"
+                requests.mkdir()
+                (folder / f"{sid}.request.json").rename(requests / "0.request.json")
+                result_path = folder / f"{sid}.result.json"
+                result = backends.read(result_path)
+                result["request_count"] = 1
+                result_path.write_text(json.dumps(result))
             backends.save(folder / f"{sid}.retrieval.json", {"selected_scene_ids": []})
     benchmark.export(recorded)
     private = backends.read(recorded / "assessment/private.json")
@@ -253,3 +260,22 @@ def test_prepared_run_rejects_replaced_retrieval_inputs(recorded, artifact):
     path.write_text(path.read_text() + "\n")
     with pytest.raises(ValueError, match="changed"):
         benchmark.checked_inputs(recorded)
+
+
+def test_native_export_rejects_ineligible_tool_text():
+    # Saved native transcripts must not bypass the eligible-pool check used for local runs.
+    from endless_voices.context import render
+    from endless_voices.retrieval import scene_id
+
+    block = {"mission": "Prior", "heading": "Prior", "passages": [
+        {"role": "narrator", "text": "Known history", "line": 1}]}
+    pool = ContextPool("sample", "conversation", "mission", "Lore", [], [block], {})
+    sid = scene_id(block)
+    document = {"id": sid, "scene_id": sid, "kind": "history", "text": render(block)}
+    messages = [*pool.messages(), {"type": "function_call_output", "call_id": "a",
+                                  "output": json.dumps({"documents": [document]})}]
+    benchmark.verify_tool_context(pool, messages, [sid])
+    document["text"] = "Withheld target"
+    messages[-1]["output"] = json.dumps({"documents": [document]})
+    with pytest.raises(ValueError, match="eligible scene"):
+        benchmark.verify_tool_context(pool, messages, [sid])
