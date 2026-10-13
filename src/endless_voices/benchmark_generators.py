@@ -8,9 +8,9 @@ from pathlib import Path
 from endless_voices import artifacts, context_generation, hosted_judge, providers
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
-from endless_voices.context import TokenizerCounter, render
+from endless_voices.context import TokenizerCounter
+from endless_voices.context_generation import verify_tool_context
 from endless_voices.dataset.storage import SceneDataset
-from endless_voices.retrieval import context_messages, passage_chunks, scene_id
 
 
 def checked_inputs(root):
@@ -80,7 +80,7 @@ def prepare(root, dataset, config, context_mode=None):
     with context_generation.open_database(context) as database:
         for i, (sid, row) in enumerate(records.items()):
             session = prepared.retrieval_session(i, database)
-            messages, traces[sid] = context_generation.select_context(
+            messages, traces[sid] = context_generation.select_static_context(
                 session, {**context, "mode": "static"}, counter)
             row["messages"] = [*messages, row["messages"][-1]]
             initial = messages if context["mode"] == "static" else session.initial_messages()
@@ -198,6 +198,8 @@ def export(root):
             raise ValueError("Provider implementation changed")
         if settings["artifact_code_sha256"] != screen.sha(root / "artifacts.py"):
             raise ValueError("Artifact implementation changed")
+        if settings["context_code_sha256"] != screen.sha(root / "context_generation.py"):
+            raise ValueError("Context implementation changed")
         raw_results = assess.indexed([screen.read(p) for p in source.glob("*.result.json")], ids)
         prompts, responses = {}, {}
         for sid, raw in raw_results.items():
@@ -210,13 +212,8 @@ def export(root):
             if dynamic:
                 actual_prompt = screen.read(source / f"{sid}.prompt.json")
                 trace = screen.read(source / f"{sid}.retrieval.json")
-                if model in plan["local_configs"]:
-                    messages = context_messages(pools[sid], trace["selected_scene_ids"])
-                    if actual_prompt["messages"] != messages:
-                        raise ValueError("Retrieved context differs from eligible scene selection")
-                else:
-                    messages = actual_prompt["messages"]
-                    verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
+                messages = actual_prompt["messages"]
+                verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
             prompt = {"sample_id": sid, "messages": messages,
                       "messages_sha256": assess.digest(assess.encoded(messages))}
             if model in plan["local_configs"]:
@@ -255,36 +252,6 @@ def export(root):
                           licensing=root / "attribution", input_provenance=selection,
                           shared_judge_context=True)
     verify_trials(root)
-
-
-def verify_tool_context(pool, messages, selected_ids):
-    """Check native tool evidence against the encounter's eligible scenes and passages."""
-    initial = pool.messages()
-    if (not messages[0]["content"].startswith(initial[0]["content"])
-            or messages[1:len(initial)] != initial[1:]):
-        raise ValueError("Native encounter differs from prepared context")
-    allowed = {}
-    for kind, blocks in (("history", pool.blocks), ("reference", pool.references)):
-        for block in blocks:
-            sid = scene_id(block)
-            allowed[sid] = (sid, kind, render(block))
-            for passage in passage_chunks(block):
-                allowed[passage["id"]] = (sid, kind, passage["text"])
-    selected = set()
-    for message in messages[len(initial):]:
-        outputs = ([message["output"]] if message.get("type") == "function_call_output"
-                   else [part["content"] for part in message.get("content", [])
-                         if isinstance(part, dict) and part.get("type") == "tool_result"])
-        for output in outputs:
-            for document in json.loads(output).get("documents", []):
-                expected = allowed.get(document["id"])
-                actual = (document["scene_id"], document["kind"],
-                          document.get("text", document.get("excerpt")))
-                if expected != actual:
-                    raise ValueError("Tool result differs from eligible scene evidence")
-                selected.add(document["scene_id"])
-    if selected != set(selected_ids):
-        raise ValueError("Retrieved scene selection differs from native tool results")
 
 
 def verify_trials(root, save=True):

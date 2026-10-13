@@ -74,11 +74,12 @@ Open the database with the same model and encoding settings used to build it.
 - `static` fits complete scenes into `context.max_input_tokens`: nearby prerequisite history
   first, then scenes ranked by similarity to the visible encounter. `context.depth` controls
   nearby history. The default input budget is 8,192 tokens.
-- `dynamic` lets the model request history, semantic search and scene reads. Hosted models
-  use native tool calls throughout generation: each result stays in the conversation, and
-  the model can retrieve again after reading it. Local models select context through JSON
-  requests before writing. There is no retrieval-turn cap; context budgets still apply,
-  and hosted requests remain subject to the run’s spend ceiling.
+- `dynamic` uses one retrieval loop for local and hosted models. Models call native tools
+  for history, semantic search and scene reads, then continue with the results in their
+  conversation. The same instructions and eligible evidence apply to every model. There
+  is no retrieval-turn cap; context budgets still apply, and hosted requests remain subject
+  to the run’s spend ceiling. Local MLX runs use the tokenizer's tool parser; Transformers
+  runs support Qwen's JSON-in-tool-tags format. Unsupported formats fail explicitly.
 
 Planet descriptions retain their names and systems. Origin, destination and configured
 planet descriptions appear in the initial prompt; planets in the reference scope or named

@@ -91,6 +91,7 @@ def recorded(tmp_path, request, monkeypatch):
                 "code_sha256": backends.sha(root / "generation_backends.py"),
                 "provider_code_sha256": backends.sha(root / "providers.py"),
                 "artifact_code_sha256": backends.sha(root / "artifacts.py"),
+                "context_code_sha256": backends.sha(root / "context_generation.py"),
             },
         )
         for sid in ["one", "two", "four"]:
@@ -234,16 +235,25 @@ def test_dynamic_export_keeps_common_judge_evidence_and_verifies_selected_scenes
     for model in selection["models"]:
         folder = recorded / model
         for sid in ("one", "two", "four"):
+            path = folder / f"{sid}.prompt.json"
             if model == "gpt-6-luna":
-                messages = backends.read(folder / f"{sid}.request.json")["body"]["input"]
-                backends.save(folder / f"{sid}.prompt.json", {"messages": messages})
+                body = backends.read(folder / f"{sid}.request.json")["body"]
+                messages = benchmark.context_generation.dynamic_messages(body["input"], 0)
+                backends.save(path, {"messages": messages})
+                body["input"] = messages
                 requests = folder / f"{sid}.retrieval"
                 requests.mkdir()
-                (folder / f"{sid}.request.json").rename(requests / "0.request.json")
+                backends.save(requests / "0.request.json", {"body": body})
+                (folder / f"{sid}.request.json").unlink()
                 result_path = folder / f"{sid}.result.json"
                 result = backends.read(result_path)
                 result["request_count"] = 1
                 result_path.write_text(json.dumps(result))
+            else:
+                prompt = backends.read(path)
+                prompt["messages"] = benchmark.context_generation.dynamic_messages(
+                    prompt["messages"], 0)
+                path.write_text(json.dumps(prompt))
             backends.save(folder / f"{sid}.retrieval.json", {"selected_scene_ids": []})
     benchmark.export(recorded)
     private = backends.read(recorded / "assessment/private.json")
@@ -272,7 +282,8 @@ def test_native_export_rejects_ineligible_tool_text():
     pool = ContextPool("sample", "conversation", "mission", "Lore", [], [block], {})
     sid = scene_id(block)
     document = {"id": sid, "scene_id": sid, "kind": "history", "text": render(block)}
-    messages = [*pool.messages(), {"type": "function_call_output", "call_id": "a",
+    messages = [*benchmark.context_generation.dynamic_messages(pool.messages(), len(pool.blocks)),
+                {"type": "function_call_output", "call_id": "a",
                                   "output": json.dumps({"documents": [document]})}]
     benchmark.verify_tool_context(pool, messages, [sid])
     document["text"] = "Withheld target"

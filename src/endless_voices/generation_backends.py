@@ -5,13 +5,18 @@ import json
 import time
 import urllib.error
 from pathlib import Path
-from types import SimpleNamespace
 
-from endless_voices import artifacts
+from endless_voices import artifacts, context_generation
 from endless_voices.artifacts import file_hash as sha
 from endless_voices.artifacts import read_json as read
 from endless_voices.artifacts import write_json as save
-from endless_voices.context_generation import benchmark_sessions, select_context
+from endless_voices.context_generation import (
+    benchmark_sessions,
+    dynamic_messages,
+    local_tool_response,
+    local_tool_results,
+    tool_loop,
+)
 
 
 def quantize_full_history(caches, full_cache_type, *, bits=8, group_size=64):
@@ -61,6 +66,7 @@ def local(root, config):
             **cfg,
             "code_sha256": sha(__file__),
             "artifact_code_sha256": sha(artifacts.__file__),
+            "context_code_sha256": sha(context_generation.__file__),
             "prompts_sha256": sha(root / "prompts.json"),
             "max_output_tokens": output_limit,
             "context_ceiling": context_limit,
@@ -94,118 +100,83 @@ def local(root, config):
             ),
         }
 
-        def count(messages):
-            rendered = tokenizer.apply_chat_template(
-                messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
-            )
-            return len(tokenizer.encode(rendered, add_special_tokens=False))
-
         for prompt in read(root / "prompts.json"):
             started = time.monotonic()
             row = {"sample_id": prompt["sample_id"], "status": "failed", "response": ""}
-            if indices:
-                mx.random.seed(42)
+            session = (prepared.retrieval_session(indices[prompt["sample_id"]], database)
+                       if indices else None)
+            tools = session.tool_schemas if session else None
+            trace = {"tools": session.trace} if session else None
+            actual = {}
 
-                def ask(messages, turn):
-                    rendered = tokenizer.apply_chat_template(
-                        messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
-                    )
-                    tokens = tokenizer.encode(rendered, add_special_tokens=False)
-                    request_folder = folder / (prompt["sample_id"] + ".retrieval")
-                    request_folder.mkdir(exist_ok=True)
-                    save(
-                        request_folder / f"{turn}.prompt.json",
-                        {"messages": messages, "rendered": rendered, "input_ids": tokens},
-                    )
-                    response, last = "", None
-                    try:
-                        for token in stream_generate(
-                            model,
-                            tokenizer,
-                            prompt=tokens,
-                            max_tokens=output_limit,
-                            sampler=make_sampler(temp=0),
-                            prefill_step_size=prefill_step_size,
-                            **local_cache(model, cfg, row),
-                        ):
-                            response += token.text
-                            last = token
-                            if mx.get_peak_memory() > 20_000_000_000:
-                                raise MemoryError("20 GB experiment ceiling exceeded")
-                            if time.monotonic() - started > 600:
-                                raise TimeoutError("600 second trial ceiling exceeded")
-                    finally:
-                        save(
-                            request_folder / f"{turn}.result.json",
-                            {
-                                "response": response,
-                                "finish_reason": last.finish_reason if last else None,
-                            },
-                        )
-                    if last is None or last.finish_reason != "stop":
-                        raise ValueError("Retrieval output limit or incomplete response")
-                    return response
+            def render(messages):
+                rendered = tokenizer.apply_chat_template(
+                    messages, tools=tools, tokenize=False, add_generation_prompt=True,
+                    enable_thinking=False,
+                )
+                return {"messages": messages, "tools": tools, "rendered": rendered,
+                        "input_ids": tokenizer.encode(rendered, add_special_tokens=False)}
 
-                try:
-                    messages, trace = select_context(
-                        prepared.retrieval_session(indices[prompt["sample_id"]], database),
-                        settings,
-                        SimpleNamespace(messages=count),
-                        ask,
-                    )
-                    prompt = {**prompt, "messages": messages}
-                    save(folder / (prompt["sample_id"] + ".retrieval.json"), trace)
-                except Exception as error:
-                    row.update(
-                        error=str(error),
-                        elapsed_seconds=time.monotonic() - started,
-                        peak_memory_bytes=mx.get_peak_memory(),
-                    )
-                    save(folder / (prompt["sample_id"] + ".result.json"), row)
-                    if isinstance(error, MemoryError) or "Insufficient Memory" in str(error):
-                        break
-                    continue
-            rendered = tokenizer.apply_chat_template(
-                prompt["messages"],
-                tokenize=False,
-                add_generation_prompt=True,
-                enable_thinking=False,
-            )
-            ids = tokenizer.encode(rendered, add_special_tokens=False)
-            save(
-                folder / (prompt["sample_id"] + ".prompt.json"),
-                {"messages": prompt["messages"], "rendered": rendered, "input_ids": ids},
-            )
-            try:
+            def ask(messages, turn):
+                nonlocal actual
+                actual = render(messages)
+                ids = actual["input_ids"]
                 if len(ids) + output_limit > context_limit:
                     raise ValueError("Context overflow; no truncation")
-                mx.random.seed(42)
-                last = None
-                cache_options = local_cache(model, cfg, row)
-                for token in stream_generate(
-                    model,
-                    tokenizer,
-                    prompt=ids,
-                    max_tokens=output_limit,
-                    sampler=make_sampler(temp=0),
-                    prefill_step_size=prefill_step_size,
-                    **cache_options,
-                ):
-                    row["response"] += token.text
-                    last = token
-                    if mx.get_peak_memory() > 20_000_000_000:
-                        raise MemoryError("20 GB experiment ceiling exceeded")
-                    if time.monotonic() - started > 600:
-                        raise TimeoutError("600 second trial ceiling exceeded")
-                if last:
-                    row.update(
-                        output_tokens=last.generation_tokens, finish_reason=last.finish_reason
-                    )
+                request_folder = folder / (prompt["sample_id"] + ".retrieval")
+                if session:
+                    request_folder.mkdir(exist_ok=True)
+                    save(request_folder / f"{turn}.prompt.json", actual)
+                response, last = "", None
+                try:
+                    for token in stream_generate(
+                        model, tokenizer, prompt=ids, max_tokens=output_limit,
+                        sampler=make_sampler(temp=0), prefill_step_size=prefill_step_size,
+                        **local_cache(model, cfg, row),
+                    ):
+                        response += token.text
+                        last = token
+                        if mx.get_peak_memory() > 20_000_000_000:
+                            raise MemoryError("20 GB experiment ceiling exceeded")
+                        if time.monotonic() - started > 600:
+                            raise TimeoutError("600 second trial ceiling exceeded")
+                finally:
+                    row.update(response=response,
+                               finish_reason=last.finish_reason if last else None,
+                               output_tokens=last.generation_tokens if last else 0)
+                    if session:
+                        save(request_folder / f"{turn}.result.json", {
+                            "response": response, "finish_reason": row["finish_reason"],
+                            "output_tokens": row["output_tokens"],
+                        })
                 if last is None or last.finish_reason != "stop":
                     raise ValueError("Output limit or incomplete response")
+                return (local_tool_response(tokenizer, response) if session
+                        else ({"content": response}, []))
+
+            try:
+                mx.random.seed(42)
+                if session:
+                    local_tool_response(tokenizer, "")
+                    _, response = tool_loop(
+                        session,
+                        dynamic_messages(session.initial_messages(), session.history_count),
+                        ask, local_tool_results,
+                        lambda messages: len(render(messages)["input_ids"])
+                        <= settings["max_input_tokens"], trace,
+                    )
+                else:
+                    response, _ = ask(prompt["messages"], 0)
+                row["response"] = response["content"]
+                if not row["response"].strip():
+                    raise ValueError("Empty continuation")
                 row["status"] = "ok"
             except Exception as error:
                 row["error"] = str(error)
+            if actual and (session is None or row["status"] == "ok"):
+                save(folder / (prompt["sample_id"] + ".prompt.json"), actual)
+            if session:
+                save(folder / (prompt["sample_id"] + ".retrieval.json"), trace)
             row.update(
                 elapsed_seconds=time.monotonic() - started, peak_memory_bytes=mx.get_peak_memory()
             )
@@ -261,6 +232,7 @@ def hosted(root, models=None, budget=5, timeout_seconds=1800):
                     "model": model,
                     "code_sha256": sha(__file__),
                     "artifact_code_sha256": sha(artifacts.__file__),
+                    "context_code_sha256": sha(context_generation.__file__),
                     "provider_code_sha256": sha(providers.__file__),
                     "prompts_sha256": sha(root / "prompts.json"),
                     "reasoning": "medium",
@@ -313,72 +285,35 @@ def hosted_dialogue(root, path, model, session, limit, counter, key, budget, tim
     started = time.monotonic()
     folder = path.parent / (path.name + ".retrieval")
     folder.mkdir()
-    messages = session.initial_messages()
-    messages[0]["content"] += (
-        "\n\nRetrieve context as needed while composing the continuation. "
-        + (f"{session.history_count} eligible history scenes are available. "
-           if session.history_count else "No eligible mission history is available at any depth. ")
-        + "Use the mission history map and read_context IDs for continuity. "
-        "Search accepts your own queries and excludes scenes already retrieved. "
-        "Writing references are independent examples, not events in this playthrough. "
-        "Earlier scenes have already happened; write at the current scene and location. "
-        "After reading tool results, retrieve more if needed. "
-        "Your final response should contain only the finished continuation."
+    body = providers.payload(
+        model, dynamic_messages(session.initial_messages(), session.history_count),
+        tools=session.tool_schemas,
     )
-    body = providers.payload(model, messages, tools=session.tool_schemas)
-    rows, turns = [], []
-    selected = set()
+    rows, trace = [], {"tools": session.trace}
 
     def fits(candidate):
         # Include schemas, tool results and reasoning in the reference-tokenizer budget.
         return counter.messages([{"role": "system", "content": json.dumps(candidate)}]) <= limit
 
-    row = {"status": "failed", "response": ""}
+    def ask(body, turn):
+        row = hosted_request(root, folder / str(turn), model, None, key,
+                             budget, timeout_seconds, body=body)
+        rows.append(row)
+        if row["status"] != "ok":
+            raise ValueError(row.get("error", "Hosted request failed"))
+        response = row["api_response"]
+        return response, providers.tool_calls(model, response)
+
     try:
-        while True:
-            if not fits(body):
-                raise ValueError("Native conversation exceeds the dynamic input budget")
-            row = hosted_request(root, folder / str(len(rows)), model, None, key,
-                                 budget, timeout_seconds, body=body)
-            rows.append(row)
-            if row["status"] != "ok":
-                break
-            response = row["api_response"]
-            calls = providers.tool_calls(model, response)
-            if not calls:
-                break
-            results = [{"error": "Tool result exceeds the remaining input budget"}
-                       for _ in calls]
-            for index, call in enumerate(calls):
-                try:
-                    arguments = call["arguments"]
-                    if isinstance(arguments, str):
-                        arguments = json.loads(arguments)
-                    session.selected_scene_ids = set(selected)
-                    documents = session.call_tool(call["name"], arguments)
-                    result = {"documents": [], "omitted_documents": len(documents)}
-                    results[index] = result
-                    for document in documents:
-                        result["documents"].append(document)
-                        result["omitted_documents"] -= 1
-                        candidate = providers.with_tool_results(body, response, calls, results)
-                        if not fits(candidate):
-                            result["documents"].pop()
-                            result["omitted_documents"] += 1
-                    selected.update(d["scene_id"] for d in result["documents"])
-                except (ValueError, TypeError, KeyError) as error:
-                    results[index] = {"error": str(error)}
-            turns.append({"calls": calls, "results": results})
-            body = providers.with_tool_results(body, response, calls, results)
+        body, _ = tool_loop(session, body, ask, providers.with_tool_results, fits, trace)
+        row = rows[-1]
     except Exception as error:
         row = {"status": "failed", "response": "", "error": str(error)}
     conversation = body.get("input") or [{"role": "system", "content": body["system"]},
                                          *body["messages"]]
     if row["status"] == "ok":
         save(path.parent / (path.name + ".prompt.json"), {"messages": conversation})
-    save(path.parent / (path.name + ".retrieval.json"), {
-        "turns": turns, "tools": session.trace, "selected_scene_ids": sorted(selected),
-    })
+    save(path.parent / (path.name + ".retrieval.json"), trace)
     row = {**row, "sample_id": path.name, "elapsed_seconds": time.monotonic() - started,
            **request_totals(rows), "request_count": len(rows)}
     save(path.parent / (path.name + ".result.json"), row)

@@ -1,8 +1,16 @@
-"""Select eligible context before generating a continuation."""
+"""Select static context or retrieve evidence during generation."""
 
 import json
+import re
 
-from endless_voices.retrieval import DEFAULT_EMBEDDING_MODEL, SceneDatabase, TransformersEmbedder
+from endless_voices.context import render
+from endless_voices.retrieval import (
+    DEFAULT_EMBEDDING_MODEL,
+    SceneDatabase,
+    TransformersEmbedder,
+    passage_chunks,
+    scene_id,
+)
 
 
 def open_database(settings):
@@ -17,99 +25,104 @@ def open_database(settings):
     return SceneDatabase(settings["index"], encoder)
 
 
-def select_context(session, settings, counter, ask=None):
-    """Return final context messages and a trace of model-directed retrieval."""
-    limit = settings["max_input_tokens"]
-    if type(limit) is not int or limit <= 0:
-        raise ValueError("max_input_tokens must be positive")
-    if settings["mode"] == "static":
-        messages = session.static_messages(counter, limit, settings.get("depth", 4))
-        return messages, {
-            "tools": session.trace,
-            "selected_scene_ids": session.trace[-1]["result_ids"],
-        }
-    if settings["mode"] != "dynamic" or ask is None:
-        raise ValueError("Dynamic context requires a model callback")
-    instruction = (
-        f"Select context for mission {session.mission!r}. Do not write the passage yet. "
-        + (f"{session.history_count} eligible history scenes are available. "
-           if session.history_count else "No eligible mission history is available at any depth. ")
-        + "This call is only for context selection. Reply only with JSON: "
-        '{"name":"search_context","arguments":{...}} to call a tool, '
-        'or {"name":"finish","arguments":{}} when ready. '
-        "Retrieved scenes that fit are included automatically. "
-        "Search excludes scenes already selected. "
-        "Use the history map and read_context IDs for mission continuity. "
+def select_static_context(session, settings, counter):
+    """Return static context and its selected scene IDs."""
+    messages = session.static_messages(
+        counter, settings["max_input_tokens"], settings.get("depth", 4))
+    return messages, {"tools": session.trace,
+                      "selected_scene_ids": session.trace[-1]["result_ids"]}
+
+
+def dynamic_messages(messages, history_count):
+    """Return the encounter and shared instructions for model-directed retrieval."""
+    messages[0]["content"] += (
+        "\n\nRetrieve context as needed while composing the continuation. "
+        + (f"{history_count} eligible history scenes are available. "
+           if history_count else "No eligible mission history is available at any depth. ")
+        + "Use the mission history map and read_context IDs for continuity. "
+        "Search accepts your own queries and excludes scenes already retrieved. "
+        "Writing references are independent examples, not events in this playthrough. "
         "Earlier scenes have already happened; write at the current scene and location. "
-        "Search writing references only for missing facts or voice examples. "
-        "Finish once the selected context supports the next passage; exhaustive coverage "
-        "is unnecessary. If a search adds no useful evidence, finish unless a specific "
-        "unanswered question needs a different tool or query. Available tools: "
-        + json.dumps(session.tool_schemas)
+        "After reading tool results, retrieve more if needed. "
+        "Your final response should contain only the finished continuation."
     )
-    session.trace.clear()
-    selected, turns, progress = [], [], []
+    return messages
 
-    def selector(ids, feedback):
-        messages = session.messages_for(ids)
-        messages[0] = {**messages[0], "content": messages[0]["content"] + "\n\n" + instruction}
-        messages[-1] = {
-            **messages[-1],
-            "content": messages[-1]["content"]
-            + "\n\nRetrieval so far: "
-            + json.dumps([*progress, feedback] if feedback is not None else progress)
-            + '\nDo not write the passage. Reply only with a JSON tool call, or '
-            + '{"name":"finish","arguments":{}} if the context is sufficient.',
-        }
-        return messages
 
+def tool_loop(session, conversation, ask, continue_with, fits, trace):
+    """Retrieve and generate until a complete response contains no tool calls."""
+    selected = set()
+    trace.update(turns=[], selected_scene_ids=[])
     while True:
-        messages = selector(selected, None)
-        if counter.messages(messages) > limit:
-            raise ValueError("Retrieval instructions and encounter exceed the input budget")
-        response = ask(messages, len(turns))
-        entry = {"messages": messages, "response": response}
-        turns.append(entry)
-        try:
-            call = json.loads(response)
-            if set(call) != {"name", "arguments"}:
-                raise ValueError("Expected name and arguments")
-            if call["name"] == "finish":
-                if call["arguments"] != {}:
-                    raise ValueError("finish takes no arguments")
-                break
-            session.selected_scene_ids = set(selected)
-            documents = session.call_tool(call["name"], call["arguments"])
-            accepted, omitted = [], 0
-            before = set(selected)
+        if not fits(conversation):
+            raise ValueError("Native conversation exceeds the dynamic input budget")
+        response, calls = ask(conversation, len(trace["turns"]))
+        if not calls:
+            return conversation, response
+        results = [{"error": "Tool result exceeds the remaining input budget"} for _ in calls]
+        for index, call in enumerate(calls):
+            try:
+                arguments = call["arguments"]
+                if isinstance(arguments, str):
+                    arguments = json.loads(arguments)
+                session.selected_scene_ids = set(selected)
+                documents = session.call_tool(call["name"], arguments)
+                result = {"documents": [], "omitted_documents": len(documents)}
+                results[index] = result
+                for document in documents:
+                    result["documents"].append(document)
+                    result["omitted_documents"] -= 1
+                    if not fits(continue_with(conversation, response, calls, results)):
+                        result["documents"].pop()
+                        result["omitted_documents"] += 1
+                selected.update(d["scene_id"] for d in result["documents"])
+            except (ValueError, TypeError, KeyError) as error:
+                results[index] = {"error": str(error)}
+        trace["turns"].append({"calls": calls, "results": results})
+        trace["selected_scene_ids"] = sorted(selected)
+        conversation = continue_with(conversation, response, calls, results)
 
-            def feedback():
-                return {**call, "added_scenes": len(set(accepted) - before),
-                        "already_selected_scenes": len(set(accepted) & before),
-                        "omitted_scenes": omitted}
-            for document in documents:
-                sid = document["scene_id"]
-                candidate = selected if sid in selected else [*selected, sid]
-                accepted.append(sid)
-                if counter.messages(selector(candidate, feedback())) <= limit:
-                    selected = candidate
-                else:
-                    accepted.pop()
-                    omitted += 1
-            while counter.messages(selector(selected, feedback())) > limit and selected:
-                removed = selected.pop()
-                accepted = [sid for sid in accepted if sid != removed]
-                omitted += 1
-            entry["result"] = feedback()
-            progress.append(entry["result"])
-        except (ValueError, TypeError, KeyError) as error:
-            entry["result"] = {"response": response, "error": str(error)}
-            progress.append(entry["result"])
-    return session.messages_for(selected), {
-        "turns": turns,
-        "tools": session.trace,
-        "selected_scene_ids": selected,
-    }
+
+def local_tool_response(tokenizer, text):
+    """Parse native local tool calls, retaining assistant text between calls."""
+    if getattr(tokenizer, "has_tool_calling", False):
+        start, end = tokenizer.tool_call_start, tokenizer.tool_call_end
+        parse = tokenizer.tool_parser
+    elif "<tool_call>" in (tokenizer.chat_template or ""):
+        start, end, parse = "<tool_call>", "</tool_call>", json.loads
+    else:
+        raise ValueError("Local tokenizer has no supported native tool format")
+    think_start = getattr(tokenizer, "think_start", None) or "<think>"
+    think_end = getattr(tokenizer, "think_end", None) or "</think>"
+    thought_pattern = re.escape(think_start) + r"(.*?)" + re.escape(think_end)
+    thoughts = re.findall(thought_pattern, text, flags=re.DOTALL)
+    if text.count(think_start) != len(thoughts):
+        raise ValueError("Incomplete native reasoning block")
+    text = re.sub(thought_pattern, "", text, flags=re.DOTALL)
+    pattern = re.escape(start) + r"(.*?)" + re.escape(end)
+    segments = re.findall(pattern, text, flags=re.DOTALL)
+    if text.count(start) != len(segments):
+        raise ValueError("Incomplete native tool call")
+    calls = []
+    for segment in segments:
+        parsed = parse(segment)
+        calls.extend(parsed if isinstance(parsed, list) else [parsed])
+    content = re.sub(pattern, "", text, flags=re.DOTALL).strip()
+    response = {"role": "assistant", "content": content}
+    if thoughts:
+        response["reasoning_content"] = "\n".join(thoughts).strip()
+    return response, calls
+
+
+def local_tool_results(messages, response, calls, results):
+    """Append assistant calls and named tool results for the model's chat template."""
+    ids = [f"call-{len(messages)}-{i}" for i in range(len(calls))]
+    return [*messages, {**response, "tool_calls": [
+        {"id": id_, "type": "function", "function": call}
+        for id_, call in zip(ids, calls, strict=True)]}, *[
+        {"role": "tool", "tool_call_id": id_, "name": call["name"],
+         "content": json.dumps(result)}
+        for id_, call, result in zip(ids, calls, results, strict=True)]]
 
 
 def benchmark_sessions(root, settings):
@@ -134,3 +147,33 @@ def benchmark_sessions(root, settings):
     if set(indices) != set(selection["ids"]):
         raise ValueError("Selected encounters are missing from prepared dataset")
     return open_database(settings), dataset, indices
+
+
+def verify_tool_context(pool, messages, selected_ids):
+    """Check native tool evidence against the encounter's eligible scenes and passages."""
+    initial = dynamic_messages(pool.messages(), len(pool.blocks))
+    if messages[:len(initial)] != initial:
+        raise ValueError("Native encounter differs from prepared context")
+    allowed = {}
+    for kind, blocks in (("history", pool.blocks), ("reference", pool.references)):
+        for block in blocks:
+            sid = scene_id(block)
+            allowed[sid] = (sid, kind, render(block))
+            for passage in passage_chunks(block):
+                allowed[passage["id"]] = (sid, kind, passage["text"])
+    selected = set()
+    for message in messages[len(initial):]:
+        outputs = ([message["output"]] if message.get("type") == "function_call_output"
+                   else [message["content"]] if message.get("role") == "tool"
+                   else [part["content"] for part in message.get("content", [])
+                         if isinstance(part, dict) and part.get("type") == "tool_result"])
+        for output in outputs:
+            for document in json.loads(output).get("documents", []):
+                expected = allowed.get(document["id"])
+                actual = (document["scene_id"], document["kind"],
+                          document.get("text", document.get("excerpt")))
+                if expected != actual:
+                    raise ValueError("Tool result differs from eligible scene evidence")
+                selected.add(document["scene_id"])
+    if selected != set(selected_ids):
+        raise ValueError("Retrieved scene selection differs from native tool results")

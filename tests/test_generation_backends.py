@@ -201,58 +201,49 @@ def test_local_runner_preserves_limits_cache_and_partial_failures(tmp_path, monk
         assert saved["messages"] == prompt["messages"]
 
 
-def test_dynamic_selection_waits_for_finish_without_leaking_oversized_scenes():
-    # Retrieval must continue past eight turns while oversized scenes stay out of the prompt.
-    from endless_voices.context_generation import select_context
+def test_local_native_loop_continues_after_reading_without_a_turn_cap():
+    # A ninth retrieval must still work, and oversized results must not reach the model.
+    from endless_voices.context_generation import (
+        dynamic_messages,
+        local_tool_response,
+        local_tool_results,
+        tool_loop,
+    )
 
     class Session:
-        trace = []
-        tool_schemas = []
-        mission = "Current mission"
-        history_count = 0
-
-        def messages_for(self, ids):
-            return [
-                {"role": "system", "content": "Write dialogue"},
-                {
-                    "role": "user",
-                    "content": "Encounter "
-                    + " ".join("x" * 4000 if sid == "large" else "useful lore" for sid in ids),
-                },
-            ]
+        selected_scene_ids = set()
 
         def call_tool(self, name, arguments):
             assert name == "search_context"
-            self.trace.append({"tool": name, "arguments": arguments})
-            return [{"scene_id": sid} for sid in ("large", "small")]
+            return [{"scene_id": "large", "text": "x" * 20000},
+                    {"scene_id": "small", "text": "useful lore"}]
 
+    tokenizer = SimpleNamespace(chat_template="<tool_call>")
     requests = []
-    responses = iter(
-        ['{"name":"search_context","arguments":{}}'] * 9
-        + ['{"name":"finish","arguments":{}}']
-    )
 
     def ask(messages, turn):
         requests.append(messages)
-        assert sum(len(m["content"]) for m in messages) <= 3500
-        return next(responses)
+        if turn:
+            assert messages[-1]["role"] == "tool"
+            assert messages[-2]["tool_calls"][0]["id"] == messages[-1]["tool_call_id"]
+            assert "useful lore" in messages[-1]["content"]
+            assert "x" * 20000 not in json.dumps(messages)
+        text = ('<think>Consider <tool_call>not an actual call</tool_call></think>'
+                '<tool_call>{"name":"search_context","arguments":{}}</tool_call>'
+                if turn < 9 else "<think></think>Written continuation")
+        return local_tool_response(tokenizer, text)
 
-    messages, trace = select_context(
-        Session(),
-        {"mode": "dynamic", "max_input_tokens": 3500},
-        SimpleNamespace(messages=lambda ms: sum(len(m["content"]) for m in ms)),
-        ask,
+    trace = {}
+    messages, response = tool_loop(
+        Session(), dynamic_messages([{"role": "system", "content": "Encounter"}], 0),
+        ask, local_tool_results, lambda ms: len(json.dumps(ms)) <= 15000, trace,
     )
-    assert "Current mission" in requests[0][0]["content"]
-    assert "No eligible mission history" in requests[0][0]["content"]
-    assert '"added_scenes": 1' in requests[1][-1]["content"]
-    assert '"name": "search_context"' in requests[1][-1]["content"]
-    assert '"added_scenes": 0' in requests[2][-1]["content"]
-    assert len(requests) == 10
+    assert "No eligible mission history" in messages[0]["content"]
+    assert len(requests) == 10 and response["content"] == "Written continuation"
     assert trace["selected_scene_ids"] == ["small"]
-    assert "useful lore" in requests[1][-1]["content"]
-    assert "Choose the next" not in messages[-1]["content"]
-    assert trace["turns"][0]["result"]["omitted_scenes"] == 1
+    assert trace["turns"][0]["results"][0]["omitted_documents"] == 1
+    with pytest.raises(ValueError, match="Incomplete"):
+        local_tool_response(tokenizer, '<tool_call>{"name":"read_context"}')
 
 
 def test_retrieval_requests_reserve_failed_costs_across_nested_folders(tmp_path, monkeypatch):

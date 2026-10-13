@@ -14,8 +14,8 @@ two policies over the same permitted material, with budgets that fit each model.
 
 - **Select static or dynamic context at runtime.** Both modes retrieve from the same scene
   database. Static selection fits nearby prerequisite history first, then semantic matches.
-  Dynamic selection lets the model request history, search and reads. Hosted models use
-  native tools while composing; local models select context before writing.
+  Dynamic generation lets local and hosted models request history, search and reads through
+  one tool loop, with shared instructions and each model's native call format.
 - **Preparation saves encounters and eligible pools, not sampled prompts.** State interpretation
   from [ADR 9](0009-build-examples-from-consistent-game-state.md) determines permitted scenes.
   Retrieval enforces branch, split and target boundaries before ranking or reading.
@@ -30,9 +30,9 @@ two policies over the same permitted material, with budgets that fit each model.
 
 ## Consequences
 
-- **Hosted conversations retain tool results and reasoning between calls.** The growing
-  transcript consumes the input budget. Separate JSON selection was replaced for hosted
-  models because it prevented native tool use during composition.
+- **Dynamic conversations retain tool results and reasoning between calls.** The growing
+  transcript consumes the input budget. Separate JSON selection was rejected because it
+  prevented tool use during composition and gave local models a different retrieval flow.
 - **Retrieval choices become part of model performance.** Dynamic selection can find useful
   scenes the static heuristic misses, but adds model calls and may choose worse context.
 - **Context limits do not prevent repeated calls.** Queries can repeat without adding scenes.

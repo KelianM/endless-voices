@@ -27,9 +27,10 @@ whole scene ([ADR 11](adr/0011-rank-passages-and-return-their-parent-scenes.md))
 
 [Context selection](../src/endless_voices/context_generation.py) supplies two policies over
 the same pool. Static selection fits nearby mission history, then semantic matches, within
-a token budget. Hosted dynamic generation uses native tool calls and retains the conversation
-between retrievals; local models select context through JSON before writing. Both policies
-record the selected context and omit complete results that exceed the input budget
+a token budget. Dynamic generation uses the same tool loop and instructions for local and
+hosted models, retaining the conversation between retrievals. Provider APIs and local chat
+templates supply their native call formats. Both policies record selected context and omit
+complete results that exceed the input budget
 ([ADR 10](adr/0010-let-agents-retrieve-context-through-shared-tools.md)).
 
 ## Training and evaluation

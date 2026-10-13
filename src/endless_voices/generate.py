@@ -20,7 +20,14 @@ from endless_voices.artifacts import digest, encoded, file_hash
 from endless_voices.artifacts import save_progress as write_json
 from endless_voices.common import load_config, load_tokenizer
 from endless_voices.context import TokenizerCounter
-from endless_voices.context_generation import open_database, select_context
+from endless_voices.context_generation import (
+    dynamic_messages,
+    local_tool_response,
+    local_tool_results,
+    open_database,
+    select_static_context,
+    tool_loop,
+)
 from endless_voices.contracts import evaluation_messages
 from endless_voices.dataset.storage import SceneDataset
 
@@ -248,7 +255,8 @@ def load_condition(args, config, run, base_path, tokenizer) -> tuple:
     return model, tokenizer, device, context_limit, generation
 
 
-def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None, messages=None):
+def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None, messages=None,
+                   tools=None):
     messages = evaluation_messages(record) if messages is None else messages
     if prompt is None:
         prompt = {}
@@ -259,10 +267,17 @@ def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None
             "messages_sha256": digest(encoded(messages)),
         }
     )
-    rendered = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    options = {"tools": tools, "enable_thinking": False} if tools else {}
+    if tools:
+        prompt["tools"] = tools
+    rendered = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True, **options,
+    )
     prompt["rendered_prompt_sha256"] = digest(rendered.encode("utf-8"))
     cursor = 0
     for message in messages:
+        if message["role"] == "tool":
+            continue
         position = rendered.find(message["content"], cursor)
         if position < 0:
             raise ValueError("chat template omits or transforms authored message content")
@@ -273,6 +288,7 @@ def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None
         return_tensors="pt",
         return_dict=True,
         truncation=False,
+        **options,
     )
     ids = inputs["input_ids"][0].tolist()
     prompt.update(
@@ -310,54 +326,60 @@ def generate_response(
     set_seed(seed)
     try:
         messages = evaluation_messages(record)
-        if session is not None:
+        tools = session.tool_schemas if session else None
 
-            def ask(selection, turn):
-                selection_prompt, selection_inputs = prepare_prompt(
-                    record, tokenizer, context_limit, args.max_new_tokens, messages=selection
-                )
-                request = {"turn": turn, **selection_prompt}
-                result.setdefault("retrieval_requests", []).append(request)
-                with torch.inference_mode():
-                    output = model.generate(
-                        **selection_inputs.to(device),
-                        generation_config=generation,
-                        use_model_defaults=False,
-                    )
-                ids = output[0, selection_prompt["input_tokens"] :].tolist()
-                request["output_ids"] = ids
-                eos = generation.eos_token_id
-                eos = [eos] if isinstance(eos, int) else eos
-                if not ids or ids[-1] not in (eos or []):
-                    raise ValueError("Retrieval output limit or incomplete response")
-                return tokenizer.decode(ids, skip_special_tokens=True).strip()
-
-            messages, trace = select_context(session, settings, TokenizerCounter(tokenizer), ask)
-            result["retrieval"] = trace
-        prompt, inputs = prepare_prompt(
-            record, tokenizer, context_limit, args.max_new_tokens, prompt, messages
-        )
-        if context_info and "error" in context_info:
-            raise ValueError(context_info["error"])
-        result.update(
-            {
-                "seed": seed,
-                "input_tokens": prompt["input_tokens"],
-                "messages_sha256": prompt["messages_sha256"],
-                "input_ids_sha256": prompt["input_ids_sha256"],
-            }
-        )
-        set_seed(seed)
-        stage = "generation"
-        with torch.inference_mode():
-            output = model.generate(
-                **inputs.to(device), generation_config=generation, use_model_defaults=False
+        def ask(messages, turn):
+            nonlocal prompt, stage
+            prompt = {}
+            prompt, inputs = prepare_prompt(
+                record, tokenizer, context_limit, args.max_new_tokens, prompt=prompt,
+                messages=messages, tools=tools,
             )
-        ids = output[0, prompt["input_tokens"] :].tolist()
-        response = tokenizer.decode(ids, skip_special_tokens=True).strip()
-        eos = generation.eos_token_id
-        eos = [eos] if isinstance(eos, int) else eos
-        finish = "eos" if ids and ids[-1] in (eos or []) else "length"
+            if context_info and "error" in context_info:
+                raise ValueError(context_info["error"])
+            request = {"turn": turn, **prompt}
+            if session:
+                result.setdefault("retrieval_requests", []).append(request)
+            stage = "generation"
+            with torch.inference_mode():
+                output = model.generate(
+                    **inputs.to(device), generation_config=generation, use_model_defaults=False,
+                )
+            ids = output[0, prompt["input_tokens"]:].tolist()
+            eos = generation.eos_token_id
+            eos = [eos] if isinstance(eos, int) else eos
+            finish = "eos" if ids and ids[-1] in (eos or []) else "length"
+            request.update(output_ids=ids, finish_reason=finish)
+            result.update(output_ids=ids, output_tokens=len(ids), finish_reason=finish,
+                          response=tokenizer.decode(ids, skip_special_tokens=True).strip())
+            if session:
+                if finish != "eos":
+                    raise ValueError("Output limit or incomplete response")
+                return local_tool_response(tokenizer, tokenizer.decode(ids[:-1],
+                                                                       skip_special_tokens=False))
+            return {"content": result["response"]}, []
+
+        result["seed"] = seed
+        if session:
+            local_tool_response(tokenizer, "")
+            trace = {"tools": session.trace}
+            result["retrieval"] = trace
+
+            def fits(messages):
+                ids = tokenizer.apply_chat_template(
+                    messages, tools=tools, tokenize=True, add_generation_prompt=True,
+                    enable_thinking=False,
+                )
+                return len(ids) <= min(settings["max_input_tokens"],
+                                       context_limit - args.max_new_tokens)
+
+            _, answer = tool_loop(
+                session, dynamic_messages(session.initial_messages(), session.history_count),
+                ask, local_tool_results, fits, trace,
+            )
+        else:
+            answer, _ = ask(messages, 0)
+        response, ids, finish = answer["content"], result["output_ids"], result["finish_reason"]
         result.update(
             {
                 "response": response,
@@ -383,7 +405,7 @@ def generate_response(
     except Exception as error:
         result["error"] = {"stage": stage, "type": type(error).__name__, "message": str(error)}
     finally:
-        if prompt:
+        if prompt and (session is None or result["status"] == "ok"):
             append_json(prompts, prompt)
     for key in ("messages_sha256", "input_ids_sha256", "input_tokens"):
         if key in prompt:
@@ -440,7 +462,7 @@ def run_generation(args) -> int:
                 for record in records:
                     sid = record["metadata"]["id"]
                     try:
-                        messages, trace = select_context(
+                        messages, trace = select_static_context(
                             prepared.retrieval_session(indices[sid], database),
                             settings,
                             TokenizerCounter(selection_tokenizer),

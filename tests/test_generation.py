@@ -384,3 +384,54 @@ def test_checkpoint_sampling_defaults_cannot_override_recorded_greedy(args, base
     assert run["generation_config"]["do_sample"] is False
     assert observed == [False]
     assert run["generation_config"]["eos_token_id"] == eos
+
+
+def test_transformers_retrieves_then_continues_in_the_same_conversation(tokenizer, monkeypatch):
+    # Decoding away native call markers or resetting to a final prompt loses retrieval evidence.
+    import io
+    from types import SimpleNamespace
+
+    tokenizer.chat_template = (
+        '{# <tool_call> #}{% if tools %}{{ tools|tojson }}{% endif %}'
+        '{% for m in messages %}{{ m.role }}: {{ m.content }}'
+        '{% if m.tool_calls %}{{ m.tool_calls|tojson }}{% endif %}{% endfor %}'
+        '{% if add_generation_prompt %}assistant: {% endif %}'
+    )
+    native = '<tool_call>{"name":"read_context","arguments":{"ids":["prior"]}}</tool_call>'
+    monkeypatch.setattr(tokenizer, 'decode', lambda ids, **kw: native if ids[0] == 2 else 'hello')
+
+    class Model(ReplyModel):
+        def generate(self, *a, **kw):
+            self.output = (2 if not self.inputs else 3, 1)
+            return super().generate(*a, **kw)
+
+    class Session:
+        history_count = 1
+        trace = []
+        tool_schemas = [{'type': 'function', 'function': {
+            'name': 'read_context', 'parameters': {'type': 'object'}}}]
+
+        def initial_messages(self):
+            return [{'role': 'system', 'content': 'Lore'}, {'role': 'user', 'content': 'Encounter'}]
+
+        def call_tool(self, name, arguments):
+            assert name == 'read_context' and arguments == {'ids': ['prior']}
+            return [{'scene_id': 'prior', 'text': 'Known fact'}]
+
+    record = json.loads((FIXTURES / 'validation.jsonl').read_text().splitlines()[0])
+    record['messages'] = [*Session().initial_messages(),
+                          {'role': 'assistant', 'content': 'Withheld answer'}]
+    handle, model = io.StringIO(), Model()
+    result = gen.generate_response(
+        record, model, tokenizer, 'cpu', 4096, GenerationConfig(eos_token_id=1),
+        SimpleNamespace(seed=42, max_new_tokens=64), handle, Session(),
+        {'max_input_tokens': 4000},
+    )
+    assert result['status'] == 'ok' and result['response'] == 'hello', result.get('error')
+    assert len(model.inputs) == 2
+    prompt = json.loads(handle.getvalue())
+    assert prompt['messages'][-1]['role'] == 'tool'
+    assert 'Known fact' in prompt['messages'][-1]['content']
+    assert 'Withheld answer' not in json.dumps(prompt)
+    assert len(result['retrieval_requests']) == 2
+    assert result['retrieval']['selected_scene_ids'] == ['prior']
