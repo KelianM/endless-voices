@@ -32,10 +32,13 @@ def select_context(session, settings, counter, ask=None):
         raise ValueError("Dynamic context requires a model callback")
     instruction = (
         f"Select context for mission {session.mission!r}. Do not write the passage yet. "
-        "This call is only for context selection. Reply only with JSON: "
+        + (f"{session.history_count} eligible history scenes are available. "
+           if session.history_count else "No eligible mission history is available at any depth. ")
+        + "This call is only for context selection. Reply only with JSON: "
         '{"name":"search_context","arguments":{...}} to call a tool, '
         'or {"name":"finish","arguments":{}} when ready. '
         "Retrieved scenes that fit are included automatically. "
+        "Search excludes scenes already selected. "
         "Use mission history for continuity, especially before writing an opening. "
         "Search writing references only for missing facts or voice examples. "
         "Finish once the selected context supports the next passage; exhaustive coverage "
@@ -74,6 +77,7 @@ def select_context(session, settings, counter, ask=None):
                 if call["arguments"] != {}:
                     raise ValueError("finish takes no arguments")
                 break
+            session.selected_scene_ids = set(selected)
             documents = session.call_tool(call["name"], call["arguments"])
             accepted, omitted = [], 0
             before = set(selected)

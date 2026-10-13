@@ -1,6 +1,7 @@
 """Build state-consistent scene examples through one preparation pipeline."""
 
 import json
+import re
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -9,6 +10,7 @@ from urllib.parse import quote
 import z3
 
 from endless_voices.context import ContextPool, digest
+from endless_voices.context import render as render_block
 from endless_voices.contracts import validate_record
 from endless_voices.game_variables import mission_values, render
 from endless_voices.instructions import SCENE_INSTRUCTIONS, scene_task
@@ -560,20 +562,21 @@ class ExampleBuilder:
             sid = "scene-" + key[:24]
             cid = "conversation-" + digest(
                 [node.get("source_path", mission.path), node["line"]])[:24]
-            descriptions = dict(self.corpus.descriptions)
-            for change in route.state.world:
-                t = change["tokens"]
-                if t[0] == "planet" and len(t) == 2:
-                    paragraphs = [n for n in change["children"] if n["tokens"][0] == "description"]
-                    if paragraphs:
-                        descriptions[t[1]] = [{"text": n["tokens"][1]} for n in paragraphs]
-            lore = "\n\n".join(
-                p["text"] for name in sorted(lore_names) for p in descriptions.get(name, [])
-            )
+            planets = self.corpus.planet_references(route.state.world)
+            lore = "\n\n".join(render_block(block) for block in planets
+                                 if block["name"] in lore_names)
             task = scene_task(has_prefix=bool(route.prefix))
             pool = self.sampler.pool(
                 sid, cid, mission, history, route.prefix, lore, split, task
             )
+            paths = self.sampler.reference_paths.get(mission.name, {mission.path})
+            directories = {str(Path(path).parent) for path in paths}
+            visible = "\n".join([pool.system_prefix, *(m["content"] for m in pool.encounter),
+                                 *(render_block(b) for b in pool.blocks)])
+            pool.references.extend(block for block in planets
+                                   if str(Path(block["path"]).parent) in directories
+                                   or block["name"] in lore_names
+                                   or re.search(r"\b" + re.escape(block["name"]) + r"\b", visible))
             target = "\n\n".join(render(p.text, values)[0] for p in route.paragraphs)
             target_lines = {p.line for p in route.paragraphs}
             if any(p.line in target_lines for p in route.prefix):

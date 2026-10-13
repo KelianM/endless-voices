@@ -290,6 +290,8 @@ class RetrievalSession:
         self.database = database
         self._pool = deepcopy(pool)
         self.mission = pool.mission
+        self.history_count = len(pool.blocks)
+        self.selected_scene_ids = set()
         self._allowed = {}
         self._chunks = {}
         self.trace = []
@@ -355,7 +357,8 @@ class RetrievalSession:
         """Rank passages and return distinct full scenes, or passages when expansion is disabled."""
         if type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("limit must be an integer from 1 to 100")
-        documents = self._rank(query, kind, expand_scenes)[:limit]
+        documents = [doc for doc in self._rank(query, kind, expand_scenes)
+                     if doc["scene_id"] not in self.selected_scene_ids][:limit]
         return self._record("search_context", {
             "query": query, "kind": kind, "limit": limit, "expand_scenes": expand_scenes,
         }, documents)

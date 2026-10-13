@@ -79,6 +79,12 @@ Open the database with the same model and encoding settings used to build it.
   scenes for the final continuation. There is no retrieval-turn cap; context budgets still
   apply, and hosted requests remain subject to the run’s spend ceiling.
 
+Planet descriptions retain their names and systems. Origin, destination and configured
+planet descriptions appear in the initial prompt; planets in the reference scope or named
+in visible context and history are also searchable, with interpreted description changes.
+Dynamic search excludes scenes already selected, and the selector states when no eligible
+mission history exists.
+
 Both policies use the same eligible scene pool. Search returns whole scenes ranked by their
 strongest passage; the lower-level retrieval API also supports passage-only results. Runs
 save actual prompts and retrieval traces. Prepared datasets do not save sampled prompts.

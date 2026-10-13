@@ -209,6 +209,7 @@ def test_dynamic_selection_waits_for_finish_without_leaking_oversized_scenes():
         trace = []
         tool_schemas = []
         mission = "Current mission"
+        history_count = 0
 
         def messages_for(self, ids):
             return [
@@ -243,6 +244,7 @@ def test_dynamic_selection_waits_for_finish_without_leaking_oversized_scenes():
         ask,
     )
     assert "Current mission" in requests[0][0]["content"]
+    assert "No eligible mission history" in requests[0][0]["content"]
     assert '"added_scenes": 1' in requests[1][-1]["content"]
     assert '"name": "search_context"' in requests[1][-1]["content"]
     assert '"added_scenes": 0' in requests[2][-1]["content"]
@@ -284,6 +286,7 @@ def test_hosted_dynamic_budget_can_exceed_shared_static_budget(tmp_path, monkeyp
         trace = []
         tool_schemas = []
         mission = "Current mission"
+        history_count = 0
 
         def messages_for(self, ids):
             return [{"role": "system", "content": "Lore " + ("x" * 9000 if ids else "")},

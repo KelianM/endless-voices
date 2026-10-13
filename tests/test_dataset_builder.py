@@ -626,3 +626,32 @@ def test_saved_prompt_bundles_require_rebuilding(tmp_path):
     (output / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="Unsupported prepared dataset format"):
         SceneDataset.load(output, "train")
+
+
+def test_planet_references_keep_names_and_only_applied_descriptions(tmp_path):
+    # A reference must identify the planet without exposing a future event's description.
+    from endless_voices.dataset.state import GameState
+
+    source = corpus(tmp_path, """system Wah
+	object Cloudfire
+planet Cloudfire
+	description `A quiet planet.`
+event future
+	planet Cloudfire
+		description `A ruined planet.`
+mission Visit
+	destination Cloudfire
+	on offer
+		conversation
+			`A landing.`
+""")
+    builder = DatasetBuilder(source, config({"Visit": spec()}))
+    _, pool, _ = builder.examples.build(source.missions["Visit"], spec(), GameState.fixed({}))[0]
+    planet = next(b for b in pool.references if b.get("source_kind") == "planet")
+    assert planet["heading"] == "Cloudfire — planet, Wah system"
+    assert planet["heading"] in pool.system_prefix
+    assert "A quiet planet." in str(planet)
+    assert "A ruined planet." not in str(pool)
+    changed = source.planet_references(source.events["future"]["children"])[0]
+    assert changed["passages"][0]["text"] == "A ruined planet."
+    assert changed["path"] == "missions.txt"

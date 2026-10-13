@@ -52,6 +52,12 @@ def test_ineligible_scene_cannot_affect_ranking_or_be_read_by_guessed_id(tmp_pat
             with pytest.raises(ValueError, match="not eligible"):
                 session.read_context([sid])
         expected = session.search_context()
+        session.selected_scene_ids = {expected[0]["scene_id"]}
+        assert session.search_context(limit=1)[0]["scene_id"] == expected[1]["scene_id"]
+        assert all(doc["scene_id"] not in session.selected_scene_ids
+                   for doc in session.search_context(expand_scenes=False))
+        assert session.read_context([expected[0]["scene_id"]])
+
 
     hidden["passages"][0]["text"] = "A completely different hidden target."
     with SceneDatabase.create(tmp_path / "changed.db",

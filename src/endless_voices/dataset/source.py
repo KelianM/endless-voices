@@ -144,7 +144,6 @@ class GameCorpus:
         self.planet_systems = {}
         self.systems = {}
         self.planets = {}
-        self.descriptions = {}
         self.reference_lore = []
         self.files = {}
         flag_conversations, persistent_conditions = {}, set()
@@ -161,6 +160,8 @@ class GameCorpus:
                 owner = (kind, names[0] if names else str(relative))
                 for operation, ancestors in walk([node]):
                     parts = operation["tokens"]
+                    if parts[:1] == ["planet"]:
+                        operation["source_path"] = str(relative)
                     variable = None
                     if len(parts) == 2 and parts[0] in {"set", "clear"}:
                         variable = parts[1]
@@ -216,18 +217,34 @@ class GameCorpus:
                         })
                 if kind == "planet" and names:
                     self.planets[names[0]] = node
-                    self.descriptions[names[0]] = [
-                        {"path": str(relative), "line": n["line"], "text": n["tokens"][1]}
-                        for n in node["children"]
-                        if n["tokens"][:1] == ["description"]
-                        and len(n["tokens"]) == 2
-                        and not n["children"]
-                    ]
         self.scratch_conditions = {
             name for name, conversations in flag_conversations.items()
             if name not in persistent_conditions
             and all(clears_on_exit(node, name) for node in conversations.values())
         }
+
+    def planet_references(self, world=()):
+        """Return named planet descriptions after interpreted world changes."""
+        planets = dict(self.planets)
+        for change in world:
+            if change["tokens"][:1] == ["planet"] and len(change["tokens"]) == 2:
+                if any(n["tokens"][:1] == ["description"] for n in change["children"]):
+                    planets[change["tokens"][1]] = change
+        blocks = []
+        for name, node in planets.items():
+            passages = [{"line": n["line"], "text": n["tokens"][1], "role": "passage"}
+                        for n in node["children"] if n["tokens"][:1] == ["description"]
+                        and len(n["tokens"]) == 2 and not n["children"]]
+            if not passages:
+                continue
+            system = self.planet_systems.get(name)
+            blocks.append({
+                "mission": None, "name": name,
+                "heading": f"{name} — planet" + (f", {system} system" if system else ""),
+                "path": node["source_path"], "conversation": node["line"],
+                "passages": passages, "reference": True, "source_kind": "planet",
+            })
+        return blocks
 
     def named_conversation_users(self):
         """Return mission names grouped by referenced conversation definition."""
