@@ -67,11 +67,11 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
 
 <section id="live-panel" hidden>
 <h2>Live continuation</h2>
-<p class="muted">Explore this scene with retrieval tools. Mission state stays at the selected scene. Suggested replies are prompts, not authored game choices.</p>
+<p class="muted">Explore this scene with retrieval tools. Mission state stays at the selected scene.</p>
 <div class="filters">
 <label>Model<select id="live-model"></select></label>
 <label>Start from<select id="live-start"><option value="scene">Scene before target</option><option value="saved">Selected saved response</option></select></label>
-<label>Suggested reply<select id="suggestion"><option value="">Type your own…</option><option>Tell me more.</option><option>What happened?</option><option>How can I help?</option><option>I should be going.</option></select></label>
+<label id="choices-label" hidden>Authored player choice<select id="player-choice"></select></label>
 </div>
 <label>Input token budget<input id="live-budget" type="number" min="1" step="1" value="65536"></label><p class="muted" id="model-status"></p>
 <div id="live-history"></div>
@@ -136,6 +136,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
       const content = document.createElement('div'); content.className = 'copy'; content.textContent = message.content;
       turn.append(role, content); history.append(turn);
     });
+    showEncounter();
     const target = sample.messages[sample.messages.length - 1].content;
     get('target').textContent = target;
     get('target-info').textContent = words(target) + ' words · Withheld during generation';
@@ -174,6 +175,25 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
     get('live-text').value = ''; get('live-status').textContent = '';
     get('live-model').disabled = false; get('live-start').disabled = false;
     updateModel();
+    showChoices();
+  }
+  function showEncounter() {
+    const sample = filtered[index], last = get('history').lastElementChild?.querySelector('.copy');
+    if (!sample || !last) return;
+    last.textContent = sample.player_choices && get('mode').value === 'live' && get('live-start').value === 'scene'
+      ? sample.player_choices.prefix : sample.messages[sample.messages.length - 2].content;
+  }
+  function showChoices() {
+    showEncounter();
+    const choices = filtered[index]?.player_choices;
+    const visible = !liveId && get('live-start').value === 'scene' && choices?.options.length;
+    get('choices-label').hidden = !visible;
+    const menu = get('player-choice'); menu.replaceChildren();
+    if (visible) {
+      choices.options.forEach(text => addOption(menu, text, text));
+      menu.value = choices.selected;
+      get('live-text').value = choices.selected;
+    }
   }
   function appendTurn(role, content) {
     liveTurns.push({role, content});
@@ -199,9 +219,10 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
   get('mode').onchange = () => {
     const live = get('mode').value === 'live';
     get('live-panel').hidden = !live; get('comparison').hidden = live;
+    showEncounter();
   };
   get('live-model').onchange = updateModel;
-  get('suggestion').onchange = () => { get('live-text').value = get('suggestion').value; };
+  get('player-choice').onchange = () => { get('live-text').value = get('player-choice').value; };
   get('reset-live').onclick = resetLive;
   get('live-start').onchange = resetLive;
   get('download-live').onclick = () => {
@@ -234,6 +255,7 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
       if (text) appendTurn('You', text);
       appendTurn(get('live-model').value, result.response); liveId = result.session_id;
       get('live-text').value = '';
+      showChoices();
       get('live-status').textContent = result.tool_calls + ' retrieval calls · ' + (result.cost_usd == null ? 'Cost estimate unavailable' : '$' + result.cost_usd.toFixed(4));
     } catch (error) { get('live-status').textContent = error.message; }
     finally {

@@ -23,6 +23,7 @@ def test_default_export_excludes_held_out_content_and_preserves_history(tmp_path
     data = payload(output)
     original = json.loads((FIXTURE.parent / "train.jsonl").read_text())
     original.pop("evaluation")
+    original["player_choices"] = None
     assert data["samples"] == [original]
     assert data["runs"] == []
     before = output.read_bytes()
@@ -120,10 +121,13 @@ def test_live_turns_keep_evidence_without_sending_authored_target(tmp_path, monk
 
     data, datasets = viewer.viewer_data(FIXTURE)
     data["live"] = {"models": [{"id": model}]}
+    data["samples"][0]["player_choices"] = {
+        "prefix": "Encounter", "options": ["Original choice", "Another choice"],
+        "selected": "Original choice"}
     session = SimpleNamespace(
         history_count=1, tool_schemas=[], selected_scene_ids=set(),
         initial_messages=lambda: [{"role": "system", "content": "Scene instructions"},
-                                  {"role": "user", "content": "Encounter"}])
+                                  {"role": "user", "content": "Encounter\n\nOriginal choice"}])
     def retrieve(name, arguments):
         if arguments.get("followup"):
             assert session.selected_scene_ids == {"evidence"}
@@ -153,7 +157,9 @@ def test_live_turns_keep_evidence_without_sending_authored_target(tmp_path, monk
             response = {"output": content}
         return {"status": "ok", "api_response": response, "estimated_cost_usd": 0.001}
     monkeypatch.setattr(live_viewer, "hosted_request", ask)
-    first = app.reply({"model": model, "sample_id": "fixture-train"})
+    first = app.reply({"model": model, "sample_id": "fixture-train", "text": "Another choice"})
+    assert "Original choice" not in json.dumps(bodies)
+    assert "Encounter\\n\\nAnother choice" in json.dumps(bodies)
     second = app.reply({"model": model, "sample_id": "fixture-train",
                         "session_id": first["session_id"], "text": "My follow-up"})
     assert second["session_id"] == first["session_id"]

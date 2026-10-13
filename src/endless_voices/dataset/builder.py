@@ -653,6 +653,12 @@ class ExampleBuilder:
                 "omitted_history_missions": omitted,
                 "prefix_lines": [p.line for p in route.prefix],
             }
+            if route.prefix and route.prefix[-1].role == "option":
+                provenance["player_choices"] = {
+                    "prefix": "\n\n".join(render(p.text, values)[0] for p in route.prefix[:-1]),
+                    "options": [render(p.text, values)[0] for p in route.choices],
+                    "selected": render(route.prefix[-1].text, values)[0],
+                }
             examples.append((record, pool, provenance))
         return examples
 

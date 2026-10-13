@@ -83,6 +83,9 @@ def viewer_data(manifest, split="train", run_directories=()):
     known = {row["metadata"]["id"] for dataset in datasets.values() for row in dataset}
     runs = [load_run(directory, manifest, known) for directory in run_directories]
     records = [{k: v for k, v in row.items() if k != "evaluation"} for row in records]
+    provenance = json.loads((manifest.parent / "provenance.json").read_text())
+    for row in records:
+        row["player_choices"] = provenance[row["metadata"]["id"]].get("player_choices")
     return {"dataset_version": "scene-dataset-v2", "samples": records,
             "runs": runs}, datasets
 

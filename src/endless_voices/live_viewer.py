@@ -86,6 +86,12 @@ class LiveViewer:
             session = dataset.retrieval_session(index, self.database)
             messages = dynamic_messages(session.initial_messages(), session.history_count)
             run_index = request.get("run_index")
+            choices = next(row["player_choices"] for row in self.data["samples"]
+                           if row["metadata"]["id"] == sid)
+            if run_index is None and choices and text.strip():
+                messages[-1]["content"] = "\n\n".join(
+                    part for part in (choices["prefix"], text.strip()) if part)
+                text = ""
             if run_index is not None:
                 if type(run_index) is not int or not 0 <= run_index < len(self.data["runs"]):
                     raise ValueError("Unknown saved run")

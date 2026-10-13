@@ -124,8 +124,10 @@ endless-voices view-samples --serve \
 
 `--run` is optional and repeatable. Each folder can be a generation run or a benchmark's
 model folder for the same dataset. Switch to **Play a live continuation**, start before
-the target or after a saved response, then choose a suggested reply or type your own.
-Suggestions are generic prompts, not authored game choices. The original target stays
+the target or after a saved response, then select an authored player choice when the starting scene has a choice menu, or type
+your own response. Choices come from the source interpreter and respect display conditions.
+After the first continuation, the choice menu disappears and the reply box stays blank.
+Prepared datasets must be rebuilt to include the authored choices. The original target stays
 out of live requests. Retrieval eligibility stays fixed at the scene's starting state;
 the reader does not advance game conditions or mission chains.
 
