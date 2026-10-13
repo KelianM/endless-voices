@@ -75,6 +75,7 @@ def load_run(directory: Path, manifest: Path, known_ids: set[str]) -> dict:
         "selected_ids": selected,
         "model": run.get("model"),
         "adapter": run.get("adapter"),
+        "original_run": run.get("original_run"),
         "responses": responses,
     }
 
