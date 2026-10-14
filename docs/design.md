@@ -11,10 +11,10 @@ into visible encounters, authored targets and compatible context. Prerequisite-c
 does not reproduce arbitrary game saves.
 
 Prepared records contain the instruction, visible encounter and target. The prompt names
-the current mission event and its known location without exposing post-target state. Eligible history and
-writing references are saved separately, with scene text deduplicated across examples.
-[SceneDataset](../src/endless_voices/dataset/storage.py) verifies artifact hashes, pool
-consistency and ownership across every published split.
+the current mission event and its known location without exposing post-target state. Game states and source passage traces preserve the selected history. Retrieval reconstructs
+eligible history and writing references from the hash-verified raw game source; mission
+graphs and reference lists are not saved per encounter.
+[SceneDataset](../src/endless_voices/dataset/storage.py) verifies artifact hashes, reconstructed pool fingerprints and ownership across every published split.
 [Record validation](../src/endless_voices/contracts.py) defines the record invariants.
 
 ## Retrieval
@@ -22,7 +22,8 @@ consistency and ownership across every published split.
 A static SQLite database holds passage vectors and interpreted scenes.
 [Retrieval sessions](../src/endless_voices/retrieval.py) enforce each example's eligibility
 before searching or reading. History represents preceding events; independent references
-supply writing examples. Search ranks a scene by its strongest passage and returns the
+supply writing examples from distinct authored passage branches, each with a compatible
+prefix. Reference alternatives do not need to match the saved playthrough. Search ranks a scene by its strongest passage and returns the
 whole scene ([ADR 11](adr/0011-rank-passages-and-return-their-parent-scenes.md)).
 
 [Context retrieval](../src/endless_voices/context_generation.py) uses the same tool loop and

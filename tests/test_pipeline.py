@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 from peft import PeftModel
-from prepared_fixtures import write_empty_pools
+from prepared_fixtures import write_raw_context
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
@@ -75,9 +75,9 @@ def prepared(tmp_path, messages):
     path = root / "train.jsonl"
     path.write_text(json.dumps(record) + "\n")
     (root / "manifest.json").write_text(json.dumps({
-        "format": "scene-dataset-v2", "split_unit": "mission_chain", "splits": ["train"],
+        "format": "scene-dataset-v3", "split_unit": "mission_chain", "splits": ["train"],
         "artifacts": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()}}))
-    write_empty_pools(root)
+    write_raw_context(root)
     return root
 
 

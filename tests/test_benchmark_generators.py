@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from prepared_fixtures import write_empty_pools
+from prepared_fixtures import write_raw_context
 
 from endless_voices import benchmark_generators as benchmark
 from endless_voices import generation_backends as backends
@@ -77,10 +77,10 @@ def recorded(tmp_path, request, monkeypatch):
     (dataset / 'validation.jsonl').write_text(
         ''.join(json.dumps(r) + '\n' for r in records.values()))
     backends.save(dataset / 'manifest.json', {
-        'format': 'scene-dataset-v2', 'split_unit': 'mission_chain', 'splits': ['validation'],
+        'format': 'scene-dataset-v3', 'split_unit': 'mission_chain', 'splits': ['validation'],
         'artifacts': {str(p.relative_to(dataset)): backends.sha(p)
                       for p in dataset.rglob('*') if p.is_file()}})
-    write_empty_pools(dataset)
+    write_raw_context(dataset)
     benchmark.prepare(root, dataset, config)
     for model in models:
         folder = root / model

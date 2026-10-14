@@ -18,7 +18,7 @@ from endless_voices.retrieval import scene_id
 from endless_voices.splits import check_chain_splits, check_mission_splits
 
 from .dialogue import DialogueInterpreter, Passage
-from .source import walk
+from .source import tokens, walk
 from .state import GameState, UnsupportedOperation, apply, condition, projected_state
 
 
@@ -45,24 +45,7 @@ class ContextBuilder:
         self.reference_paths = {}
         self.reference_exclusions = {}
         self.history_variables = None
-        self.graph = {
-            name: [parent for parent in self.prerequisites(m.node) if parent in corpus.missions]
-            for name, m in corpus.missions.items()
-        }
-
-    @staticmethod
-    def prerequisites(node):
-        result = set()
-        for child in node["children"]:
-            if child["tokens"] != ["to", "offer"]:
-                continue
-            for term, parents in walk(child["children"]):
-                if any(p["tokens"] == ["or"] for p in parents):
-                    continue
-                t = term["tokens"]
-                if len(t) == 2 and t[0] == "has" and t[1].endswith(": done"):
-                    result.add(t[1][:-6])
-        return sorted(result)
+        self.graph = corpus.mission_graph
 
     def ancestors(self, mission):
         ordered, active, done = [], set(), set()
@@ -335,9 +318,9 @@ class ContextBuilder:
             ]
             candidates = []
             for history in histories:
-                timelines = sorted(history.state.advance(),
-                                   key=lambda state: digest([self.seed, state.snapshot()]))
-                for state in timelines:
+                timelines = sorted(enumerate(history.state.advance()),
+                                   key=lambda item: digest([self.seed, item[0]]))
+                for _, state in timelines:
                     self.enter(state, previous)
                     state = state.assume(condition(requirements, state))
                     if state is not None:
@@ -366,7 +349,8 @@ class ContextBuilder:
         for history in histories:
             outcomes = history.state.advance(minimum_days)
             if sample:
-                outcomes = [min(outcomes, key=lambda s: digest([self.seed, s.snapshot()]))]
+                outcomes = [min(enumerate(outcomes),
+                                key=lambda item: digest([self.seed, item[0]]))[1]]
             advanced.extend(History(state, history.blocks) for state in outcomes)
         return self.bounded(advanced)
 
@@ -376,7 +360,7 @@ class ContextBuilder:
         excluded.update(self.reference_exclusions.get(mission.name, ()))
         blocks = []
         paths = self.reference_paths.get(mission.name, {mission.path})
-        for path in paths:
+        for path in sorted(paths):
             for other in self.corpus.missions.values():
                 if (other.path != path or other.name in excluded
                         or not self.eligible(other.name, split)):
@@ -397,24 +381,20 @@ class ContextBuilder:
                                           planet_systems=self.corpus.planet_systems)
                         self.enter(state, other)
                         node = conversations[0]
-                        routes = [
-                            route for attempt in range(8)
-                            for route in self.interpreter.histories(
-                                node, state, actions,
-                                sample_seed=digest([self.seed, other.name, node["line"], attempt]),
-                            )
-                        ]
-                        routes = [r for r in routes if r.prefix or r.paragraphs]
-                        if not routes:
-                            continue
-                        route = max(routes, key=lambda r: sum(
-                            len(p.text) for p in (*r.prefix, *r.paragraphs)
-                        ))
-                        block = self.block(
-                            other, (*route.prefix, *route.paragraphs), node, event["tokens"][1])
-                        block.update(reference=True, conversation=node["line"],
-                                     state=route.state.snapshot())
-                        scenes.append(block)
+                        branches = {}
+                        for route in self.interpreter.continuations(
+                                node, state, actions, future_variables=set()):
+                            if not route.paragraphs:
+                                continue
+                            key = tuple(p.line for p in route.paragraphs)
+                            if key in branches:
+                                continue
+                            block = self.block(
+                                other, (*route.prefix, *route.paragraphs), node,
+                                event["tokens"][1])
+                            block.update(reference=True, conversation=node["line"])
+                            branches[key] = block
+                        scenes.extend(branches.values())
                     self.reference_cache[other.name] = scenes
                 target_definitions = {
                     self.corpus.conversations[name]["source_path"] + ":" + str(
@@ -437,6 +417,49 @@ class ContextBuilder:
         blocks.extend(block for block in self.corpus.reference_lore
                       if str(Path(block["path"]).parent) in directories)
         return blocks
+
+    def restore_pool(self, record, evidence):
+        """Reconstruct eligible context from the encounter's source trace and game state."""
+        meta = record["metadata"]
+        name = meta["sources"][0]["source_group"].removeprefix("mission / ")
+        mission = self.corpus.missions[name]
+        blocks = []
+        for entry in evidence["history"]:
+            paragraphs = []
+            for line, role in entry["passages"]:
+                parts = tokens(self.corpus.source_lines[entry["path"]][line - 1].lstrip())
+                if len(parts) == 1:
+                    text = parts[0]
+                elif len(parts) == 2 and parts[0] == "dialog":
+                    text = parts[1]
+                else:
+                    raise ValueError("History passage does not identify literal source text")
+                paragraphs.append(Passage(line, text, role))
+            blocks.append(self.block(self.corpus.missions[entry["mission"]], paragraphs,
+                                     {"source_path": entry["path"]}, entry["phase"]))
+        state = GameState(world=tuple(evidence["encounter_state"]["world_changes"]))
+        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+        pool = ContextPool(meta["id"], meta["conversation_id"], mission.name,
+                           record["messages"][0]["content"], record["messages"][1:-1],
+                           blocks, self.graph, values,
+                           self.references(mission, meta["split"], History(state, blocks)))
+        self.add_planets(pool, mission, state.world,
+                         self.specifications[mission.name].get("lore_planets", []))
+        return pool
+
+    def add_planets(self, pool, mission, world, lore_names=()):
+        """Add named and region-relevant planets visible in this encounter's world."""
+        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+        names = set(lore_names)
+        names.update(values[k] for k in ("<planet>", "<origin>") if k in values)
+        paths = self.reference_paths.get(mission.name, {mission.path})
+        directories = {str(Path(path).parent) for path in paths}
+        visible = "\n".join([pool.system_prefix, *(m["content"] for m in pool.encounter),
+                             *(render_block(b) for b in pool.blocks)])
+        pool.references.extend(block for block in self.corpus.planet_references(world)
+                               if str(Path(block["path"]).parent) in directories
+                               or block["name"] in names
+                               or re.search(r"\b" + re.escape(block["name"]) + r"\b", visible))
 
     def pool(
         self, sample_id, conversation_id, mission, history, prefix, lore, split, task
@@ -545,7 +568,6 @@ class ExampleBuilder:
                                     self.seed,
                                     history.blocks,
                                     [asdict(p) for p in route.prefix],
-                                    route.state.snapshot(),
                                 ]
                             ),
                         )
@@ -598,14 +620,7 @@ class ExampleBuilder:
             pool.system_prefix = SCENE_INSTRUCTIONS[task] + "\n\n" + cue + "\n\n" + overview
             if lore:
                 pool.system_prefix += "\n\n" + lore
-            paths = self.sampler.reference_paths.get(mission.name, {mission.path})
-            directories = {str(Path(path).parent) for path in paths}
-            visible = "\n".join([pool.system_prefix, *(m["content"] for m in pool.encounter),
-                                 *(render_block(b) for b in pool.blocks)])
-            pool.references.extend(block for block in planets
-                                   if str(Path(block["path"]).parent) in directories
-                                   or block["name"] in lore_names
-                                   or re.search(r"\b" + re.escape(block["name"]) + r"\b", visible))
+            self.sampler.add_planets(pool, mission, history.state.world, lore_names)
             target = "\n\n".join(render(p.text, values)[0] for p in route.paragraphs)
             target_lines = {p.line for p in route.paragraphs}
             if any(p.line in target_lines for p in route.prefix):
@@ -647,6 +662,11 @@ class ExampleBuilder:
             validate_record(record)
             provenance = {
                 "state": route.state.snapshot(),
+                "encounter_state": history.state.snapshot(),
+                "history": [{"mission": block["mission"], "phase": block["phase"],
+                             "path": block["path"],
+                             "passages": [[p["line"], p["role"]] for p in block["passages"]]}
+                            for block in history.blocks],
                 "source_path": node.get("source_path", mission.path),
                 "source_sha256": node.get("source_sha256", mission.sha256),
                 "source_revision": self.corpus.revision,
@@ -688,6 +708,7 @@ class DatasetBuilder:
             config.get("max_history_routes", 1000),
             seed=config["seed"],
         )
+        self.sampler.specifications = self.config["missions"]
         check_chain_splits(assignments, self.sampler.graph)
         for name, spec in config["missions"].items():
             self.sampler.reference_paths[name] = sorted({

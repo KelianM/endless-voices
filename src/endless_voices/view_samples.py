@@ -91,7 +91,7 @@ def viewer_data(manifest, split="all", run_directories=()):
     provenance = json.loads((manifest.parent / "provenance.json").read_text())
     for row in records:
         row["player_choices"] = provenance[row["metadata"]["id"]].get("player_choices")
-    return {"dataset_version": "scene-dataset-v2", "samples": records,
+    return {"dataset_version": "scene-dataset-v3", "samples": records,
             "runs": runs}, datasets
 
 

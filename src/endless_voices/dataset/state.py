@@ -139,7 +139,7 @@ class GameState:
             return result
         result.constraints += (condition,)
         solver = z3.Solver()
-        solver.set(timeout=5000)
+        solver.set(timeout=5000, random_seed=0)
         solver.add(*result.constraints)
         status = solver.check()
         if status == z3.unknown:
@@ -149,7 +149,7 @@ class GameState:
     @classmethod
     def fixed(cls, values):
         state = cls()
-        for name, value in values.items():
+        for name, value in sorted(values.items()):
             if type(value) is not int:
                 raise ValueError("Game state values must be integers")
             state.value(name)
@@ -157,9 +157,9 @@ class GameState:
         return state
 
     def snapshot(self):
-        """Return symbolic requirements and one reproducible compatible initial state."""
+        """Return one concrete compatible state to persist for replay."""
         solver = z3.Solver()
-        solver.set(timeout=5000)
+        solver.set(timeout=5000, random_seed=0)
         solver.add(*self.constraints)
         if solver.check() != z3.sat:
             raise ValueError("Cannot save an inconsistent or unresolved state")
@@ -176,7 +176,6 @@ class GameState:
             ],
             "world_changes": list(self.world),
             "failed_missions_pending": list(self.failures),
-            "requirements": [z3.simplify(c).sexpr() for c in self.constraints],
             "initial_values": {
                 k: model.eval(v, model_completion=True).as_long()
                 for k, v in sorted(self.initial.items())
@@ -367,7 +366,7 @@ def projected_state(state, variables=None, symbol_cache=None):
         return symbol_cache[key]
 
     values = state.values if variables is None else {
-        name: state.values.get(name, z3.Int("initial:" + name)) for name in variables}
+        name: state.values.get(name, z3.Int("initial:" + name)) for name in sorted(variables)}
     constraints = [z3.simplify(c) for c in state.constraints]
     if variables is not None:
         live = set().union(*(symbols(v) for v in values.values()), symbols(state.elapsed),

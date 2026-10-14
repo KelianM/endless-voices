@@ -1,6 +1,7 @@
 """Publish prepared examples and verify them for training or benchmarking."""
 
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -11,7 +12,7 @@ from pathlib import Path
 
 from endless_voices.artifacts import file_hash
 from endless_voices.artifacts import write_json as save
-from endless_voices.context import ContextPool, digest
+from endless_voices.context import digest
 from endless_voices.contracts import SPLITS, read_records, validate_record
 from endless_voices.splits import mission_key
 
@@ -19,9 +20,9 @@ from endless_voices.splits import mission_key
 class SceneDataset(Sequence):
     """Provide prepared encounters, targets and eligible context pools."""
 
-    def __init__(self, records, pools):
+    def __init__(self, records, context, evidence):
         self.records = deepcopy(records)
-        self._pools = deepcopy(pools)
+        self._context, self.evidence = context, evidence
         ids = [r["metadata"]["id"] for r in self.records if "metadata" in r]
         if len(ids) != len(set(ids)):
             raise ValueError("Duplicate scene IDs")
@@ -39,7 +40,7 @@ class SceneDataset(Sequence):
         """Verify artifacts and cross-split ownership, returning each published split."""
         root = Path(root).resolve()
         manifest = json.loads((root / "manifest.json").read_text())
-        if (manifest.get("format") != "scene-dataset-v2"
+        if (manifest.get("format") != "scene-dataset-v3"
                 or manifest.get("split_unit") != "mission_chain"):
             raise ValueError("Unsupported prepared dataset format")
         splits = manifest.get("splits")
@@ -50,15 +51,27 @@ class SceneDataset(Sequence):
         artifacts = manifest.get("artifacts")
         if not isinstance(artifacts, dict) or any(f"{s}.jsonl" not in artifacts for s in splits):
             raise ValueError("Every published split requires an artifact hash")
-        if "retrieval.json" not in artifacts:
-            raise ValueError("Prepared datasets require a retrieval.json artifact hash")
+        if not {"config.json", "provenance.json"} <= artifacts.keys():
+            raise ValueError("Prepared datasets require hashed configuration and provenance")
         for name, expected in artifacts.items():
             path = (root / name).resolve()
             if Path(name).is_absolute() or not path.is_relative_to(root):
                 raise ValueError("Artifact must be inside the manifest directory")
             if file_hash(path) != expected:
                 raise ValueError(f"Dataset artifact differs: {name}")
-        pools = load_pools(root)
+        from .source import GameCorpus
+
+        corpus = GameCorpus(root / manifest["source_root"], {
+            "revision": manifest["source_revision"],
+            "files": [{"path": path, "sha256": value}
+                      for path, value in manifest["source_files"].items()]})
+        config = json.loads((root / "config.json").read_text())
+        from endless_voices.splits import check_chain_splits
+
+        check_chain_splits({name: spec["split"] for name, spec in config["missions"].items()},
+                           corpus.mission_graph)
+        context = {"corpus": corpus, "config": config}
+        evidence = json.loads((root / "provenance.json").read_text())
         datasets, ids, groups, physical = {}, {}, {}, set()
         for split in splits:
             path = root / f"{split}.jsonl"
@@ -85,23 +98,14 @@ class SceneDataset(Sequence):
                         raise ValueError(f"{location}: {kind} {owner!r} crosses splits")
                     groups[key] = split
                 rows.append(record)
-            split_pools = {}
             for record in rows:
                 meta = record["metadata"]
-                pool = pools.get(meta["id"])
-                if (pool is None or pool.conversation_id != meta["conversation_id"]
-                        or "mission / " + pool.mission != meta["sources"][0]["source_group"]):
-                    raise ValueError("Retrieval pool does not match its scene record")
-                split_pools[meta["id"]] = pool
-            datasets[split] = cls(rows, split_pools)
-        if set(pools) != set(ids):
-            raise ValueError("Retrieval pools must cover exactly the published scenes")
-        from endless_voices.splits import check_chain_splits
-
-        assignments = {pool.mission: split for split, dataset in datasets.items()
-                       for pool in dataset._pools.values()}
-        graph = {name: parents for pool in pools.values() for name, parents in pool.graph.items()}
-        check_chain_splits(assignments, graph)
+                mission = meta["sources"][0]["source_group"].removeprefix("mission / ")
+                if config["missions"][mission]["split"] != split:
+                    raise ValueError("Scene split differs from its configured mission")
+            datasets[split] = cls(rows, context, evidence)
+        if set(evidence) != set(ids):
+            raise ValueError("Provenance must cover exactly the published scenes")
         return datasets
 
     @classmethod
@@ -118,38 +122,24 @@ class SceneDataset(Sequence):
         return self[index]["messages"][-1]["content"]
 
     def context_pool(self, index):
-        """Return the saved eligible context for one scene without its continuation."""
-        return deepcopy(self._pools[self.records[index]["metadata"]["id"]])
+        """Reconstruct eligible context from raw source and verify its preparation fingerprint."""
+        record = self[index]
+        evidence = self.evidence[record["metadata"]["id"]]
+        if "builder" not in self._context:
+            from .builder import DatasetBuilder
+
+            self._context["builder"] = DatasetBuilder(self._context["corpus"],
+                                                      self._context["config"])
+        pool = self._context["builder"].sampler.restore_pool(record, evidence)
+        if digest(asdict(pool)) != evidence["context"]["pool_sha256"]:
+            raise ValueError("Reconstructed context differs from its preparation evidence")
+        return deepcopy(pool)
 
     def retrieval_session(self, index, database):
-        """Bind retrieval tools to one scene's saved eligible context."""
+        """Bind retrieval tools to one scene's reconstructed eligible context."""
         from endless_voices.retrieval import RetrievalSession
 
         return RetrievalSession(database, self.context_pool(index))
-
-
-def load_pools(root):
-    """Restore deduplicated context pools and verify their preparation fingerprints."""
-    from endless_voices.retrieval import scene_id
-
-    saved = json.loads((root / "retrieval.json").read_text())
-    if saved.get("format") != "scene-retrieval-pools-v1":
-        raise ValueError("Unsupported retrieval pool format")
-    scenes = saved["scenes"]
-    if any(scene_id(block) != key for key, block in scenes.items()):
-        raise ValueError("Retrieval scene differs from its identifier")
-    evidence = json.loads((root / "provenance.json").read_text())
-    pools = {}
-    for key, fields in saved["pools"].items():
-        fields = dict(fields)
-        for kind in ("blocks", "references"):
-            fields[kind] = [scenes[sid] for sid in fields[kind]]
-        pool = ContextPool(**fields)
-        if (pool.sample_id != key
-                or digest(pool.__dict__) != evidence[key]["context"]["pool_sha256"]):
-            raise ValueError("Retrieval pool differs from its preparation evidence")
-        pools[key] = pool
-    return pools
 
 
 def implementation():
@@ -185,19 +175,6 @@ def write_dataset(output, built, config, corpus):
             record["metadata"]["id"]: {
                 **provenance, "context": {"pool_sha256": digest(asdict(pool))}}
             for record, pool, provenance in built})
-        from endless_voices.retrieval import scene_id
-
-        scenes, pools = {}, {}
-        for record, pool, _ in built:
-            fields = asdict(pool)
-            for kind in ("blocks", "references"):
-                for block in fields[kind]:
-                    scenes[scene_id(block)] = block
-                fields[kind] = [scene_id(block) for block in fields[kind]]
-            pools[record["metadata"]["id"]] = fields
-        save(root / "retrieval.json", {
-            "format": "scene-retrieval-pools-v1", "scenes": scenes, "pools": pools,
-        })
         save(root / "config.json", config)
         licensing = root / "licensing"
         licensing.mkdir()
@@ -211,11 +188,12 @@ def write_dataset(output, built, config, corpus):
         save(
             root / "manifest.json",
             {
-                "format": "scene-dataset-v2",
+                "format": "scene-dataset-v3",
                 "split_unit": "mission_chain",
                 "splits": splits,
                 "solver_version": z3.get_version_string(),
                 "build": implementation(),
+                "source_root": os.path.relpath(corpus.root.resolve(), output.resolve()),
                 "source_revision": corpus.revision,
                 "source_files": corpus.files,
                 "artifacts": {

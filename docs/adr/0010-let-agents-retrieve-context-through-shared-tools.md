@@ -16,14 +16,17 @@ permitted evidence, with budgets that fit each model.
   receive the same instructions and eligible evidence, using their native call formats.
 - **Select context beforehand only for training and judging.** Fit nearby prerequisite
   history first, then semantic matches. Benchmark judges receive common evidence.
-- **Preparation saves encounters and eligible pools, not sampled prompts.** State interpretation
+- **Preparation saves encounters, game states and source traces.** Reconstruct eligible
+  pools from shared raw source when needed, and verify their fingerprints. State interpretation
   from [ADR 9](0009-build-examples-from-consistent-game-state.md) determines permitted scenes.
   Retrieval enforces branch, split and target boundaries before ranking or reading.
 - **Fit whole scenes within the configured input budget.** Local runs reserve output space
   within the model's context ceiling. Hosted runs may use larger budgets. The model chooses
   when to finish retrieval; hosted calls remain subject to the run’s spend ceiling.
 - **Keep history and writing references distinct.** A reference demonstrates the game's
-  writing without asserting that its events happened in the current playthrough.
+  writing without asserting that its events happened in the current playthrough. Retain
+  distinct authored passage branches with compatible prefixes; selecting only the longest
+  sampled route discarded alternative writing references.
 - **Save conversations and retrieval traces with the run.** Record the evidence the model
   actually received, including tool results.
 
@@ -43,7 +46,7 @@ permitted evidence, with budgets that fit each model.
   random-fill policy in [ADR 8](0008-infer-scene-writing-from-sampled-game-context.md), while
   retaining minimal instructions and authored evidence. Reproducing the old sampler was
   rejected because the benchmark will be rerun with the shared retrieval flow.
-- **Prepared pools remain bounded by the interpreter.** Dynamic retrieval can choose among
+- **Eligibility remains bounded by the interpreter.** Dynamic retrieval can choose among
   permitted scenes but cannot reconstruct an arbitrary live game save.
 - **Judges do not see each generator's particular evidence.** Common static context keeps
   the judging conditions fixed, but may omit a fact a dynamic generator retrieved.

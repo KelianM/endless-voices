@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 from peft import LoraConfig, TaskType, get_peft_model
-from prepared_fixtures import write_empty_pools
+from prepared_fixtures import write_raw_context
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
@@ -70,7 +70,7 @@ def args(tmp_path, base, monkeypatch):
     manifest = json.loads((dataset / "manifest.json").read_text())
     manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     (dataset / "manifest.json").write_text(json.dumps(manifest))
-    write_empty_pools(dataset)
+    write_raw_context(dataset)
 
     class Encoder:
         identity = "generation-test"
@@ -352,7 +352,7 @@ def test_seed_is_independent_of_selection_order(args, monkeypatch):
     manifest = json.loads(args.manifest.read_text())
     manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     args.manifest.write_text(json.dumps(manifest))
-    write_empty_pools(args.manifest.parent)
+    write_raw_context(args.manifest.parent)
     assert gen.run_generation(args) == 0
     first = read_run(args)[1][0]
     other = copy.copy(args)

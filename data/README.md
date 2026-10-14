@@ -9,8 +9,8 @@ Omitting a mission's conversation list selects supported conversations and dialo
 An empty list excludes targets while retaining split ownership. The configuration contains
 no quote selectors or per-branch routes.
 
-[Preparation usage](../README.md#prepare-data) builds encounters, targets, eligible context
-pools, provenance and licensing. Preparation needs no tokenizer or model. Unsupported
+[Preparation usage](../README.md#prepare-data) saves encounters, targets, game states, source
+traces and licensing. Eligible context is reconstructed from the pinned raw source. Preparation needs no tokenizer or model. Unsupported
 operations or exceeded exploration limits fail the build rather than dropping examples.
 Context selection and token budgets apply when a run consumes the prepared examples.
 

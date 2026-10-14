@@ -1,17 +1,1 @@
-{
-  "fixture-test": {
-    "context": {
-      "pool_sha256": "d0d2c81e9eaeab2f164f699320e5ec87c7d0bceb36563fe329a1dce3e3b9a14e"
-    }
-  },
-  "fixture-train": {
-    "context": {
-      "pool_sha256": "c7ff161b9e717e5a437816841d174599362ef812d274170a043bf53c9a809e8d"
-    }
-  },
-  "fixture-validation": {
-    "context": {
-      "pool_sha256": "3602293c6f907147446f6c242770123265608dd04274df7e68bbbc279bb44730"
-    }
-  }
-}
+{"fixture-test": {"context": {"pool_sha256": "fbbb925136d893f61aeb772a8794670e5530cb5b39a180e2f6d6d709f9da113d"}, "encounter_state": {"current_values": {}, "draws": {}, "elapsed_days": 0, "failed_missions_pending": [], "initial_values": {}, "pending_events": [], "world_changes": []}, "history": [], "state": {"current_values": {}, "draws": {}, "elapsed_days": 0, "failed_missions_pending": [], "initial_values": {}, "pending_events": [], "world_changes": []}}, "fixture-train": {"context": {"pool_sha256": "2100de98bd38541d6f1db61e7bd0b5b0f83796a3dce5f351f427e8aa1b7e211c"}, "encounter_state": {"current_values": {}, "draws": {}, "elapsed_days": 0, "failed_missions_pending": [], "initial_values": {}, "pending_events": [], "world_changes": []}, "history": [], "state": {"current_values": {}, "draws": {}, "elapsed_days": 0, "failed_missions_pending": [], "initial_values": {}, "pending_events": [], "world_changes": []}}, "fixture-validation": {"context": {"pool_sha256": "47d3b93b2d419d8701fbcce5f8fe3d178a3b13aa6ce29c62d3a556830dd35d1e"}, "encounter_state": {"current_values": {}, "draws": {}, "elapsed_days": 0, "failed_missions_pending": [], "initial_values": {}, "pending_events": [], "world_changes": []}, "history": [], "state": {"current_values": {}, "draws": {}, "elapsed_days": 0, "failed_missions_pending": [], "initial_values": {}, "pending_events": [], "world_changes": []}}}

@@ -85,20 +85,21 @@ mission Later
 """
 
 
-def test_each_target_gets_a_compatible_history_and_shared_saved_context(tmp_path):
+def test_each_target_gets_a_compatible_history_from_raw_source(tmp_path):
     source = corpus(tmp_path, STORY)
     builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}))
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
     assert {p.name for p in output.iterdir()} == {
-        "train.jsonl", "manifest.json", "config.json", "provenance.json", "licensing",
-        "retrieval.json"}
+        "train.jsonl", "manifest.json", "config.json", "provenance.json", "licensing"}
     manifest = json.loads((output / "manifest.json").read_text())
     assert manifest["build"]["git_revision"]
     assert manifest["build"]["source_hashes"]
     evidence = json.loads((output / "provenance.json").read_text())
     assert set(evidence) == {row["metadata"]["id"] for row in dataset}
+    assert all("requirements" not in row[state] for row in evidence.values()
+               for state in ("state", "encounter_state"))
     for row in dataset:
         context = evidence[row["metadata"]["id"]]["context"]
         assert set(context) == {"pool_sha256"}
@@ -244,7 +245,7 @@ def test_context_samples_event_timing_without_collapsing_current_mission_outcome
     assert (witness["elapsed_days"] >= 1) == (witness["current_values"]["ready"] == 1)
 
 
-def test_reference_context_excludes_target_mission_and_heldout_and_resolves_one_branch(tmp_path):
+def test_reference_context_keeps_distinct_branches_without_target_or_heldout(tmp_path):
     story = '''mission Target
 \ton offer
 \t\tconversation
@@ -296,11 +297,14 @@ mission Reference
         if row["messages"][-1]["content"] == "Current answer.":
             assert "Current answer." not in prompt
         assert "Held-out answer." not in prompt
-        assert ("An Earth childhood." in prompt) != ("A Mars childhood." in prompt)
+        assert "An Earth childhood." in prompt and "A Mars childhood." in prompt
         references = pool.references
-        assert len(references) == 1 and references[0]["mission"] == "Reference"
-        assert references[0]["state"]["current_values"]["earth"] == int(
-            "An Earth childhood." in prompt)
+        assert len(references) == 2
+        for reference in references:
+            text = json.dumps(reference)
+            assert reference["mission"] == "Reference"
+            assert ("An Earth childhood." in text) != ("A Mars childhood." in text)
+            assert "state" not in reference
 
 
 def test_shared_completion_flag_is_a_condition_not_a_missing_mission(tmp_path):
@@ -558,7 +562,7 @@ def test_repeated_dialog_entries_preserve_all_paragraphs_in_later_context(tmp_pa
     assert "First paragraph.\n\nSecond paragraph." in prompt
 
 
-def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(tmp_path):
+def test_raw_context_reconstruction_excludes_target_and_shared_mutation(tmp_path):
     from endless_voices.retrieval import SceneDatabase
 
     class Encoder:
@@ -573,7 +577,7 @@ def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(t
     output = tmp_path / "prepared"
     builder.build(output)
     dataset = SceneDataset.load(output, "train")
-    saved = json.loads((output / "retrieval.json").read_text())
+    assert not (output / "retrieval.json").exists()
     for index, record in enumerate(dataset):
         pool = dataset.context_pool(index)
         assert pool.sample_id == record["metadata"]["id"]
@@ -582,37 +586,41 @@ def test_retrieval_pools_survive_preparation_without_target_or_shared_mutation(t
             original = pool.blocks[0]["passages"][0]["text"]
             pool.blocks[0]["passages"][0]["text"] = "Changed by caller"
             assert dataset.context_pool(index).blocks[0]["passages"][0]["text"] == original
-    assert len(saved["scenes"]) < sum(
-        len(p["blocks"]) + len(p["references"]) for p in saved["pools"].values())
-    with SceneDatabase.create(tmp_path / "context.sqlite", saved["scenes"].values(),
-                              Encoder()) as database:
+    assert all("references" not in row and "graph" not in row
+               for row in dataset.evidence.values())
+    pools = [dataset.context_pool(i) for i in range(len(dataset))]
+    blocks = [block for pool in pools for block in pool.blocks + pool.references]
+    with SceneDatabase.create(tmp_path / "context.sqlite", blocks, Encoder()) as database:
         index = next(i for i in range(len(dataset)) if dataset.context_pool(i).blocks)
         session = dataset.retrieval_session(index, database)
         matches = session.call_tool("search_context", {})
         assert matches
         passages = session.call_tool("read_context", {"ids": [m["id"] for m in matches]})
         assert all(dataset.target(index) not in passage["text"] for passage in passages)
-
-
-def test_retrieval_sidecar_tampering_is_rejected(tmp_path):
-    source = corpus(tmp_path, STORY)
-    output = tmp_path / "prepared"
-    DatasetBuilder(source, config({"Later": spec()})).build(output)
-    path = output / "retrieval.json"
-    path.write_text(path.read_text() + " ")
-    with pytest.raises(ValueError, match="Dataset artifact differs: retrieval.json"):
+    (source.root / "missions.txt").write_text(STORY + "\n")
+    with pytest.raises(ValueError, match="Source hash differs"):
         SceneDataset.load(output, "train")
 
 
-def test_prepared_dataset_requires_hashed_retrieval_pools(tmp_path):
+def test_state_provenance_tampering_is_rejected(tmp_path):
+    source = corpus(tmp_path, STORY)
+    output = tmp_path / "prepared"
+    DatasetBuilder(source, config({"Later": spec()})).build(output)
+    path = output / "provenance.json"
+    path.write_text(path.read_text() + " ")
+    with pytest.raises(ValueError, match="Dataset artifact differs: provenance.json"):
+        SceneDataset.load(output, "train")
+
+
+def test_prepared_dataset_requires_hashed_provenance(tmp_path):
     source = corpus(tmp_path, STORY)
     output = tmp_path / "prepared"
     DatasetBuilder(source, config({"Later": spec()})).build(output)
     manifest = json.loads((output / "manifest.json").read_text())
-    del manifest["artifacts"]["retrieval.json"]
+    del manifest["artifacts"]["provenance.json"]
     (output / "manifest.json").write_text(json.dumps(manifest))
-    (output / "retrieval.json").unlink()
-    with pytest.raises(ValueError, match="require a retrieval.json artifact hash"):
+    (output / "provenance.json").unlink()
+    with pytest.raises(ValueError, match="require hashed configuration and provenance"):
         SceneDataset.load(output, "train")
 
 

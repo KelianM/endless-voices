@@ -133,6 +133,26 @@ class Mission:
 class GameCorpus:
     """Load hash-verified source missions once for dataset preparation."""
 
+    @property
+    def mission_graph(self):
+        """Return prerequisite mission links from authored offer conditions."""
+        graph = {}
+        for name, mission in self.missions.items():
+            parents = set()
+            for child in mission.node["children"]:
+                if child["tokens"] != ["to", "offer"]:
+                    continue
+                for term, ancestors in walk(child["children"]):
+                    if any(p["tokens"] == ["or"] for p in ancestors):
+                        continue
+                    parts = term["tokens"]
+                    if len(parts) == 2 and parts[0] == "has" and parts[1].endswith(": done"):
+                        parent = parts[1][:-6]
+                        if parent in self.missions:
+                            parents.add(parent)
+            graph[name] = sorted(parents)
+        return graph
+
     def __init__(self, root, inventory):
         self.root = Path(root)
         self.revision = inventory["revision"]
@@ -146,8 +166,9 @@ class GameCorpus:
         self.planets = {}
         self.reference_lore = []
         self.files = {}
+        self.source_lines = {}
         flag_conversations, persistent_conditions = {}, set()
-        for entry in inventory["files"]:
+        for entry in sorted(inventory["files"], key=lambda entry: entry["path"]):
             relative = Path(entry["path"])
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("Source path must be relative")
@@ -155,6 +176,7 @@ class GameCorpus:
             if hashlib.sha256(raw).hexdigest() != entry["sha256"]:
                 raise ValueError(f"Source hash differs: {relative}")
             self.files[str(relative)] = entry["sha256"]
+            self.source_lines[str(relative)] = raw.decode("utf-8").splitlines()
             for node in tree(raw.decode("utf-8")):
                 kind, *names = node["tokens"]
                 owner = (kind, names[0] if names else str(relative))

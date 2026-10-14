@@ -25,7 +25,7 @@ dataset descriptions and architecture decisions.
 
 ## Prepare data
 
-Prepare encounters and eligible context from cached game sources, without loading a model
+Prepare reproducible encounters from cached game sources, without loading a model
 or tokenizer:
 
 ```sh
@@ -39,7 +39,12 @@ endless-voices prepare-dataset \
 
 [Dataset inputs](data/README.md) explains source and mission selection. The
 [published dataset](data/dataset/README.md) records release coverage and limitations;
-rebuild that older bundle before using the current retrieval flow.
+use the pinned raw source cache alongside the prepared bundle.
+
+The bundle saves game states, authored targets and source passage traces. It does not save
+context pools or eligible-scene lists. Retrieval reconstructs those from the raw game files
+and checks the original pool fingerprint. Keep the raw source cache at the manifest’s
+`source_root` (relative to the bundle); source hashes are verified on load.
 
 Validate a prepared bundle with:
 

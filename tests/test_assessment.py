@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
-from prepared_fixtures import write_empty_pools
+from prepared_fixtures import write_raw_context
 
 from endless_voices import assessment as a
 from endless_voices.context_generation import dynamic_messages
@@ -31,7 +31,7 @@ def dataset(tmp_path):
         path.write_text("".join(json.dumps(r) + "\n" for r in rows))
         manifest["artifacts"][path.name] = a.file_hash(path)
     a.write_json(tmp_path / "manifest.json", manifest)
-    write_empty_pools(tmp_path)
+    write_raw_context(tmp_path)
     return tmp_path / "manifest.json"
 
 

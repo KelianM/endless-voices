@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from prepared_fixtures import write_empty_pools
+from prepared_fixtures import write_raw_context
 
 from endless_voices.contracts import (
     evaluation_messages,
@@ -158,7 +158,7 @@ def test_scenario_family_split_unit(manifest):
     row["metadata"]["id"] = "another-variant"
     rewrite(manifest, "test", [record("test")])
     rewrite(manifest, "train", [record(), row])
-    write_empty_pools(manifest.parent)
+    write_raw_context(manifest.parent)
     assert validate_manifest(manifest)["train"]["records"] == 2
 
 
