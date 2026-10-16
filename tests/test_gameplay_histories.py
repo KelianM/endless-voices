@@ -34,3 +34,31 @@ mission Later
     assert encounter.history.state.snapshot()["current_values"]["Earlier: done"] == 1
     _, omitted = gameplay.encounters(corpus.missions["Later"], GameState(), excluded={"Earlier"})
     assert omitted == ["Earlier"]
+
+
+def test_equivalent_condition_order_keeps_the_same_history_witness():
+    from types import SimpleNamespace
+
+    import z3
+
+    from endless_voices.gameplay.histories import History
+
+    credits, reputation = z3.Ints("credits reputation")
+    conditions = [
+        z3.Or(credits > 0, z3.And(reputation > 0, credits > 10)),
+        z3.Or(z3.And(credits > 10, reputation > 0), credits > 0),
+    ]
+    histories = [History(GameState(values={"credits": credits, "reputation": reputation},
+                                   constraints=(condition,)), [{"choice": choice}])
+                 for choice, condition in enumerate(conditions)]
+    gameplay = HistoryReconstructor(SimpleNamespace(mission_dependencies={}),
+                                    DialogueInterpreter(), {})
+    forward = gameplay.bounded(histories)
+    backward = gameplay.bounded(list(reversed(histories)))
+    assert len(forward) == 1
+    assert forward[0] is backward[0]
+
+    opposite = [History(GameState(values={"credits": credits, "reputation": reputation},
+                                  constraints=(condition,)), [])
+                for condition in (credits > reputation, reputation > credits)]
+    assert len(gameplay.bounded(opposite)) == 2

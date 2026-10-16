@@ -36,6 +36,8 @@ possibilities. Concrete solver snapshots can choose different satisfying values 
 when passages and histories match. Dependency inference supports selected prerequisite
 forms; mission
 scheduling explores sequential and overlapping producer schedules, not every possible
-phase interleaving. Equivalent projected states share a representative history.
+phase interleaving. State comparison normalizes commutative operand order before grouping histories.
+Equivalent projected states share a representative history, independently of solver
+print order.
 Unsupported operations and exceeded route limits fail explicitly. These limits apply
 to both dataset preparation and direct gameplay use.

@@ -8,7 +8,7 @@ import z3
 from endless_voices.artifacts import fingerprint as digest
 
 from .source import walk
-from .state import GameState, apply, condition, projected_state, unsupported
+from .state import GameState, apply, condition, expression_key, projected_state, unsupported
 
 ENDPOINTS = {"accept", "decline", "defer", "launch", "flee", "die", "explode"}
 
@@ -139,7 +139,7 @@ class DialogueInterpreter:
             explored.add(execution_key)
             visit_key = (
                 pc,
-                tuple(sorted((k, z3.simplify(v).sexpr()) for k, v in current.values.items())),
+                tuple(sorted((k, expression_key(v)) for k, v in current.values.items())),
             )
             count = visits.get(visit_key, 0) + 1
             if count > self.max_visits:
