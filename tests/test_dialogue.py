@@ -2,9 +2,9 @@
 
 import pytest
 
-from endless_voices.dataset.dialogue import DialogueInterpreter
-from endless_voices.dataset.source import tree
-from endless_voices.dataset.state import GameState, UnsupportedOperation
+from endless_voices.gameplay.dialogue import DialogueInterpreter
+from endless_voices.gameplay.source import tree
+from endless_voices.gameplay.state import GameState, UnsupportedOperation
 
 
 def run(body, state=None):

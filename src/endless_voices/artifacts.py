@@ -13,6 +13,11 @@ def digest(value):
     return hashlib.sha256(value).hexdigest()
 
 
+def fingerprint(value):
+    """Hash a JSON-serializable value with deterministic key ordering."""
+    return digest(encoded(value))
+
+
 def file_hash(path):
     with Path(path).open("rb") as handle:
         return hashlib.file_digest(handle, "sha256").hexdigest()

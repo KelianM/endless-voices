@@ -5,7 +5,7 @@ from random import Random
 
 import z3
 
-from endless_voices.context import digest
+from endless_voices.artifacts import fingerprint as digest
 
 from .source import walk
 from .state import GameState, apply, condition, projected_state, unsupported

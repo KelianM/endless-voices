@@ -6,9 +6,16 @@ continuations with the original writing. The [README](../README.md) contains usa
 
 ## Preparation
 
-[DatasetBuilder](../src/endless_voices/dataset/builder.py) interprets pinned game sources
-into visible encounters, authored targets and compatible context. Prerequisite-connected mission chains stay in one split. The interpreter resolves supported branches and mission variables; the interpreter
-does not reproduce arbitrary game saves.
+[Gameplay reconstruction](../src/endless_voices/gameplay/README.md) parses pinned game
+sources, infers mission dependencies and interprets compatible histories. The gameplay
+package owns symbolic state, event timing, dialogue branches, mission scheduling and
+reproducible encounter sampling. The interpreter supports a bounded subset of game
+behavior and does not reproduce arbitrary game saves.
+
+[DatasetBuilder](../src/endless_voices/dataset/builder.py) consumes reconstructed encounters
+and creates examples. Dataset preparation owns split eligibility, writing references,
+prompts and publication. Prerequisite-connected mission chains stay in one split.
+Gameplay receives excluded mission names without depending on dataset split rules.
 
 Prepared records contain the instruction, visible encounter and target. The prompt names
 the current mission event and its known location without exposing post-target state. Game states and source passage traces preserve the selected history. Retrieval reconstructs

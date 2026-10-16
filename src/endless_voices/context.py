@@ -1,6 +1,5 @@
 """Represent eligible story context and count complete generation prompts."""
 
-import hashlib
 import json
 import re
 from collections import deque
@@ -8,13 +7,6 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Protocol
-
-from endless_voices.artifacts import encoded
-
-
-def digest(value):
-    return hashlib.sha256(encoded(value)).hexdigest()
-
 
 
 def distances(graph, start):

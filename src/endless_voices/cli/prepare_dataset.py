@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from endless_voices.dataset.builder import DatasetBuilder
-from endless_voices.dataset.source import GameCorpus
+from endless_voices.gameplay.source import GameCorpus
 
 
 def main(argv=None):

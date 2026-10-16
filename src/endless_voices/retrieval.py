@@ -7,7 +7,8 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Literal, Protocol
 
-from endless_voices.context import digest, distances, render
+from endless_voices.artifacts import fingerprint as digest
+from endless_voices.context import distances, render
 
 DEFAULT_EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-0.6B"
 DEFAULT_QUERY_INSTRUCTION = (

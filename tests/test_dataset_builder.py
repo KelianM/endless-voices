@@ -11,8 +11,8 @@ from endless_voices.assessment import load_dataset
 from endless_voices.context import render
 from endless_voices.contracts import validate_manifest
 from endless_voices.dataset.builder import DatasetBuilder
-from endless_voices.dataset.source import GameCorpus
 from endless_voices.dataset.storage import SceneDataset
+from endless_voices.gameplay.source import GameCorpus
 from endless_voices.generate import select_samples
 
 
@@ -291,21 +291,21 @@ mission Later
 
 
 def test_context_samples_event_timing_without_collapsing_current_mission_outcomes(tmp_path):
-    from endless_voices.dataset.builder import History
-    from endless_voices.dataset.source import tree
-    from endless_voices.dataset.state import GameState, apply
+    from endless_voices.gameplay.histories import History
+    from endless_voices.gameplay.source import tree
+    from endless_voices.gameplay.state import GameState, apply
 
     builder = DatasetBuilder(corpus(tmp_path, STORY), config({"Later": spec()}))
     state = GameState.fixed({"ready": 0})
     state.events = {"change": tree('event change\n\tset ready')[0]}
     history = History(apply(tree('event change 1'), state), [])
-    all_outcomes = builder.sampler.advance([history])
+    all_outcomes = builder.sampler.gameplay.advance([history])
     assert {h.state.snapshot()["current_values"]["ready"] for h in all_outcomes} == {0, 1}
-    sampled = builder.sampler.advance([history], sample=True)
+    sampled = builder.sampler.gameplay.advance([history], sample=True)
     assert len(sampled) == 1
     witness = sampled[0].state.snapshot()
     assert witness in [h.state.snapshot() for h in all_outcomes]
-    assert witness == builder.sampler.advance([history], sample=True)[0].state.snapshot()
+    assert witness == builder.sampler.gameplay.advance([history], sample=True)[0].state.snapshot()
     assert (witness["elapsed_days"] >= 1) == (witness["current_values"]["ready"] == 1)
 
 
@@ -428,9 +428,9 @@ def test_on_enter_applies_effects_before_later_passage(tmp_path):
 
 
 def test_named_failure_runs_cleanup_once_after_current_actions(tmp_path):
-    from endless_voices.dataset.builder import History
-    from endless_voices.dataset.source import tree
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.histories import History
+    from endless_voices.gameplay.source import tree
+    from endless_voices.gameplay.state import GameState
 
     text = '''mission Earlier
 \ton fail
@@ -441,7 +441,7 @@ mission Current
     source = corpus(tmp_path, text)
     builder = DatasetBuilder(source, config({"Current": spec()}))
     state = GameState.fixed({"Earlier: active": 1, "cleanup": 0})
-    routes = builder.sampler.event(tree('fail Earlier\nset after'),
+    routes = builder.sampler.gameplay.event(tree('fail Earlier\nset after'),
                                    [History(state, [])], source.missions["Current"], "accept")
     saved = routes[0].state.snapshot()["current_values"]
     assert saved["Earlier: active"] == 0
@@ -451,7 +451,7 @@ mission Current
 
 
 def test_unique_mission_owned_counter_starts_at_zero_without_replacing_prior_state(tmp_path):
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     text = '''mission Counter
 \ton offer
@@ -463,10 +463,10 @@ def test_unique_mission_owned_counter_starts_at_zero_without_replacing_prior_sta
     source = corpus(tmp_path, text)
     builder = DatasetBuilder(source, config({"Counter": spec()}))
     absent = GameState()
-    builder.sampler.enter(absent, source.missions["Counter"])
+    builder.sampler.gameplay.enter(absent, source.missions["Counter"])
     assert absent.snapshot()["current_values"]["questions"] == 0
     existing = GameState.fixed({"questions": 2})
-    builder.sampler.enter(existing, source.missions["Counter"])
+    builder.sampler.gameplay.enter(existing, source.missions["Counter"])
     assert existing.snapshot()["current_values"]["questions"] == 2
 
 
@@ -494,7 +494,7 @@ mission Training
 
 
 def test_shared_conversation_scratch_flags_default_zero_but_scores_remain_external(tmp_path):
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     text = '''mission First
 \ton complete
@@ -522,11 +522,11 @@ mission Second
     source = corpus(tmp_path, text)
     builder = DatasetBuilder(source, config({"First": spec(), "Second": spec()}))
     state = GameState()
-    builder.sampler.enter(state, source.missions["Second"])
+    builder.sampler.gameplay.enter(state, source.missions["Second"])
     assert state.snapshot()["current_values"]["discussed"] == 0
     assert "medicine" not in state.values
     previous = GameState.fixed({"discussed": 1, "medicine": 3})
-    builder.sampler.enter(previous, source.missions["Second"])
+    builder.sampler.gameplay.enter(previous, source.missions["Second"])
     saved = previous.snapshot()["current_values"]
     assert saved["discussed"] == 1
     assert saved["medicine"] == 3
@@ -535,11 +535,11 @@ mission Second
 def test_history_projection_retains_correlated_future_choices_and_whole_witness(tmp_path):
     import z3
 
-    from endless_voices.dataset.builder import History
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.histories import History
+    from endless_voices.gameplay.state import GameState
 
     sampler = DatasetBuilder(corpus(tmp_path, "mission Target\n"),
-                             config({"Target": spec()})).sampler
+                             config({"Target": spec()})).sampler.gameplay
     sampler.history_variables = {"future"}
     histories = []
     for irrelevant, positive in [(0, True), (1, True), (2, False)]:
@@ -571,12 +571,12 @@ mission Target
 \t\t\tlabel end
 \t\t\t`End.`
 ''')
-    sampler = DatasetBuilder(source, config({"Target": spec()})).sampler
+    sampler = DatasetBuilder(source, config({"Target": spec()})).sampler.gameplay
     assert {"live", "carry", "prior", "Target: active"} <= sampler.future_variables(["Target"])
 
 
 def test_final_targets_do_not_require_materializing_unused_terminal_histories(tmp_path):
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     source = corpus(tmp_path, '''mission Target
 \ton complete
@@ -598,7 +598,7 @@ def test_final_targets_do_not_require_materializing_unused_terminal_histories(tm
 \t\t\t\taccept
 ''')
     builder = DatasetBuilder(source, config({"Target": spec()}))
-    builder.sampler.max_routes = 1
+    builder.sampler.gameplay.max_routes = 1
     rows = builder.examples.build(source.missions["Target"], spec(), GameState())
     assert {row[0]["messages"][-1]["content"] for row in rows} == {
         "Left ending.", "Right ending."}
@@ -608,7 +608,7 @@ def test_final_targets_do_not_require_materializing_unused_terminal_histories(tm
 
 
 def test_repeated_dialog_entries_preserve_all_paragraphs_in_later_context(tmp_path):
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     source = corpus(tmp_path, '''mission Target
 \ton accept
@@ -701,7 +701,7 @@ def test_saved_prompt_bundles_require_rebuilding(tmp_path):
 
 def test_planet_references_keep_names_and_only_applied_descriptions(tmp_path):
     # A reference must identify the planet without exposing a future event's description.
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     source = corpus(tmp_path, """system Wah
 	object Cloudfire
@@ -730,7 +730,7 @@ mission Visit
 
 def test_scene_cue_uses_event_location_without_completion_answer(tmp_path):
     # Completion payments and dialogue outcomes must not enter the scene cue.
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     source = corpus(tmp_path, """mission Journey
 	source Origin
@@ -778,10 +778,10 @@ mission Later
 \t\tconversation
 \t\t\t`You made it in time.`
 '''
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.state import GameState
 
     builder = DatasetBuilder(corpus(tmp_path, story), config({"Later": spec()}))
-    builder.sampler.seed = "0"
+    builder.sampler.gameplay.seed = "0"
     rows = builder.examples.build(builder.corpus.missions["Later"], spec(),
                                   GameState.fixed({"expired": 0}))
     assert rows
@@ -1039,6 +1039,21 @@ mission Later
         text += 'event reset\n\tclear ended\n'
     source = corpus(tmp_path, text)
     builder = DatasetBuilder(source, config({"Later": spec()}))
-    plans = builder.sampler.history_plans("Later")
+    plans = builder.sampler.gameplay.history_plans("Later")
     assert any("Ending" in stages for stages, _ in plans) == can_clear
     assert any("Ordinary" in stages for stages, _ in plans)
+
+
+def test_named_conversation_cannot_cross_assigned_mission_splits(tmp_path):
+    source = corpus(tmp_path, (
+        'conversation "shared"\n\t`A shared target.`\n'
+        'mission "First"\n\ton offer\n\t\tconversation "shared"\n'
+        'mission "Second"\n\ton complete\n\t\tconversation "shared"\n'
+        'mission "Unselected"\n\ton offer\n\t\tconversation "shared"\n'
+    ))
+    with pytest.raises(ValueError, match="crosses mission splits"):
+        DatasetBuilder(source, config({"First": spec(), "Second": spec("validation")}))
+    builder = DatasetBuilder(source, config({
+        "First": spec("validation"), "Second": spec("validation")}))
+    assert builder.sampler.conversation_owners == {"shared": "validation"}
+    assert source.named_conversation_users() == {"shared": {"First", "Second", "Unselected"}}

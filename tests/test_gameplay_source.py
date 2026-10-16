@@ -4,8 +4,8 @@ import hashlib
 
 import pytest
 
-from endless_voices.dataset.source import GameCorpus
-from endless_voices.dataset.state import UnsupportedOperation
+from endless_voices.gameplay.source import GameCorpus
+from endless_voices.gameplay.state import UnsupportedOperation
 
 
 def corpus(tmp_path, files):
@@ -78,24 +78,6 @@ def test_dialog_preserves_inline_children_and_named_phrase_sources(tmp_path):
     assert payment == [{"line": 3, "text": "Payment received.", "path": "phrases.txt",
                         "sha256": source.files["phrases.txt"]}]
 
-
-def test_named_conversation_cannot_cross_assigned_mission_splits(tmp_path):
-    source = corpus(tmp_path, {
-        "source.txt": (
-            'conversation "shared"\n\t`A shared target.`\n'
-            'mission "First"\n\ton offer\n\t\tconversation "shared"\n'
-            'mission "Second"\n\ton complete\n\t\tconversation "shared"\n'
-            'mission "Unselected"\n\ton offer\n\t\tconversation "shared"\n'
-        ),
-    })
-    with pytest.raises(ValueError, match="crosses mission splits"):
-        source.conversation_owners({"First": "train", "Second": "validation"})
-    assert source.conversation_owners({"First": "validation", "Second": "validation"}) == {
-        "shared": "validation",
-    }
-    assert source.named_conversation_users() == {
-        "shared": {"First", "Second", "Unselected"},
-    }
 
 
 def test_counter_ownership_includes_nonmission_writers(tmp_path):

@@ -4,10 +4,10 @@ import json
 from dataclasses import asdict
 
 from endless_voices.artifacts import file_hash, save_progress
-from endless_voices.context import digest
+from endless_voices.artifacts import fingerprint as digest
 from endless_voices.dataset.builder import DatasetBuilder
-from endless_voices.dataset.source import GameCorpus
-from endless_voices.dataset.state import GameState
+from endless_voices.gameplay.source import GameCorpus
+from endless_voices.gameplay.state import GameState
 
 
 def write_raw_context(root):

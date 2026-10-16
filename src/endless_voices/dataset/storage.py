@@ -11,8 +11,8 @@ from dataclasses import asdict
 from pathlib import Path
 
 from endless_voices.artifacts import file_hash
+from endless_voices.artifacts import fingerprint as digest
 from endless_voices.artifacts import write_json as save
-from endless_voices.context import digest
 from endless_voices.contracts import SPLITS, read_records, validate_record
 from endless_voices.splits import mission_key
 
@@ -59,7 +59,7 @@ class SceneDataset(Sequence):
                 raise ValueError("Artifact must be inside the manifest directory")
             if file_hash(path) != expected:
                 raise ValueError(f"Dataset artifact differs: {name}")
-        from .source import GameCorpus
+        from endless_voices.gameplay.source import GameCorpus
 
         corpus = GameCorpus(root / manifest["source_root"], {
             "revision": manifest["source_revision"],

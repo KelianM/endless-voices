@@ -21,8 +21,8 @@ def save(path, value):
 
 def prepare(args):
     from endless_voices.dataset.builder import DatasetBuilder
-    from endless_voices.dataset.source import GameCorpus
-    from endless_voices.dataset.state import GameState
+    from endless_voices.gameplay.source import GameCorpus
+    from endless_voices.gameplay.state import GameState
 
     plan = json.loads(args.plan.read_text())
     config = json.loads(args.config.read_text())

@@ -131,70 +131,21 @@ class Mission:
 
 
 class GameCorpus:
-    """Load hash-verified source missions once for dataset preparation."""
+    """Load hash-verified game content and its source locations."""
 
     @property
     def mission_dependencies(self):
-        """Return required conditions and alternative mission phases that establish them."""
-        events = {}
-        for event, schedulers in self.event_schedulers.items():
-            if ("event: " + event not in self.condition_writers
-                    and all(kind == "mission" and phase in {"offer", "complete"}
-                            for kind, _, phase in schedulers)):
-                events[event] = sorted((name, phase) for _, name, phase in schedulers)
-        dependencies, present, absent = {}, {}, {}
-        for name, mission in self.missions.items():
-            required = {}
-            present[name], absent[name] = set(), set()
-            for child in mission.node["children"]:
-                if child["tokens"] != ["to", "offer"]:
-                    continue
-                for term, ancestors in walk(child["children"]):
-                    if any(p["tokens"] == ["or"] for p in ancestors):
-                        continue
-                    parts = term["tokens"]
-                    if len(parts) == 2 and parts[0] == "not":
-                        absent[name].add(parts[1])
-                    if len(parts) != 2 or parts[0] != "has":
-                        continue
-                    flag = parts[1]
-                    present[name].add(flag)
-                    if flag.endswith(": done") and flag[:-6] in self.missions:
-                        required[flag] = [(flag[:-6], "complete")]
-                    elif flag.startswith("event: ") and flag[7:] in events:
-                        choices = events[flag[7:]]
-                        if all(parent != name for parent, _ in choices):
-                            required[flag] = choices
-            dependencies[name] = required
-        # A flag required absent earlier needs a witnessed transition before it can be present.
-        changed = True
-        while changed:
-            changed = False
-            for name, required in dependencies.items():
-                pending = [p for choices in required.values() for p, _ in choices]
-                ancestors = set()
-                while pending:
-                    parent = pending.pop()
-                    if parent in ancestors or parent == name:
-                        continue
-                    ancestors.add(parent)
-                    pending.extend(p for choices in dependencies[parent].values()
-                                   for p, _ in choices)
-                earlier_absent = set().union(*(absent[p] for p in ancestors))
-                for flag in sorted((present[name] & earlier_absent) - required.keys()):
-                    triggers = self.condition_triggers.get(flag, set())
-                    if triggers and all(kind == "mission" and parent != name
-                                        and phase in {"offer", "complete"}
-                                        for kind, parent, phase in triggers):
-                        required[flag] = sorted((parent, phase) for _, parent, phase in triggers)
-                        changed = True
-        return dependencies
+        """Return required conditions and mission phases that can establish them."""
+        from .graph import mission_dependencies
+
+        return mission_dependencies(self)
 
     @property
     def mission_graph(self):
-        """Return all possible prerequisite links for split isolation and retrieval."""
-        return {name: sorted({parent for choices in required.values() for parent, _ in choices})
-                for name, required in self.mission_dependencies.items()}
+        """Return every possible prerequisite link."""
+        from .graph import mission_graph
+
+        return mission_graph(self.mission_dependencies)
 
     def __init__(self, root, inventory):
         self.root = Path(root)
@@ -335,17 +286,6 @@ class GameCorpus:
                 if parts[:1] == ["conversation"] and len(parts) == 2 and not node["children"]:
                     users.setdefault(parts[1], set()).add(mission.name)
         return users
-
-    def conversation_owners(self, assignments):
-        """Validate shared conversation splits and return each definition's owner."""
-        owners = {}
-        for name, missions in self.named_conversation_users().items():
-            splits = {assignments[m] for m in missions if m in assignments}
-            if len(splits) > 1:
-                raise ValueError(f"Named conversation {name!r} crosses mission splits")
-            if splits:
-                owners[name] = splits.pop()
-        return owners
 
     def resolve_conversation(self, node, mission):
         """Return inline or named dialogue with its definition's source location."""

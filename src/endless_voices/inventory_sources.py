@@ -4,7 +4,7 @@ import hashlib
 import subprocess
 from collections import Counter, defaultdict
 
-from endless_voices.dataset.source import tokens
+from endless_voices.gameplay.source import tokens
 
 REVISION = "7140eb2a29ce4d2797933075c751791a892c7d4f"
 CATEGORIES = ("conversation", "dialog", "description", "spaceport", "log", "phrase_news")
