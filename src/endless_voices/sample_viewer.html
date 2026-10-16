@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endless Voices · Sample reader</title>
+<style>
+:root { color-scheme: light dark; --bg: light-dark(#fafaf8,#171918); --text: light-dark(#242c28,#e5eae6); --muted: light-dark(#58685f,#a9b7ae); --line: light-dark(#d5ddd7,#39453d); --panel: light-dark(#fff,#202722); --accent: light-dark(#265b40,#b5dbc3); }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, sans-serif; }
+main { max-width: 1080px; margin: auto; padding: 32px 24px 60px; }
+h1 { margin: 0; font-size: 28px; font-weight: 600; }
+h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
+p { margin: 0 0 16px; }
+.muted { color: var(--muted); font-size: 14px; }
+.filters { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 12px; margin: 24px 0 14px; }
+label { display: grid; gap: 5px; font-size: 14px; }
+select, input, button, textarea { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; min-width: 0; max-width: 100%; }
+button { cursor: pointer; }
+button:disabled { opacity: .45; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+nav { display: flex; gap: 10px; align-items: center; margin: 14px 0 28px; flex-wrap: wrap; }
+nav label { flex: 1; min-width: 180px; }
+#position { font-variant-numeric: tabular-nums; }
+section { margin-top: 24px; }
+.copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.turn { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--line); }
+.turn:last-child { border-color: var(--accent); }
+.role { color: var(--muted); font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; border-top: 1px solid var(--line); margin-top: 24px; }
+.comparison.solo { grid-template-columns: 1fr; }
+details { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; }
+summary { cursor: pointer; color: var(--accent); padding: 6px 0 12px; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+#sample-id { overflow-wrap: anywhere; }
+#empty { padding: 32px 0; }
+[hidden] { display: none !important; }
+@media (max-width: 650px) { main { padding: 20px 16px 40px; } .filters, .comparison { grid-template-columns: 1fr; } nav label { flex-basis: 100%; order: -1; } }
+</style>
+</head>
+<body>
+<main>
+<header><h1>Endless Voices</h1><p class="muted" id="dataset"></p></header>
+<section id="live-settings" hidden><h2>Play settings</h2>
+<p class="muted">Explore this scene with retrieval tools. Mission state stays at the selected scene.</p>
+<div class="filters">
+<label>Model<select id="live-model"></select></label>
+<label>Start from<select id="live-start"><option value="scene">Scene before target</option><option value="saved">Selected saved response</option></select></label>
+
+</div>
+<p class="muted" id="model-status"></p>
+</section>
+<div class="filters">
+<label>Split<select id="split"></select></label>
+<label>Identity<select id="identity"></select></label>
+<label>Search ID, role or topic<input id="search" type="search" placeholder="e.g. quarg, diplomacy, barkeep"></label>
+</div>
+<nav aria-label="Sample navigation">
+<button id="previous" type="button">← Previous</button>
+<label>Sample<select id="sample"></select></label>
+<button id="next" type="button">Next →</button>
+<span class="muted" id="position" aria-live="polite"></span>
+</nav>
+<p id="empty" hidden>No samples match these filters.</p>
+<article id="reading">
+<h2 id="character"></h2><p class="muted" id="sample-id"></p>
+<p id="play-link" hidden><a href="#live-panel">Play this scene →</a> · <a href="#comparison">Read the game’s continuation</a></p>
+<details id="instructions"><summary>Model instructions, scene and selected lore</summary><div class="copy" id="system"></div></details>
+
+
+
+
+<section id="conversation"><h2>Conversation</h2><div id="history"></div><div id="live-history"></div></section>
+<section id="live-panel" hidden>
+<h2>Your next reply</h2>
+<label id="choices-label" hidden>Authored player choice<select id="player-choice"></select></label>
+<label>Your response<textarea id="live-text" rows="3" placeholder="Leave blank to generate the scene’s first continuation"></textarea></label>
+<nav><button id="send-live">Generate continuation</button><button id="reset-live">Restart live conversation</button><button id="download-live">Download conversation</button><span id="live-status" class="muted" aria-live="polite"></span></nav>
+</section>
+<label id="saved-run-label">Saved run<select id="saved-run"></select></label>
+<div class="comparison" id="comparison">
+<section><h2>In the game</h2><p class="muted" id="target-info"></p><div class="copy" id="target"></div></section>
+<section id="model-panel"><h2>Saved response</h2><p class="muted" id="response-info"></p><div class="copy" id="response"></div><pre id="failure" hidden></pre><div id="saved-trace"></div></section>
+</div>
+
+<details><summary>Sample metadata and sources</summary><pre id="metadata"></pre></details>
+<details id="run-details" hidden><summary>Generation run</summary><pre id="run-info"></pre></details>
+</article>
+</main>
+<script id="samples-data" type="application/json">__SAMPLE_DATA__</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('samples-data').textContent);
+  const get = id => document.getElementById(id);
+  const split = get('split'), identity = get('identity'), search = get('search'), select = get('sample');
+  let filtered = [], index = 0;
+  let liveId = null, liveTurns = [], busy = false;
+  const runs = data.runs;
+  data.run = runs[0] || null;
+  runs.forEach((run, i) => addRun(i, run.name));
+  function addRun(i, label) {
+    const option = document.createElement('option'); option.value = i; option.textContent = label;
+    get('saved-run').append(option);
+  }
+  const words = text => (text.match(/[\p{L}\p{N}_]+(?:['’][\p{L}\p{N}_]+)*/gu) || []).length;
+  const addOption = (node, value, label) => {
+    const option = document.createElement('option'); option.value = value; option.textContent = label; node.append(option);
+  };
+  const splits = [...new Set(data.samples.map(s => s.metadata.split))];
+  if (splits.length > 1) addOption(split, 'all', 'All included splits');
+  splits.forEach(value => addOption(split, value, value === 'test' ? 'test · held out' : value));
+  addOption(identity, 'all', 'All identities');
+  [...new Set(data.samples.map(s => s.metadata.identity))].sort().forEach(value => addOption(identity, value, value));
+  get('dataset').textContent = data.dataset_version + ' · ' + data.samples.length + ' samples · Local reader';
+  get('model-panel').hidden = !data.run;
+  get('saved-run-label').hidden = !data.run;
+  get('comparison').classList.toggle('solo', !data.run);
+  if (data.run) {
+    get('run-details').hidden = false;
+    const {responses, selected_ids, ...summary} = data.run;
+    get('run-info').textContent = JSON.stringify(summary, null, 2);
+  }
+  function render(reset = true) {
+    const sample = filtered[index];
+    get('reading').hidden = !sample; get('empty').hidden = Boolean(sample);
+    get('previous').disabled = !sample || index === 0;
+    get('next').disabled = !sample || index === filtered.length - 1;
+    select.disabled = !sample;
+    get('position').textContent = sample ? (index + 1) + ' / ' + filtered.length : '0 / 0';
+    if (!sample) return;
+    if (reset) resetLive();
+    select.value = sample.metadata.id;
+    get('character').textContent = sample.metadata.character_role;
+    get('sample-id').textContent = sample.metadata.identity + ' · ' + sample.metadata.split + ' · ' + sample.metadata.id;
+    get('system').textContent = sample.messages[0].content;
+    const history = get('history'); history.replaceChildren();
+    sample.messages.slice(1, -1).forEach((message, i, turns) => {
+      const turn = document.createElement('div'); turn.className = 'turn';
+      const role = document.createElement('div'); role.className = 'role';
+      role.textContent = message.role === 'assistant' ? 'Earlier assistant reply · authored' : (i === turns.length - 1 ? 'User · final prompt' : 'User');
+      const content = document.createElement('div'); content.className = 'copy'; content.textContent = message.content;
+      turn.append(role, content); history.append(turn);
+    });
+    showEncounter();
+    const target = sample.messages[sample.messages.length - 1].content;
+    get('target').textContent = target;
+    get('target-info').textContent = words(target) + ' words · Original authored path; custom replies may diverge. Never sent to the model.';
+    get('metadata').textContent = JSON.stringify(sample.metadata, null, 2);
+    if (data.run) {
+      const {responses, selected_ids, ...summary} = data.run;
+      get('run-info').textContent = JSON.stringify(summary, null, 2);
+      const response = data.run.responses[sample.metadata.id];
+      get('saved-trace').replaceChildren();
+      showTrace(get('saved-trace'), response?.retrieval);
+      get('response').textContent = response && response.response ? response.response : '';
+      get('failure').hidden = !(response && response.error);
+      get('failure').textContent = response && response.error ? JSON.stringify(response.error, null, 2) : '';
+      if (!response) {
+        get('response-info').textContent = data.run.selected_ids.includes(sample.metadata.id) ? 'Selected for run · response record missing' : 'Not selected for this run';
+      } else {
+        const info = [response.status === 'ok' ? 'Completed' : 'Failed · partial text retained when available'];
+        if (response.response != null) info.push(words(response.response) + ' words');
+        if (response.elapsed_seconds != null) info.push(response.elapsed_seconds.toFixed(1) + ' seconds');
+        if (response.finish_reason) info.push('Stop: ' + response.finish_reason);
+        get('response-info').textContent = info.join(' · ');
+      }
+    }
+  }
+  function filter(preferredId) {
+    const query = search.value.trim().toLowerCase();
+    filtered = data.samples.filter(s => (split.value === 'all' || s.metadata.split === split.value) &&
+      (identity.value === 'all' || s.metadata.identity === identity.value) &&
+      [s.metadata.id, s.metadata.identity, s.metadata.character_role, ...s.metadata.topics, ...s.metadata.sources.map(source => source.source_group)].join(' ').toLowerCase().includes(query));
+    select.replaceChildren();
+    filtered.forEach(s => addOption(select, s.metadata.id, s.metadata.sources[0].source_group + ' · ' + s.metadata.id));
+    index = Math.max(0, filtered.findIndex(s => s.metadata.id === preferredId)); render();
+  }
+  function navigate(next) { index = next; render(); }
+  get('saved-run').onchange = () => { data.run = runs[Number(get('saved-run').value)]; render(false); };
+  function resetLive() {
+    get('send-live').textContent = 'Generate continuation';
+    liveId = null; liveTurns = []; get('live-history').replaceChildren();
+    get('live-text').value = ''; get('live-status').textContent = '';
+    get('live-model').disabled = false; get('live-start').disabled = false;
+    updateModel();
+    showChoices();
+  }
+  function showEncounter() {
+    const sample = filtered[index], last = get('history').lastElementChild?.querySelector('.copy');
+    if (!sample || !last) return;
+    last.textContent = sample.player_choices && data.live && get('live-start').value === 'scene'
+      ? sample.player_choices.prefix : sample.messages[sample.messages.length - 2].content;
+  }
+  function showChoices() {
+    showEncounter();
+    const choices = filtered[index]?.player_choices;
+    const visible = !liveId && get('live-start').value === 'scene' && choices?.options.length;
+    get('choices-label').hidden = !visible;
+    const menu = get('player-choice'); menu.replaceChildren();
+    if (visible) {
+      choices.options.forEach(text => addOption(menu, text, text));
+      menu.value = choices.selected;
+      get('live-text').value = choices.selected;
+    }
+  }
+  function appendTurn(role, content, retrieval, usage) {
+    liveTurns.push({role, content, retrieval, usage});
+    const turn = document.createElement('div'); turn.className = 'turn';
+    const label = document.createElement('div'); label.className = 'role'; label.textContent = role;
+    const text = document.createElement('div'); text.className = 'copy'; text.textContent = content;
+    turn.append(label, text);
+    if (retrieval) showTrace(turn, retrieval, usage);
+    get('live-history').append(turn);
+  }
+  function showTrace(parent, trace, usage = {}) {
+    const details = document.createElement('details'), summary = document.createElement('summary');
+    const turns = trace?.turns || [], count = turns.reduce((n, turn) => n + turn.calls.length, 0);
+    summary.textContent = trace ? 'Model activity · ' + count + ' tool calls' : 'Model activity · not recorded for this saved response';
+    details.append(summary);
+    if (usage.input_tokens != null) {
+      const info = document.createElement('p'); info.className = 'muted';
+      const tokens = usage.input_tokens + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+      info.textContent = tokens.toLocaleString() + ' input tokens on the final request · reported by the provider';
+      details.append(info);
+    }
+    turns.forEach(turn => turn.calls.forEach((call, i) => {
+      const item = document.createElement('details'), title = document.createElement('summary');
+      const result = turn.results[i];
+      title.textContent = call.name + (result.documents ? ' · ' + result.documents.length + ' scenes/passages returned' : '');
+      const args = document.createElement('pre'); args.textContent = typeof call.arguments === 'string' ? call.arguments : JSON.stringify(call.arguments, null, 2);
+      const output = document.createElement('pre'); output.textContent = JSON.stringify(result, null, 2);
+      item.append(title, args, output); details.append(item);
+    }));
+    parent.append(details);
+  }
+  function updateModel() {
+    if (!data.live) return;
+    const model = data.live.models.find(m => m.id === get('live-model').value);
+    get('model-status').textContent = (model?.provider === 'local'
+      ? 'Local input limit: ' + model.max_input_tokens.toLocaleString() + ' tokens, configured to fit local memory.'
+      : 'Context window: managed by the hosted provider for this model. No additional viewer token cap.')
+      + ' ' + (data.live.errors || []).join(' · ');
+  }
+  if (data.live) {
+    get('play-link').hidden = false;
+    get('live-panel').hidden = false;
+    get('live-settings').hidden = false;
+    data.live.models.forEach(model => addOption(get('live-model'), model.id, model.provider + ' · ' + model.id));
+    if (data.live.models.some(m => m.id === 'gpt-6-luna')) get('live-model').value = 'gpt-6-luna';
+    updateModel();
+    get('dataset').textContent += data.live.budget_usd == null ? ' · Hosted replies are billed to your API account' : ' · Live spending budget $' + data.live.budget_usd;
+  }
+  get('live-model').onchange = updateModel;
+  get('player-choice').onchange = () => { get('live-text').value = get('player-choice').value; };
+  get('reset-live').onclick = resetLive;
+  get('live-start').onchange = resetLive;
+  get('download-live').onclick = () => {
+    const value = {sample_id: select.value, model: get('live-model').value, encounter: filtered[index].messages.slice(0, -1), turns: liveTurns};
+    const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], {type:'application/json'}));
+    const a = document.createElement('a'); a.href = url; a.download = 'conversation.json'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  get('send-live').onclick = async () => {
+    if (busy) return;
+    const text = get('live-text').value.trim();
+    const saved = !liveId && get('live-start').value === 'saved';
+    const response = data.run?.responses[select.value];
+    if (saved && (response?.status !== 'ok' || !response.response)) {
+      get('live-status').textContent = 'Select a saved run with a completed response first.'; return;
+    }
+    if ((liveId || saved) && !text) { get('live-status').textContent = 'Enter a reply first.'; return; }
+    busy = true;
+    const controls = [...document.querySelectorAll('button, select, input, textarea')];
+    const disabled = controls.map(control => control.disabled);
+    controls.forEach(control => { control.disabled = true; });
+    get('live-status').textContent = 'Reading context and writing… First use also loads the retrieval encoder.';
+    try {
+      const reply = await fetch('/continue', {method:'POST', headers:{
+        'Content-Type':'application/json', 'X-Viewer-Token':data.live.token},
+        body:JSON.stringify({sample_id:select.value, model:get('live-model').value,
+          session_id:liveId, text, run_index:saved ? Number(get('saved-run').value) : null})});
+      const result = await reply.json(); if (!reply.ok) throw Error(result.error || 'Request failed');
+      if (saved) appendTurn('Saved response', response.response);
+      if (text) appendTurn('You', text);
+      appendTurn(get('live-model').value, result.response, result.retrieval, result.usage); liveId = result.session_id;
+      get('live-text').value = '';
+      get('send-live').textContent = 'Send reply';
+      showChoices();
+      get('live-status').textContent = result.tool_calls + ' retrieval calls · ' + (result.cost_usd == null ? 'Cost estimate unavailable' : '$' + result.cost_usd.toFixed(4));
+    } catch (error) { get('live-status').textContent = error.message; }
+    finally {
+      busy = false; controls.forEach((control, i) => { control.disabled = disabled[i]; });
+      get('live-model').disabled = Boolean(liveId); get('live-start').disabled = Boolean(liveId);
+    }
+  };
+  split.addEventListener('change', () => filter(select.value));
+  identity.addEventListener('change', () => filter(select.value));
+  search.addEventListener('input', () => filter(select.value));
+  select.addEventListener('change', () => navigate(filtered.findIndex(s => s.metadata.id === select.value)));
+  get('previous').addEventListener('click', () => navigate(index - 1));
+  get('next').addEventListener('click', () => navigate(index + 1));
+  document.addEventListener('keydown', event => {
+    if (busy || /^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(event.target.tagName) || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key === 'ArrowLeft' && index > 0) { event.preventDefault(); navigate(index - 1); }
+    if (event.key === 'ArrowRight' && index + 1 < filtered.length) { event.preventDefault(); navigate(index + 1); }
+  });
+  filter();
+})();
+</script>
+</body>
+</html>

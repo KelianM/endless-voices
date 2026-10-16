@@ -1,6 +1,5 @@
 """Validate conversation samples and split manifests offline."""
 
-import argparse
 import json
 import re
 from pathlib import Path
@@ -161,33 +160,3 @@ def validate_manifest(path: Path, *, tokenizer=None, max_length: int | None = No
                     stats[key][value] = stats[key].get(value, 0) + 1
         coverage[split] = stats
     return coverage
-
-
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("manifest", type=Path)
-    parser.add_argument("--tokenizer", type=Path, help="optional local tokenizer directory only")
-    parser.add_argument(
-        "--max-length", type=int, help="complete-sample token limit for all splits; no truncation"
-    )
-    args = parser.parse_args()
-    if (args.tokenizer is None) != (args.max_length is None):
-        parser.error("--tokenizer and --max-length must be supplied together")
-    try:
-        tokenizer = None
-        if args.tokenizer is not None:
-            if not args.tokenizer.is_dir():
-                raise ValueError("--tokenizer must be an existing local directory")
-            from transformers import AutoTokenizer
-
-            tokenizer = AutoTokenizer.from_pretrained(
-                str(args.tokenizer.resolve()), local_files_only=True, trust_remote_code=False
-            )
-        counts = validate_manifest(args.manifest, tokenizer=tokenizer, max_length=args.max_length)
-    except (ValueError, OSError, UnicodeError) as error:
-        parser.exit(1, f"{error}\n")
-    print(json.dumps(counts, indent=2, sort_keys=True))
-
-
-if __name__ == "__main__":
-    main()

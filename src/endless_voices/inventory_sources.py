@@ -1,13 +1,10 @@
 """Measure pinned Endless Sky source structure, not model-ready dialogue or speakers."""
 
-import argparse
 import hashlib
-import json
 import subprocess
 from collections import Counter, defaultdict
-from pathlib import Path
 
-from endless_voices.dataset.source import tokens
+from endless_voices.gameplay.source import tokens
 
 REVISION = "7140eb2a29ce4d2797933075c751791a892c7d4f"
 CATEGORIES = ("conversation", "dialog", "description", "spaceport", "log", "phrase_news")
@@ -113,15 +110,3 @@ def inventory(root):
         "groups": {g: dict(sorted(c.items())) for g, c in sorted(groups.items())},
         "files": files,
     }
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("upstream", type=Path)
-    parser.add_argument("--output", type=Path, required=True)
-    args = parser.parse_args()
-    args.output.write_text(json.dumps(inventory(args.upstream), indent=2) + "\n")
-
-
-if __name__ == "__main__":
-    main()

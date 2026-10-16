@@ -1,7 +1,7 @@
 """Protect arithmetic, money and event timing used by authored dialogue."""
 
-from endless_voices.dataset.source import tree
-from endless_voices.dataset.state import GameState, apply, condition
+from endless_voices.gameplay.source import tree
+from endless_voices.gameplay.state import GameState, apply, condition
 
 
 def test_random_threshold_uses_multiplication_precedence():

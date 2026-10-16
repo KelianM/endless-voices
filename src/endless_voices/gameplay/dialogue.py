@@ -5,10 +5,10 @@ from random import Random
 
 import z3
 
-from endless_voices.context import digest
+from endless_voices.artifacts import fingerprint as digest
 
 from .source import walk
-from .state import GameState, apply, condition, projected_state, unsupported
+from .state import GameState, apply, condition, expression_key, projected_state, unsupported
 
 ENDPOINTS = {"accept", "decline", "defer", "launch", "flee", "die", "explode"}
 
@@ -27,6 +27,7 @@ class Continuation:
     state: GameState
     stop: int | str
     terminal: bool
+    choices: tuple[Passage, ...] = ()
 
     @property
     def text(self):
@@ -98,13 +99,13 @@ class DialogueInterpreter:
             if initial is None:
                 return []
         after_display = actions
-        pending = [(0, initial, (), (), {}, False)]
+        pending = [(0, initial, (), (), {}, False, ())]
         results, steps = [], 0
         explored = set()
         symbol_cache = {}
         random = Random(sample_seed)
         while pending:
-            pc, current, prefix, paragraphs, visits, displayed = pending.pop()
+            pc, current, prefix, paragraphs, visits, displayed, choices = pending.pop()
             pending_start = len(pending)
             steps += 1
             if steps > self.max_steps:
@@ -117,7 +118,7 @@ class DialogueInterpreter:
                     continue
                 results.append(
                     Continuation(
-                        prefix, paragraphs, current, stop, True
+                        prefix, paragraphs, current, stop, True, choices
                     )
                 )
                 if sample_seed is not None:
@@ -138,7 +139,7 @@ class DialogueInterpreter:
             explored.add(execution_key)
             visit_key = (
                 pc,
-                tuple(sorted((k, z3.simplify(v).sexpr()) for k, v in current.values.items())),
+                tuple(sorted((k, expression_key(v)) for k, v in current.values.items())),
             )
             count = visits.get(visit_key, 0) + 1
             if count > self.max_visits:
@@ -147,12 +148,14 @@ class DialogueInterpreter:
             t = node["tokens"]
 
             def enqueue(dest, candidate, pre=prefix, text=paragraphs, shown=displayed,
-                        seen=visits):
+                        seen=visits, menu=choices):
                 if candidate is not None:
-                    pending.append((dest, candidate, pre, text, seen, shown))
+                    pending.append((dest, candidate, pre, text, seen, shown, menu))
 
             if t == ["choice"]:
                 options = node["children"]
+                menu = tuple(Passage(o["line"], o["tokens"][0], "option") for o in options
+                             if current.assume(visible(o, current)) is not None)
                 any_visible = []
                 for option in options:
                     if not option["raw"].lstrip().startswith(("`", '"')):
@@ -167,10 +170,11 @@ class DialogueInterpreter:
                     candidate = current.assume(predicate)
                     if candidate is not None and not displayed:
                         candidate = apply(after_display, candidate)
-                    enqueue(controls(option, pc + 1), candidate, pre, (), True, seen={})
+                    enqueue(controls(option, pc + 1), candidate, pre, (), True, seen={}, menu=menu)
                 stopping = current.assume(z3.Or(*any_visible))
                 if paragraphs and stopping is not None:
-                    results.append(Continuation(prefix, paragraphs, stopping, node["line"], False))
+                    results.append(Continuation(
+                        prefix, paragraphs, stopping, node["line"], False, choices))
                 enqueue(pc + 1, current.assume(z3.Not(z3.Or(*any_visible))))
             elif t[:1] == ["branch"] and len(t) in {2, 3}:
                 predicate = condition(node["children"], current)

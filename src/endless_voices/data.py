@@ -6,13 +6,6 @@ from typing import Any
 import torch
 from transformers import PreTrainedTokenizerBase
 
-from endless_voices.dataset.storage import SceneDataset
-
-
-def load_conversations(path: str, split: str = "train") -> list[list[dict[str, str]]]:
-    """Load messages from a verified prepared dataset split."""
-    return [record["messages"] for record in SceneDataset.load(path, split)]
-
 
 class TokenizedSceneDataset(torch.utils.data.Dataset):
     """Provide fixed tokenized examples to the trainer's DataLoader."""
@@ -28,15 +21,15 @@ class TokenizedSceneDataset(torch.utils.data.Dataset):
 
 
 def tokenize_conversations(
-    path: str, tokenizer: PreTrainedTokenizerBase, max_length: int, loss: str = "continuation",
-    split: str = "train"
+    conversations, tokenizer: PreTrainedTokenizerBase, max_length: int,
+    loss: str = "continuation"
 ) -> TokenizedSceneDataset:
     if max_length < 2:
         raise ValueError("data.max_length must be at least 2")
     if loss not in {"continuation", "all"}:
         raise ValueError("data.loss must be continuation or all")
     examples = []
-    for index, messages in enumerate(load_conversations(path, split), 1):
+    for index, messages in enumerate(conversations, 1):
         ids = tokenize_messages(messages, tokenizer, max_length, label=f"Conversation {index}")
         labels = list(ids)
         if loss == "continuation":

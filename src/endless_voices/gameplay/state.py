@@ -1,9 +1,12 @@
 """Track integer game conditions and satisfiable route requirements."""
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 import z3
 from z3.z3util import get_vars
+
+from endless_voices.artifacts import fingerprint
 
 
 class UnsupportedOperation(ValueError):
@@ -139,7 +142,7 @@ class GameState:
             return result
         result.constraints += (condition,)
         solver = z3.Solver()
-        solver.set(timeout=5000)
+        solver.set(timeout=5000, random_seed=0)
         solver.add(*result.constraints)
         status = solver.check()
         if status == z3.unknown:
@@ -149,7 +152,7 @@ class GameState:
     @classmethod
     def fixed(cls, values):
         state = cls()
-        for name, value in values.items():
+        for name, value in sorted(values.items()):
             if type(value) is not int:
                 raise ValueError("Game state values must be integers")
             state.value(name)
@@ -157,9 +160,9 @@ class GameState:
         return state
 
     def snapshot(self):
-        """Return symbolic requirements and one reproducible compatible initial state."""
+        """Return one concrete compatible state to persist for replay."""
         solver = z3.Solver()
-        solver.set(timeout=5000)
+        solver.set(timeout=5000, random_seed=0)
         solver.add(*self.constraints)
         if solver.check() != z3.sat:
             raise ValueError("Cannot save an inconsistent or unresolved state")
@@ -176,7 +179,6 @@ class GameState:
             ],
             "world_changes": list(self.world),
             "failed_missions_pending": list(self.failures),
-            "requirements": [z3.simplify(c).sexpr() for c in self.constraints],
             "initial_values": {
                 k: model.eval(v, model_completion=True).as_long()
                 for k, v in sorted(self.initial.items())
@@ -356,6 +358,29 @@ def expression(tokens, state):
     return z3.simplify(result)
 
 
+@lru_cache(maxsize=4096)
+def expression_key(expression):
+    """Fingerprint a simplified expression with stable commutative operand order."""
+    keys = {}
+
+    def visit(node):
+        identity = node.get_id()
+        if identity not in keys:
+            if not node.num_args():
+                keys[identity] = fingerprint([node.sort().sexpr(), node.sexpr()])
+            else:
+                operands = [visit(child) for child in node.children()]
+                if node.decl().kind() in {
+                    z3.Z3_OP_AND, z3.Z3_OP_OR, z3.Z3_OP_XOR, z3.Z3_OP_EQ,
+                    z3.Z3_OP_DISTINCT, z3.Z3_OP_ADD, z3.Z3_OP_MUL,
+                }:
+                    operands.sort()
+                keys[identity] = fingerprint([str(node.decl()), operands])
+        return keys[identity]
+
+    return visit(z3.simplify(expression))
+
+
 def projected_state(state, variables=None, symbol_cache=None):
     """Return future-relevant state without changing its complete history witness."""
     symbol_cache = {} if symbol_cache is None else symbol_cache
@@ -367,7 +392,7 @@ def projected_state(state, variables=None, symbol_cache=None):
         return symbol_cache[key]
 
     values = state.values if variables is None else {
-        name: state.values.get(name, z3.Int("initial:" + name)) for name in variables}
+        name: state.values.get(name, z3.Int("initial:" + name)) for name in sorted(variables)}
     constraints = [z3.simplify(c) for c in state.constraints]
     if variables is not None:
         live = set().union(*(symbols(v) for v in values.values()), symbols(state.elapsed),
@@ -384,10 +409,10 @@ def projected_state(state, variables=None, symbol_cache=None):
             constraints = [c for c in constraints if c.sexpr() not in linked_keys]
         constraints = connected
     return {
-        "values": {k: z3.simplify(v).sexpr() for k, v in sorted(values.items())},
-        "constraints": sorted({c.sexpr() for c in constraints if not z3.is_true(c)}),
-        "pending": [(name, z3.simplify(due).sexpr()) for name, due in state.pending],
-        "elapsed": z3.simplify(state.elapsed).sexpr(),
+        "values": {k: expression_key(v) for k, v in sorted(values.items())},
+        "constraints": sorted({expression_key(c) for c in constraints if not z3.is_true(c)}),
+        "pending": [(name, expression_key(due)) for name, due in state.pending],
+        "elapsed": expression_key(state.elapsed),
         "world": state.world,
         "failures": state.failures,
         "scope": state.scope,

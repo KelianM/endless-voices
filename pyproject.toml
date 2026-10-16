@@ -13,17 +13,14 @@ dependencies = [
     "transformers>=4.57,<5",
     "peft>=0.17,<0.19",
     "accelerate>=1.2,<2",
-    "z3-solver>=4.13,<5",
+    "z3-solver==4.16.0",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
 
 [project.scripts]
-validate = "endless_voices.contracts:main"
-train = "endless_voices.train:main"
-chat = "endless_voices.chat:main"
-generate = "endless_voices.generate:main"
+endless-voices = "endless_voices.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -39,4 +36,4 @@ select = ["E", "F", "I", "UP"]
 testpaths = ["tests"]
 
 [tool.setuptools.package-data]
-endless_voices = ["review.html"]
+endless_voices = ["review.html", "sample_viewer.html"]

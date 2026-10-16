@@ -5,8 +5,10 @@ import json
 from pathlib import Path
 
 import pytest
+from prepared_fixtures import write_raw_context
 
 from endless_voices import assessment as a
+from endless_voices.context_generation import dynamic_messages
 from endless_voices.judge import judge_messages, parse_answer
 
 
@@ -29,6 +31,7 @@ def dataset(tmp_path):
         path.write_text("".join(json.dumps(r) + "\n" for r in rows))
         manifest["artifacts"][path.name] = a.file_hash(path)
     a.write_json(tmp_path / "manifest.json", manifest)
+    write_raw_context(tmp_path)
     return tmp_path / "manifest.json"
 
 
@@ -39,7 +42,7 @@ def generation(path, manifest, statuses):
     for sid, status in zip(ids, statuses, strict=True):
         if status == "missing":
             continue
-        messages = a.evaluation_messages(records[sid])
+        messages = dynamic_messages(a.evaluation_messages(records[sid]), 0)
         prompt = {
             "sample_id": sid,
             "messages": messages,
@@ -50,7 +53,8 @@ def generation(path, manifest, statuses):
         }
         prompts.append(prompt)
         response = {k: v for k, v in prompt.items() if k not in {"messages", "input_ids"}}
-        response.update(status=status, response="Invented model reply", finish_reason="eos")
+        response.update(status=status, response="Invented model reply", finish_reason="eos",
+                        retrieval={"turns": [], "selected_scene_ids": []})
         if status == "failed":
             response.update(finish_reason="length", error={"type": "OutputLimit"})
         responses.append(response)
@@ -123,6 +127,76 @@ def test_pack_keeps_keys_conditions_and_source_metadata_outside_public_trials(da
     assert a.prepare(dataset, {"PRIVATE-CONDITION": run}, second, seed=12) == trials
     with pytest.raises(ValueError, match="exists"):
         a.prepare(dataset, {"x": run}, pack)
+
+
+@pytest.mark.parametrize("whole_scene", [False, True])
+def test_assessment_exports_retrieved_evidence_without_native_tool_messages(tmp_path, whole_scene):
+    import hashlib
+
+    from endless_voices.context import render
+    from endless_voices.context_generation import local_tool_results
+    from endless_voices.dataset.builder import DatasetBuilder
+    from endless_voices.dataset.storage import SceneDataset
+    from endless_voices.gameplay.source import GameCorpus
+    from endless_voices.retrieval import passage_chunks, scene_id
+
+    source = tmp_path / "source"
+    source.mkdir()
+    for name in ("license.txt", "copyright", "credits.txt"):
+        (source / name).write_text("Test attribution")
+    text = '''mission Earlier
+\ton complete
+\t\tdialog
+\t\t\t`The retrieved history.`
+\t\t\t`The rest of the scene.`
+mission Later
+\tto offer
+\t\thas "Earlier: done"
+\ton offer
+\t\tconversation
+\t\t\t`The withheld target.`
+'''
+    (source / "missions.txt").write_text(text)
+    corpus = GameCorpus(source, {"revision": "a" * 40, "files": [
+        {"path": "missions.txt", "sha256": hashlib.sha256(text.encode()).hexdigest()}]})
+    metadata = a.read_rows(Path(__file__).parent / "fixtures/contracts/validation.jsonl")[0][
+        "metadata"]
+    spec = {key: metadata[key] for key in (
+        "split", "identity", "species", "character_role", "topics", "scenario_group")}
+    builder = DatasetBuilder(corpus, {"missions": {"Later": spec}, "seed": "test", "player": {}})
+    builder.build(tmp_path / "dataset", splits=("validation",))
+    manifest = tmp_path / "dataset/manifest.json"
+    pool = SceneDataset.load(manifest.parent, "validation").context_pool(0)
+    block = pool.blocks[0]
+    sid = scene_id(block)
+    passage = passage_chunks(block)[0]
+    document = {"id": sid if whole_scene else passage["id"], "scene_id": sid,
+                "kind": "history", "text": render(block) if whole_scene else passage["text"]}
+    run = generation(tmp_path / "run", manifest, ["ok"])
+    prompt = a.read_rows(run / "prompts.jsonl")[0]
+    prompt["messages"] = local_tool_results(
+        dynamic_messages(pool.messages(), len(pool.blocks)),
+        {"role": "assistant", "content": "", "reasoning_content": "Private deliberation"},
+        [{"name": "read_context", "arguments": {"ids": [document["id"]]}}],
+        [{"documents": [document]}])
+    prompt["messages_sha256"] = a.digest(a.encoded(prompt["messages"]))
+    response = a.read_rows(run / "responses.jsonl")[0]
+    response.update(messages_sha256=prompt["messages_sha256"],
+                    retrieval={"selected_scene_ids": [sid]})
+    for name, row in (("prompts", prompt), ("responses", response)):
+        (run / f"{name}.jsonl").write_text(json.dumps(row) + "\n")
+    declaration = a.read_json(run / "run.json")
+    declaration["artifacts_sha256"] = {
+        name: a.file_hash(run / name) for name in declaration["artifacts_sha256"]}
+    (run / "run.json").write_text(json.dumps(declaration))
+
+    pack = tmp_path / "pack"
+    trials = a.prepare(manifest, {"model": run}, pack, seed=12)
+    trial = a.read_json(pack / trials[0]["path"])
+    expected = {**block, "passages": block["passages"] if whole_scene else block["passages"][:1]}
+    assert trial["context"] == pool.messages([expected])
+    assert "Private deliberation" not in json.dumps(trial)
+    assert (pack / trials[0]["path"]).with_suffix(".html").is_file()
 
 
 @pytest.mark.parametrize(

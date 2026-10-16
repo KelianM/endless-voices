@@ -11,6 +11,11 @@ split = "train"
 max_length = 9216
 loss = "continuation"
 
+[context]
+index = "data/local/context.sqlite"
+max_input_tokens = 8192
+depth = 4
+
 [lora]
 r = 8
 lora_alpha = 16

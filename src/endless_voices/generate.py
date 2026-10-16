@@ -1,9 +1,7 @@
 """Generate one continuation per curated sample and save reproducible run records."""
 
-import argparse
 import importlib.metadata
 import json
-import math
 import os
 import platform
 import re
@@ -21,6 +19,13 @@ from transformers import AutoModelForCausalLM, GenerationConfig, set_seed
 from endless_voices.artifacts import digest, encoded, file_hash
 from endless_voices.artifacts import save_progress as write_json
 from endless_voices.common import load_config, load_tokenizer
+from endless_voices.context_generation import (
+    dynamic_messages,
+    local_tool_response,
+    local_tool_results,
+    open_database,
+    tool_loop,
+)
 from endless_voices.contracts import evaluation_messages
 from endless_voices.dataset.storage import SceneDataset
 
@@ -122,8 +127,10 @@ def execution_info() -> dict:
         },
         "git_commit": head.decode().strip() if head else None,
         "git_dirty": bool(status) if status is not None else None,
-        "code_sha256": {str(p.relative_to(Path(__file__).parent)): file_hash(p)
-                        for p in Path(__file__).parent.rglob("*.py")},
+        "code_sha256": {
+            str(p.relative_to(Path(__file__).parent)): file_hash(p)
+            for p in Path(__file__).parent.rglob("*.py")
+        },
         "mps_available": torch.backends.mps.is_available(),
         "cuda_version": torch.version.cuda,
         "deterministic_algorithms": torch.are_deterministic_algorithms_enabled(),
@@ -154,11 +161,9 @@ def tokenizer_signature(tokenizer) -> str:
     )
 
 
-def load_condition(args, config, run) -> tuple:
+def load_condition(args, config, run, base_path, tokenizer) -> tuple:
     source = config["model"]["name_or_path"]
     revision = config["model"].get("revision")
-    base_path, run["model"] = artifact(source, revision, args)
-    tokenizer = load_tokenizer(str(base_path))
     run["tokenizer"] = {**run["model"], "signature": tokenizer_signature(tokenizer)}
     tokenizer.save_pretrained(args.output / "tokenizer")
     adapter_path = None
@@ -248,8 +253,9 @@ def load_condition(args, config, run) -> tuple:
     return model, tokenizer, device, context_limit, generation
 
 
-def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None):
-    messages = evaluation_messages(record)
+def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None, messages=None,
+                   tools=None):
+    messages = evaluation_messages(record) if messages is None else messages
     if prompt is None:
         prompt = {}
     prompt.update(
@@ -259,10 +265,17 @@ def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None
             "messages_sha256": digest(encoded(messages)),
         }
     )
-    rendered = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    options = {"tools": tools, "enable_thinking": False} if tools else {}
+    if tools:
+        prompt["tools"] = tools
+    rendered = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True, **options,
+    )
     prompt["rendered_prompt_sha256"] = digest(rendered.encode("utf-8"))
     cursor = 0
     for message in messages:
+        if message["role"] == "tool":
+            continue
         position = rendered.find(message["content"], cursor)
         if position < 0:
             raise ValueError("chat template omits or transforms authored message content")
@@ -273,6 +286,7 @@ def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None
         return_tensors="pt",
         return_dict=True,
         truncation=False,
+        **options,
     )
     ids = inputs["input_ids"][0].tolist()
     prompt.update(
@@ -286,36 +300,72 @@ def prepare_prompt(record, tokenizer, context_limit, max_new_tokens, prompt=None
     return prompt, inputs
 
 
-def generate_response(record, model, tokenizer, device, context_limit, generation, args, prompts):
+def generate_response(
+    record,
+    model,
+    tokenizer,
+    device,
+    context_limit,
+    generation,
+    args,
+    prompts,
+    session,
+    settings,
+):
     sample_id = record["metadata"]["id"]
     started = time.monotonic()
     result = {"sample_id": sample_id, "status": "failed", "response": None}
     stage = "prompt"
     prompt = {}
+    seed = int(digest(f"{args.seed}:{sample_id}".encode())[:8], 16)
+    set_seed(seed)
     try:
-        prompt, inputs = prepare_prompt(
-            record, tokenizer, context_limit, args.max_new_tokens, prompt
-        )
-        seed = int(digest(f"{args.seed}:{sample_id}".encode())[:8], 16)
-        result.update(
-            {
-                "seed": seed,
-                "input_tokens": prompt["input_tokens"],
-                "messages_sha256": prompt["messages_sha256"],
-                "input_ids_sha256": prompt["input_ids_sha256"],
-            }
-        )
-        set_seed(seed)
-        stage = "generation"
-        with torch.inference_mode():
-            output = model.generate(
-                **inputs.to(device), generation_config=generation, use_model_defaults=False
+        tools = session.tool_schemas
+
+        def ask(messages, turn):
+            nonlocal prompt, stage
+            prompt = {}
+            prompt, inputs = prepare_prompt(
+                record, tokenizer, context_limit, args.max_new_tokens, prompt=prompt,
+                messages=messages, tools=tools,
             )
-        ids = output[0, prompt["input_tokens"] :].tolist()
-        response = tokenizer.decode(ids, skip_special_tokens=True).strip()
-        eos = generation.eos_token_id
-        eos = [eos] if isinstance(eos, int) else eos
-        finish = "eos" if ids and ids[-1] in (eos or []) else "length"
+            request = {"turn": turn, **prompt}
+            result.setdefault("retrieval_requests", []).append(request)
+            stage = "generation"
+            with torch.inference_mode():
+                output = model.generate(
+                    **inputs.to(device), generation_config=generation, use_model_defaults=False,
+                )
+            ids = output[0, prompt["input_tokens"]:].tolist()
+            eos = generation.eos_token_id
+            eos = [eos] if isinstance(eos, int) else eos
+            finish = "eos" if ids and ids[-1] in (eos or []) else "length"
+            request.update(output_ids=ids, finish_reason=finish)
+            result.update(output_ids=ids, output_tokens=len(ids), finish_reason=finish,
+                          response=tokenizer.decode(ids, skip_special_tokens=True).strip())
+            if finish != "eos":
+                raise ValueError("Output limit or incomplete response")
+            return local_tool_response(tokenizer, tokenizer.decode(ids[:-1],
+                                                                   skip_special_tokens=False))
+
+        result["seed"] = seed
+        local_tool_response(tokenizer, "")
+        trace = {"tools": session.trace}
+        result["retrieval"] = trace
+
+        def fits(messages):
+            ids = tokenizer.apply_chat_template(
+                messages, tools=tools, tokenize=True, add_generation_prompt=True,
+                enable_thinking=False,
+            )
+            return len(ids) <= min(settings["max_input_tokens"],
+                                   context_limit - args.max_new_tokens)
+
+        _, answer = tool_loop(
+            session, dynamic_messages(session.initial_messages(), session.history_count),
+            ask, local_tool_results, fits, trace,
+        )
+        response, ids, finish = answer["content"], result["output_ids"], result["finish_reason"]
         result.update(
             {
                 "response": response,
@@ -324,13 +374,7 @@ def generate_response(record, model, tokenizer, device, context_limit, generatio
                 "finish_reason": finish,
             }
         )
-        if finish == "length":
-            result["error"] = {
-                "stage": stage,
-                "type": "OutputLimit",
-                "message": "response did not reach EOS; partial output retained",
-            }
-        elif not response:
+        if not response:
             result["error"] = {
                 "stage": stage,
                 "type": "EmptyResponse",
@@ -339,9 +383,12 @@ def generate_response(record, model, tokenizer, device, context_limit, generatio
         else:
             result["status"] = "ok"
     except Exception as error:
-        result["error"] = {"stage": stage, "type": type(error).__name__, "message": str(error)}
+        result["error"] = {
+            "stage": stage, "type": "OutputLimit" if result.get("finish_reason") == "length"
+            else type(error).__name__, "message": str(error),
+        }
     finally:
-        if prompt:
+        if prompt and result["status"] == "ok":
             append_json(prompts, prompt)
     for key in ("messages_sha256", "input_ids_sha256", "input_tokens"):
         if key in prompt:
@@ -372,15 +419,41 @@ def run_generation(args) -> int:
     counts = {"ok": 0, "failed": 0}
     completed = set()
     exit_code = 0
+    database = None
     with (
         (args.output / "responses.jsonl").open("x", encoding="utf-8") as responses,
         (args.output / "prompts.jsonl").open("x", encoding="utf-8") as prompts,
     ):
         try:
-            condition = load_condition(args, config, run)
+            settings = dict(config["context"])
+            source, run["model"] = artifact(
+                config["model"]["name_or_path"], config["model"].get("revision"), args
+            )
+            selection_tokenizer = load_tokenizer(str(source))
+            settings["max_input_tokens"] = min(
+                settings.get("max_input_tokens", args.max_context_tokens),
+                args.max_context_tokens - args.max_new_tokens,
+                selection_tokenizer.model_max_length - args.max_new_tokens,
+            )
+            prepared = SceneDataset.load(args.manifest.parent, args.split)
+            database = open_database(settings)
+            indices = {record["metadata"]["id"]: i for i, record in enumerate(prepared)}
+            run["context"] = settings
+            run["context_index_sha256"] = file_hash(settings["index"])
+            condition = load_condition(args, config, run, source, selection_tokenizer)
+            settings["max_input_tokens"] = min(
+                settings["max_input_tokens"], condition[3] - args.max_new_tokens
+            )
             write_json(args.output / "run.json", run)
             for record in records:
-                result = generate_response(record, *condition, args, prompts)
+                result = generate_response(
+                    record,
+                    *condition,
+                    args,
+                    prompts,
+                    prepared.retrieval_session(indices[record["metadata"]["id"]], database),
+                    settings,
+                )
                 append_json(responses, result)
                 completed.add(result["sample_id"])
                 counts[result["status"]] += 1
@@ -400,6 +473,9 @@ def run_generation(args) -> int:
                         },
                     )
                     counts["failed"] += 1
+        finally:
+            if database is not None:
+                database.close()
     run.update(
         {
             "status": "interrupted"
@@ -421,73 +497,3 @@ def run_generation(args) -> int:
     write_json(args.output / "run.json", run)
     print(f"Saved {counts} to {args.output}")
     return exit_code or int(bool(counts["failed"]))
-
-
-def parse_args(argv=None):
-    parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument("--config", default="configs/generate.toml", help="Model TOML config")
-    parser.add_argument("--manifest", type=Path, required=True, help="Dataset split manifest")
-    parser.add_argument(
-        "--split",
-        choices=["train", "validation", "test"],
-        default="validation",
-        help="Split to generate",
-    )
-    parser.add_argument("--sample-ids", type=Path, help="JSON list; order is preserved")
-    parser.add_argument("--limit", type=int, help="First N selected samples")
-    parser.add_argument("--output", type=Path, required=True, help="Must not already exist")
-    parser.add_argument("--adapter", help="Existing local LoRA directory or Hub ID")
-    parser.add_argument("--adapter-revision", help="Full Hub commit for the adapter")
-    parser.add_argument("--cache-dir", default="data/local/hub", help="Model download cache")
-    parser.add_argument("--offline", action="store_true", help="Require cached model files")
-    parser.add_argument(
-        "--device", choices=["auto", "cpu", "mps", "cuda"], default="auto", help="Execution device"
-    )
-    parser.add_argument(
-        "--dtype",
-        choices=["float32", "float16", "bfloat16"],
-        default="float32",
-        help="Weight precision",
-    )
-    parser.add_argument(
-        "--max-context-tokens", type=int, default=4096, help="Total prompt and output budget"
-    )
-    parser.add_argument(
-        "--max-new-tokens", type=int, default=512, help="Output cap; reaching it is a failure"
-    )
-    parser.add_argument(
-        "--temperature",
-        type=float,
-        default=0.0,
-        help="Zero for greedy decoding; positive for sampling",
-    )
-    parser.add_argument("--top-p", type=float, default=1.0, help="Nucleus probability for sampling")
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Run seed used to derive stable per-sample seeds"
-    )
-    args = parser.parse_args(argv)
-    if not 0 < args.max_new_tokens < args.max_context_tokens:
-        parser.error("require 0 < max-new-tokens < max-context-tokens")
-    if not math.isfinite(args.temperature) or args.temperature < 0 or not 0 < args.top_p <= 1:
-        parser.error("require finite temperature >= 0 and 0 < top-p <= 1")
-    if args.limit is not None and args.limit < 1:
-        parser.error("limit must be positive")
-    if args.adapter_revision and not args.adapter:
-        parser.error("adapter-revision requires adapter")
-    return args
-
-
-def main() -> None:
-    args = parse_args()
-    try:
-        code = run_generation(args)
-    except (ValueError, OSError) as error:
-        print(str(error), file=sys.stderr)
-        code = 1
-    raise SystemExit(code)
-
-
-if __name__ == "__main__":
-    main()

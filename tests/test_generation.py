@@ -3,19 +3,20 @@
 import copy
 import json
 import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 import torch
 from peft import LoraConfig, TaskType, get_peft_model
+from prepared_fixtures import write_raw_context
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
 from transformers import GenerationConfig, GPT2Config, GPT2LMHeadModel, PreTrainedTokenizerFast
 
 from endless_voices import generate as gen
+from endless_voices.cli.generate import main, parse_args
+from endless_voices.retrieval import SceneDatabase
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -28,6 +29,7 @@ def tokenizer():
         tokenizer_object=backend, unk_token="<unk>", eos_token="<eos>", pad_token="<eos>"
     )
     tokenizer.chat_template = (
+        "{# <tool_call> #}"
         "{% for m in messages %}{{ m['role'] + ': ' + m['content'] + eos_token }}{% endfor %}"
         "{% if add_generation_prompt %}assistant: {% endif %}"
     )
@@ -55,7 +57,7 @@ def base(tmp_path, tokenizer):
 
 
 @pytest.fixture
-def args(tmp_path, base):
+def args(tmp_path, base, monkeypatch):
     dataset = tmp_path / "dataset"
     shutil.copytree(FIXTURES, dataset)
     path = dataset / "validation.jsonl"
@@ -68,9 +70,22 @@ def args(tmp_path, base):
     manifest = json.loads((dataset / "manifest.json").read_text())
     manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     (dataset / "manifest.json").write_text(json.dumps(manifest))
+    write_raw_context(dataset)
+
+    class Encoder:
+        identity = "generation-test"
+
+        def embed(self, texts, *, kind):
+            return [[1.0] for _ in texts]
+
+    index = tmp_path / "context.db"
+    SceneDatabase.create(index, [{"heading": "Unused scene", "passages": [
+        {"line": 1, "role": "passage", "text": "Not eligible"}]}], Encoder()).close()
+    monkeypatch.setattr(gen, "open_database", lambda settings: SceneDatabase(index, Encoder()))
     config = tmp_path / "model.toml"
-    config.write_text(f'[model]\nname_or_path = "{base}"\n')
-    return gen.parse_args(
+    config.write_text(f'[model]\nname_or_path = "{base}"\n'
+                      f'[context]\nindex = "{index}"\n')
+    return parse_args(
         [
             "--config",
             str(config),
@@ -130,7 +145,7 @@ def test_only_final_target_withheld_and_provenance_saved(args, monkeypatch):
     args.max_context_tokens = 512
     assert gen.run_generation(args) == 0
     run, rows, prompts = read_run(args)
-    assert prompts[0]["messages"] == record["messages"][:-1]
+    assert prompts[0]["messages"] == gen.dynamic_messages(record["messages"][:-1], 0)
     assert any(message["role"] == "assistant" for message in prompts[0]["messages"])
     assert "evaluation" not in prompts[0] and "metadata" not in prompts[0]
     assert rows[0]["response"] == "hello"
@@ -187,17 +202,17 @@ def test_generation_failures_preserve_ids_and_partial_output(
 def test_overlong_prompt_is_recorded_without_generation(args, monkeypatch):
     model = ReplyModel()
     use_stub(monkeypatch, model)
-    args.max_context_tokens = 8
+    model.config.n_positions = 8
     assert gen.run_generation(args) == 1
     _, rows, prompts = read_run(args)
     assert rows[0]["error"]["stage"] == "prompt"
-    assert "exceeds" in rows[0]["error"]["message"]
-    assert prompts[0]["input_tokens"] > 8
+    assert "input budget" in rows[0]["error"]["message"]
+    assert not prompts
     assert not model.inputs
 
 
 def test_template_cannot_silently_drop_system_or_history(args, monkeypatch, base, tokenizer):
-    tokenizer.chat_template = "{{ messages[-1]['content'] }}"
+    tokenizer.chat_template = "{# <tool_call> #}{{ messages[-1]['content'] }}"
     tokenizer.save_pretrained(base)
     model = ReplyModel()
     use_stub(monkeypatch, model)
@@ -266,11 +281,8 @@ def test_real_tiny_model_and_lora_cli_use_identical_context(args, base, tmp_path
     saved = []
     for name, extra in (("base-run", []), ("adapter-run", ["--adapter", str(adapter)])):
         args.output = tmp_path / name
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "endless_voices.generate",
+        with pytest.raises(SystemExit) as result:
+            main([
                 "--config",
                 args.config,
                 "--manifest",
@@ -285,17 +297,15 @@ def test_real_tiny_model_and_lora_cli_use_identical_context(args, base, tmp_path
                 "--max-new-tokens",
                 "4",
                 *extra,
-            ],
-            capture_output=True,
-            text=True,
-        )
+            ])
         run, rows, prompts = read_run(args)
-        assert result.returncode in (0, 1), result.stderr
-        assert "error" not in run, result.stderr
+        assert result.value.code in (0, 1)
+        assert "error" not in run
         assert rows[0].get("error", {}).get("type") in (None, "OutputLimit", "EmptyResponse")
         assert rows[0]["output_ids"]
         saved.append((run, rows, prompts))
     assert saved[0][2] == saved[1][2]
+    assert saved[0][1][0]["retrieval_requests"] == saved[1][1][0]["retrieval_requests"]
     assert saved[0][1][0]["output_ids"] == saved[1][1][0]["output_ids"]
     assert saved[0][0]["model"] == saved[1][0]["model"]
     assert saved[1][0]["adapter"]["files_sha256"]["adapter_model.safetensors"]
@@ -342,6 +352,7 @@ def test_seed_is_independent_of_selection_order(args, monkeypatch):
     manifest = json.loads(args.manifest.read_text())
     manifest["artifacts"]["validation.jsonl"] = gen.file_hash(path)
     args.manifest.write_text(json.dumps(manifest))
+    write_raw_context(args.manifest.parent)
     assert gen.run_generation(args) == 0
     first = read_run(args)[1][0]
     other = copy.copy(args)
@@ -375,3 +386,54 @@ def test_checkpoint_sampling_defaults_cannot_override_recorded_greedy(args, base
     assert run["generation_config"]["do_sample"] is False
     assert observed == [False]
     assert run["generation_config"]["eos_token_id"] == eos
+
+
+def test_transformers_retrieves_then_continues_in_the_same_conversation(tokenizer, monkeypatch):
+    # Decoding away native call markers or resetting to a final prompt loses retrieval evidence.
+    import io
+    from types import SimpleNamespace
+
+    tokenizer.chat_template = (
+        '{# <tool_call> #}{% if tools %}{{ tools|tojson }}{% endif %}'
+        '{% for m in messages %}{{ m.role }}: {{ m.content }}'
+        '{% if m.tool_calls %}{{ m.tool_calls|tojson }}{% endif %}{% endfor %}'
+        '{% if add_generation_prompt %}assistant: {% endif %}'
+    )
+    native = '<tool_call>{"name":"read_context","arguments":{"ids":["prior"]}}</tool_call>'
+    monkeypatch.setattr(tokenizer, 'decode', lambda ids, **kw: native if ids[0] == 2 else 'hello')
+
+    class Model(ReplyModel):
+        def generate(self, *a, **kw):
+            self.output = (2 if not self.inputs else 3, 1)
+            return super().generate(*a, **kw)
+
+    class Session:
+        history_count = 1
+        trace = []
+        tool_schemas = [{'type': 'function', 'function': {
+            'name': 'read_context', 'parameters': {'type': 'object'}}}]
+
+        def initial_messages(self):
+            return [{'role': 'system', 'content': 'Lore'}, {'role': 'user', 'content': 'Encounter'}]
+
+        def call_tool(self, name, arguments):
+            assert name == 'read_context' and arguments == {'ids': ['prior']}
+            return [{'scene_id': 'prior', 'text': 'Known fact'}]
+
+    record = json.loads((FIXTURES / 'validation.jsonl').read_text().splitlines()[0])
+    record['messages'] = [*Session().initial_messages(),
+                          {'role': 'assistant', 'content': 'Withheld answer'}]
+    handle, model = io.StringIO(), Model()
+    result = gen.generate_response(
+        record, model, tokenizer, 'cpu', 4096, GenerationConfig(eos_token_id=1),
+        SimpleNamespace(seed=42, max_new_tokens=64), handle, Session(),
+        {'max_input_tokens': 4000},
+    )
+    assert result['status'] == 'ok' and result['response'] == 'hello', result.get('error')
+    assert len(model.inputs) == 2
+    prompt = json.loads(handle.getvalue())
+    assert prompt['messages'][-1]['role'] == 'tool'
+    assert 'Known fact' in prompt['messages'][-1]['content']
+    assert 'Withheld answer' not in json.dumps(prompt)
+    assert len(result['retrieval_requests']) == 2
+    assert result['retrieval']['selected_scene_ids'] == ['prior']

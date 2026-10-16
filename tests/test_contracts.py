@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from prepared_fixtures import write_raw_context
 
 from endless_voices.contracts import (
     evaluation_messages,
@@ -16,7 +17,7 @@ from endless_voices.contracts import (
     validate_manifest,
     validate_record,
 )
-from endless_voices.data import load_conversations
+from endless_voices.dataset.storage import SceneDataset
 
 FIXTURES = Path(__file__).parent / "fixtures" / "contracts"
 
@@ -39,11 +40,11 @@ def rewrite(manifest, split, records):
     manifest.write_text(json.dumps(contents))
 
 
-def test_valid_manifest_and_loader_compatibility():
+def test_valid_manifest_and_dataset_loading():
     counts = validate_manifest(FIXTURES / "manifest.json")
     assert counts["train"]["identities"] == {"invented-archive-guild": 1}
     assert counts["test"]["records"] == 1
-    assert load_conversations(str(FIXTURES)) == [record()["messages"]]
+    assert SceneDataset.load(FIXTURES, "train")[0]["messages"] == record()["messages"]
 
 
 @pytest.mark.parametrize("key", list(record()["metadata"]))
@@ -157,6 +158,7 @@ def test_scenario_family_split_unit(manifest):
     row["metadata"]["id"] = "another-variant"
     rewrite(manifest, "test", [record("test")])
     rewrite(manifest, "train", [record(), row])
+    write_raw_context(manifest.parent)
     assert validate_manifest(manifest)["train"]["records"] == 2
 
 
@@ -243,7 +245,7 @@ def test_optional_length_check_has_line_error(manifest, split):
 
 
 def test_cli_offline_and_actionable_failure(manifest):
-    command = [sys.executable, "-m", "endless_voices.contracts", str(manifest)]
+    command = [sys.executable, "-m", "endless_voices", "validate", str(manifest)]
     result = subprocess.run(command, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["validation"]["records"] == 1
@@ -313,7 +315,7 @@ def test_mission_manifest_rejects_distinct_conversations_in_the_same_mission(man
     validation["metadata"]["sources"][0] = copy.deepcopy(train["metadata"]["sources"][0])
     rewrite(manifest, "validation", [validation])
     contents = json.loads(manifest.read_text())
-    contents["split_unit"] = "mission"
+    contents["split_unit"] = "mission_chain"
     manifest.write_text(json.dumps(contents))
     with pytest.raises(ValueError, match="mission .* crosses splits"):
         validate_manifest(manifest)
@@ -333,4 +335,4 @@ def test_training_checks_other_published_splits_before_loading(manifest):
     row["metadata"]["sources"][0] = copy.deepcopy(record()["metadata"]["sources"][0])
     rewrite(manifest, "validation", [row])
     with pytest.raises(ValueError, match="mission .*crosses splits"):
-        load_conversations(manifest.parent, "train")
+        SceneDataset.load(manifest.parent, "train")

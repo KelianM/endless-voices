@@ -2,7 +2,7 @@
 
 import pytest
 
-from endless_voices.game_variables import mission_values, player_values, render
+from endless_voices.gameplay.variables import mission_values, player_values, render
 
 
 def node(**fields):

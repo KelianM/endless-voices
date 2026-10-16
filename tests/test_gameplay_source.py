@@ -4,8 +4,8 @@ import hashlib
 
 import pytest
 
-from endless_voices.dataset.source import GameCorpus
-from endless_voices.dataset.state import UnsupportedOperation
+from endless_voices.gameplay.source import GameCorpus
+from endless_voices.gameplay.state import UnsupportedOperation
 
 
 def corpus(tmp_path, files):
@@ -35,6 +35,31 @@ def test_named_conversation_keeps_definition_location_and_callsite(tmp_path):
         source.resolve_conversation(reference, mission)
 
 
+@pytest.mark.parametrize("alternative", [
+    'mission Other\n\ton decline\n\t\tevent wedding 10\n',
+    'event calendar\n\tevent wedding 10\n',
+    'conversation shared\n\taction\n\t\tevent wedding 10\n',
+    'mission Other\n\ton complete\n\t\tset "event: wedding"\n',
+    'event wedding\n\tdate 1 1 3014\n',
+])
+def test_event_with_another_trigger_does_not_imply_completed_mission(tmp_path, alternative):
+    source = corpus(tmp_path, {"missions.txt": (
+        'mission Earlier\n\ton complete\n\t\tevent wedding 60\n'
+        'mission Later\n\tto offer\n\t\thas "event: wedding"\n' + alternative
+    )})
+    assert source.mission_graph["Later"] == []
+
+
+def test_optional_or_uncompleted_event_does_not_become_history(tmp_path):
+    source = corpus(tmp_path, {"missions.txt": (
+        'mission Earlier\n\ton complete\n\t\tevent wedding 60\n'
+        'mission Declined\n\ton decline\n\t\tevent rejected 1\n'
+        'mission Later\n\tto offer\n\t\tor\n\t\t\thas "event: wedding"\n'
+        '\t\t\thas other\n\t\thas "event: rejected"\n'
+    )})
+    assert source.mission_graph["Later"] == []
+
+
 def test_dialog_preserves_inline_children_and_named_phrase_sources(tmp_path):
     source = corpus(tmp_path, {
         "phrases.txt": 'phrase "payment"\n\tword\n\t\t`Payment received.`\n',
@@ -53,24 +78,6 @@ def test_dialog_preserves_inline_children_and_named_phrase_sources(tmp_path):
     assert payment == [{"line": 3, "text": "Payment received.", "path": "phrases.txt",
                         "sha256": source.files["phrases.txt"]}]
 
-
-def test_named_conversation_cannot_cross_assigned_mission_splits(tmp_path):
-    source = corpus(tmp_path, {
-        "source.txt": (
-            'conversation "shared"\n\t`A shared target.`\n'
-            'mission "First"\n\ton offer\n\t\tconversation "shared"\n'
-            'mission "Second"\n\ton complete\n\t\tconversation "shared"\n'
-            'mission "Unselected"\n\ton offer\n\t\tconversation "shared"\n'
-        ),
-    })
-    with pytest.raises(ValueError, match="crosses mission splits"):
-        source.conversation_owners({"First": "train", "Second": "validation"})
-    assert source.conversation_owners({"First": "validation", "Second": "validation"}) == {
-        "shared": "validation",
-    }
-    assert source.named_conversation_users() == {
-        "shared": {"First", "Second", "Unselected"},
-    }
 
 
 def test_counter_ownership_includes_nonmission_writers(tmp_path):

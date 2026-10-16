@@ -131,7 +131,21 @@ class Mission:
 
 
 class GameCorpus:
-    """Load hash-verified source missions once for dataset preparation."""
+    """Load hash-verified game content and its source locations."""
+
+    @property
+    def mission_dependencies(self):
+        """Return required conditions and mission phases that can establish them."""
+        from .graph import mission_dependencies
+
+        return mission_dependencies(self)
+
+    @property
+    def mission_graph(self):
+        """Return every possible prerequisite link."""
+        from .graph import mission_graph
+
+        return mission_graph(self.mission_dependencies)
 
     def __init__(self, root, inventory):
         self.root = Path(root)
@@ -141,14 +155,16 @@ class GameCorpus:
         self.conversations = {}
         self.phrases = {}
         self.condition_writers = {}
+        self.condition_triggers = {}
+        self.event_schedulers = {}
         self.planet_systems = {}
         self.systems = {}
         self.planets = {}
-        self.descriptions = {}
         self.reference_lore = []
         self.files = {}
+        self.source_lines = {}
         flag_conversations, persistent_conditions = {}, set()
-        for entry in inventory["files"]:
+        for entry in sorted(inventory["files"], key=lambda entry: entry["path"]):
             relative = Path(entry["path"])
             if relative.is_absolute() or ".." in relative.parts:
                 raise ValueError("Source path must be relative")
@@ -156,11 +172,22 @@ class GameCorpus:
             if hashlib.sha256(raw).hexdigest() != entry["sha256"]:
                 raise ValueError(f"Source hash differs: {relative}")
             self.files[str(relative)] = entry["sha256"]
+            self.source_lines[str(relative)] = raw.decode("utf-8").splitlines()
             for node in tree(raw.decode("utf-8")):
                 kind, *names = node["tokens"]
                 owner = (kind, names[0] if names else str(relative))
+                if kind == "event" and any(c["tokens"][:1] == ["date"]
+                                           for c in node["children"]):
+                    self.event_schedulers.setdefault(names[0], set()).add((*owner, None))
                 for operation, ancestors in walk([node]):
                     parts = operation["tokens"]
+                    if ancestors and parts[0] == "event" and 2 <= len(parts) <= 4:
+                        phase = next((p["tokens"][1] for p in ancestors
+                                      if p["tokens"][:1] == ["on"]
+                                      and len(p["tokens"]) >= 2), None)
+                        self.event_schedulers.setdefault(parts[1], set()).add((*owner, phase))
+                    if parts[:1] == ["planet"]:
+                        operation["source_path"] = str(relative)
                     variable = None
                     if len(parts) == 2 and parts[0] in {"set", "clear"}:
                         variable = parts[1]
@@ -170,6 +197,11 @@ class GameCorpus:
                         variable = parts[0]
                     if variable is not None:
                         self.condition_writers.setdefault(variable, set()).add(owner)
+                        phase = next((p["tokens"][1] for p in ancestors
+                                      if p["tokens"][:1] == ["on"]
+                                      and len(p["tokens"]) >= 2), None)
+                        self.condition_triggers.setdefault(variable, set()).add(
+                            (*owner, phase if parts[0] == "set" else None))
                         conversation = next((n for n in reversed(ancestors)
                                              if n["tokens"][:1] == ["conversation"]), None)
                         if conversation is None or parts[0] not in {"set", "clear"}:
@@ -216,18 +248,34 @@ class GameCorpus:
                         })
                 if kind == "planet" and names:
                     self.planets[names[0]] = node
-                    self.descriptions[names[0]] = [
-                        {"path": str(relative), "line": n["line"], "text": n["tokens"][1]}
-                        for n in node["children"]
-                        if n["tokens"][:1] == ["description"]
-                        and len(n["tokens"]) == 2
-                        and not n["children"]
-                    ]
         self.scratch_conditions = {
             name for name, conversations in flag_conversations.items()
             if name not in persistent_conditions
             and all(clears_on_exit(node, name) for node in conversations.values())
         }
+
+    def planet_references(self, world=()):
+        """Return named planet descriptions after interpreted world changes."""
+        planets = dict(self.planets)
+        for change in world:
+            if change["tokens"][:1] == ["planet"] and len(change["tokens"]) == 2:
+                if any(n["tokens"][:1] == ["description"] for n in change["children"]):
+                    planets[change["tokens"][1]] = change
+        blocks = []
+        for name, node in planets.items():
+            passages = [{"line": n["line"], "text": n["tokens"][1], "role": "passage"}
+                        for n in node["children"] if n["tokens"][:1] == ["description"]
+                        and len(n["tokens"]) == 2 and not n["children"]]
+            if not passages:
+                continue
+            system = self.planet_systems.get(name)
+            blocks.append({
+                "mission": None, "name": name,
+                "heading": f"{name} — planet" + (f", {system} system" if system else ""),
+                "path": node["source_path"], "conversation": node["line"],
+                "passages": passages, "reference": True, "source_kind": "planet",
+            })
+        return blocks
 
     def named_conversation_users(self):
         """Return mission names grouped by referenced conversation definition."""
@@ -238,17 +286,6 @@ class GameCorpus:
                 if parts[:1] == ["conversation"] and len(parts) == 2 and not node["children"]:
                     users.setdefault(parts[1], set()).add(mission.name)
         return users
-
-    def conversation_owners(self, assignments):
-        """Validate shared conversation splits and return each definition's owner."""
-        owners = {}
-        for name, missions in self.named_conversation_users().items():
-            splits = {assignments[m] for m in missions if m in assignments}
-            if len(splits) > 1:
-                raise ValueError(f"Named conversation {name!r} crosses mission splits")
-            if splits:
-                owners[name] = splits.pop()
-        return owners
 
     def resolve_conversation(self, node, mission):
         """Return inline or named dialogue with its definition's source location."""

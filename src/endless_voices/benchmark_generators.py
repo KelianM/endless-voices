@@ -1,15 +1,15 @@
 """Prepare, verify and run a benchmark from one shared context selection."""
 
-import argparse
 import json
 import re
 import shutil
 from pathlib import Path
-from types import SimpleNamespace
 
-from endless_voices import artifacts, hosted_judge, providers
+from endless_voices import artifacts, context_generation, hosted_judge, providers
 from endless_voices import assessment as assess
 from endless_voices import generation_backends as screen
+from endless_voices.context import TokenizerCounter
+from endless_voices.context_generation import verify_tool_context
 from endless_voices.dataset.storage import SceneDataset
 
 
@@ -19,20 +19,18 @@ def checked_inputs(root):
     for name, expected in selection["artifacts_sha256"].items():
         if screen.sha(root / name) != expected:
             raise ValueError(f"Benchmark preparation changed: {name}")
+    manifest = Path(selection["dataset_source"]) / "manifest.json"
+    if screen.sha(manifest) != selection["manifest_sha256"]:
+        raise ValueError("Prepared dataset manifest changed")
+    if screen.sha(selection["context"]["index"]) != selection["index_sha256"]:
+        raise ValueError("Context index changed")
     records = screen.read(root / "records.json")
     prompts = screen.read(root / "prompts.json")
     if list(records) != selection["ids"]:
         raise ValueError("Dataset sample IDs differ")
-    expected = [generation_prompt(row) for row in records.values()]
-    if prompts != expected:
-        raise ValueError("Generation prompts differ from dataset context")
+    if [p["sample_id"] for p in prompts] != selection["ids"]:
+        raise ValueError("Generation prompt IDs differ")
     return selection, records, prompts
-
-
-def generation_prompt(record):
-    messages = assess.evaluation_messages(record)
-    return {"sample_id": record["metadata"]["id"], "messages": messages,
-            "messages_sha256": assess.digest(assess.encoded(messages))}
 
 
 def prepare(root, dataset, config):
@@ -40,9 +38,13 @@ def prepare(root, dataset, config):
     if root.exists():
         raise ValueError("Output exists; choose a new directory")
     manifest = dataset / "manifest.json"
-    records = {r['metadata']['id']: r for r in SceneDataset.load(dataset, 'validation')}
+    prepared = SceneDataset.load(dataset, 'validation')
+    records = {r['metadata']['id']: r for r in prepared}
     ids = list(records)
     plan = screen.read(config)
+    context = plan["context"]
+    context["index"] = str(Path(context["index"]).resolve())
+    context["tokenizer"] = str(Path(context["tokenizer"]).resolve())
     supported = {"gemma31b", "qwen30b", "gpt-6-luna", "claude-sonnet-5-5"}
     if (not plan["generators"] or set(plan["generators"]) - supported
             or len(set(plan["generators"])) != len(plan["generators"])
@@ -57,7 +59,21 @@ def prepare(root, dataset, config):
     locals_ = {name: screen.read(path) for name, path in plan["local_configs"].items()}
     if any(cfg["label"] != name for name, cfg in locals_.items()):
         raise ValueError("Local model label differs from configuration")
-    prompts = [generation_prompt(row) for row in records.values()]
+    from transformers import AutoTokenizer
+
+    counter = TokenizerCounter(AutoTokenizer.from_pretrained(
+        context["tokenizer"], local_files_only=True, **context.get("tokenizer_options", {})))
+    prompts, traces = [], {}
+    with context_generation.open_database(context) as database:
+        for i, (sid, row) in enumerate(records.items()):
+            session = prepared.retrieval_session(i, database)
+            messages, traces[sid] = context_generation.select_static_context(
+                session, context, counter)
+            row["messages"] = [*messages, row["messages"][-1]]
+            initial = context_generation.dynamic_messages(
+                session.initial_messages(), session.history_count)
+            prompts.append({"sample_id": sid, "messages": initial, "tools": session.tool_schemas,
+                            "messages_sha256": assess.digest(assess.encoded(initial))})
     unresolved_variables = {}
     for sid, row in records.items():
         messages, target = row["messages"][:-1], row["messages"][-1]["content"]
@@ -74,19 +90,24 @@ def prepare(root, dataset, config):
     screen.save(root / "variables.json", unresolved_variables)
     screen.save(root / "records.json", records)
     screen.save(root / "prompts.json", prompts)
+    screen.save(root / "context-traces.json", traces)
     for name, cfg in locals_.items():
         screen.save(root / f"{name}-config.json", cfg)
     screen.save(root / "plan.json", plan)
     for p in (Path(__file__), Path(screen.__file__),
-              Path(providers.__file__), Path(artifacts.__file__)):
+              Path(providers.__file__), Path(artifacts.__file__),
+              Path(context_generation.__file__)):
         shutil.copy2(p, root / p.name)
+    cli_source = Path(__file__).with_name("cli") / "benchmark.py"
+    shutil.copy2(cli_source, root / "cli-benchmark.py")
     files = [p for p in root.rglob("*") if p.is_file()]
     screen.save(root / "selection.json", {
         "ids": ids, "split": "validation", "manifest_sha256": screen.sha(manifest),
         "context_sha256": screen.sha(root / "prompts.json"),
-        "dataset_source": str(dataset),
+        "dataset_source": str(dataset.resolve()),
+        "context": context, "index_sha256": screen.sha(context["index"]),
         "models": plan["generators"],
-        "context": "Prepared dataset messages; final target withheld from generation",
+        "judging_context": "Common selected evidence, independent of generator retrieval",
         "candidate_order": "one balanced randomized assignment per condition; no reversed trials",
         "artifacts_sha256": {str(p.relative_to(root)): screen.sha(p) for p in files},
     })
@@ -94,7 +115,7 @@ def prepare(root, dataset, config):
 
 
 def preflight(root, tokenizers):
-    """Check complete local prompts and judge request bounds before model execution."""
+    """Check initial tool-enabled prompts and judge request bounds before model execution."""
     _, records, prompts = checked_inputs(root)
     plan = screen.read(root / "plan.json")
     locals_ = {name: screen.read(root / f"{name}-config.json")
@@ -106,14 +127,16 @@ def preflight(root, tokenizers):
         counts = {}
         for name, tokenizer in tokenizers.items():
             rendered = tokenizer.apply_chat_template(
-                prompt["messages"], tokenize=False, add_generation_prompt=True,
-                enable_thinking=False)
+                prompt["messages"], tools=prompt["tools"], tokenize=False,
+                add_generation_prompt=True, enable_thinking=False)
             counts[name] = len(tokenizer.encode(rendered, add_special_tokens=False))
             local = locals_[name]
-            if counts[name] + local["max_output_tokens"] > local["context_ceiling"]:
+            limit = min(local.get("max_input_tokens", local["context_ceiling"]),
+                        local["context_ceiling"] - local["max_output_tokens"])
+            if counts[name] > limit:
                 raise ValueError(f"{name} context exceeds configured limit; no truncation")
         original = records[sid]["messages"][-1]["content"]
-        trial = {"trial_id": "0" * 32, "context": prompt["messages"],
+        trial = {"trial_id": "0" * 32, "context": assess.evaluation_messages(records[sid]),
                  "A": original, "B": "Preflight placeholder; no judgment requested."}
         body = hosted_judge.payload(plan["judge"], trial, instructions)
         bound = len(json.dumps(body).encode()) + 2048 + 4096 + body["max_output_tokens"]
@@ -138,16 +161,19 @@ def local_smoke(root, model):
     smoke = root / f"smoke-{model}"
     smoke.mkdir(exist_ok=False)
     screen.save(smoke / "prompts.json", [p for p in prompts if p["sample_id"] == sid])
+    shutil.copy2(root / "selection.json", smoke / "selection.json")
     screen.local(smoke, root / f"{model}-config.json")
 
 
 def export(root):
     """Verify raw generation evidence and create one blinded primary trial per success."""
-    selection, records, original_prompts = checked_inputs(root)
+    selection, records, _ = checked_inputs(root)
     plan = screen.read(root / "plan.json")
     ids = selection["ids"]
-    originals = {p["sample_id"]: p for p in original_prompts}
     loaded, provenance = {}, {}
+    prepared = SceneDataset.load(selection["dataset_source"], "validation")
+    pools = {row["metadata"]["id"]: prepared.context_pool(i)
+             for i, row in enumerate(prepared)}
     for model in plan["generators"]:
         source = root / model
         settings = screen.read(source / "settings.json")
@@ -160,10 +186,20 @@ def export(root):
             raise ValueError("Provider implementation changed")
         if settings["artifact_code_sha256"] != screen.sha(root / "artifacts.py"):
             raise ValueError("Artifact implementation changed")
+        if settings["context_code_sha256"] != screen.sha(root / "context_generation.py"):
+            raise ValueError("Context implementation changed")
         raw_results = assess.indexed([screen.read(p) for p in source.glob("*.result.json")], ids)
         prompts, responses = {}, {}
         for sid, raw in raw_results.items():
-            messages = originals[sid]["messages"]
+            if not (source / f"{sid}.prompt.json").exists():
+                if raw["status"] == "ok":
+                    raise ValueError("Success without final generation prompt")
+                responses[sid] = raw
+                continue
+            actual_prompt = screen.read(source / f"{sid}.prompt.json")
+            trace = screen.read(source / f"{sid}.retrieval.json")
+            messages = actual_prompt["messages"]
+            verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
             prompt = {"sample_id": sid, "messages": messages,
                       "messages_sha256": assess.digest(assess.encoded(messages))}
             if model in plan["local_configs"]:
@@ -174,7 +210,8 @@ def export(root):
                               input_ids_sha256=assess.digest(assess.encoded(actual["input_ids"])))
                 complete = raw.get("finish_reason") == "stop"
             else:
-                body = screen.read(source / f"{sid}.request.json")["body"]
+                request = source / f"{sid}.retrieval" / f"{raw['request_count'] - 1}.request.json"
+                body = screen.read(request)["body"]
                 actual = body.get("input") or [{"role": "system", "content": body["system"]},
                                                *body["messages"]]
                 if actual != messages or body["model"] != model:
@@ -193,11 +230,12 @@ def export(root):
         loaded[model] = (run, prompts, responses)
         provenance[model] = {"run": run, "verified_hashes": True,
                              "raw_artifacts_sha256": {str(p.relative_to(root)): screen.sha(p)
-                                                      for p in source.glob("*.json")}}
+                                                      for p in source.rglob("*.json")}}
     controls = [{"sample_id": ids[0], "kind": "identical"},
                 {"sample_id": ids[0], "kind": "wrong-context", "donor_id": ids[-1]}]
     assess.prepare_trials(records, loaded, root / "assessment", provenance, controls=controls,
-                          licensing=root / "attribution", input_provenance=selection)
+                          licensing=root / "attribution", input_provenance=selection,
+                          shared_judge_context=True)
     verify_trials(root)
 
 
@@ -208,7 +246,7 @@ def verify_trials(root, save=True):
     pack = root / "assessment"
     private = screen.read(pack / "private.json")
     instructions = (pack / "public/instructions.txt").read_text()
-    by_id = {p["sample_id"]: p["messages"] for p in prompts}
+    by_id = {sid: assess.evaluation_messages(row) for sid, row in records.items()}
     if assess.digest(instructions.encode()) != private["instructions_sha256"]:
         raise ValueError("Judge instructions changed")
     expected = {r["path"] for r in private["trials"]}
@@ -223,7 +261,7 @@ def verify_trials(root, save=True):
         if list(trial) != ["trial_id", "context", "A", "B"]:
             raise ValueError("Candidate serialization order differs")
         if trial["context"] != by_id[row["sample_id"]]:
-            raise ValueError("Judge context differs from generation")
+            raise ValueError("Judge context differs from shared static evidence")
         if row["kind"] == "primary":
             key = (row["condition"], row["sample_id"])
             if key in seen:
@@ -240,66 +278,10 @@ def verify_trials(root, save=True):
         bounds.append(bound)
     verification = {
         "primary_trials": len(seen), "total_trials": len(bounds),
-        "maximum_request_bound": max(bounds), "same_context": True, "fixed_A_then_B": True,
+        "maximum_request_bound": max(bounds), "shared_judge_context": True, "fixed_A_then_B": True,
         "single_order": True, "context_sha256": selection["context_sha256"],
     }
     if save:
         screen.save(root / "trial-verification.json", verification)
     elif verification != screen.read(root / "trial-verification.json"):
         raise ValueError("Trial verification changed")
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["prepare", "preflight", "local-smoke", "local",
-                                          "hosted", "export", "judge", "report"])
-    parser.add_argument("--root", type=Path, required=True)
-    parser.add_argument("--dataset", type=Path)
-    parser.add_argument("--config", type=Path, default=Path("configs/benchmark.json"))
-    parser.add_argument("--model", choices=["gemma31b", "qwen30b"],
-                        help="Local model for local and local-smoke stages")
-    args = parser.parse_args()
-    root = args.root
-    if args.stage == "prepare":
-        if args.dataset is None:
-            parser.error("prepare requires --dataset")
-        prepare(root, args.dataset, args.config)
-        return
-    checked_inputs(root)
-    plan = screen.read(root / "plan.json")
-    if args.stage == "preflight":
-        from transformers import AutoTokenizer
-        tokenizers = {name: AutoTokenizer.from_pretrained(
-            screen.read(root / f"{name}-config.json")["path"], local_files_only=True)
-            for name in plan["local_configs"]}
-        preflight(root, tokenizers)
-    elif args.stage == "local-smoke":
-        if args.model not in plan["local_configs"]:
-            parser.error("Choose a selected local model with --model")
-        local_smoke(root, args.model)
-    elif args.stage == "local":
-        if args.model not in plan["local_configs"]:
-            parser.error("Choose a selected local model with --model")
-        screen.local(root, root / f"{args.model}-config.json")
-    elif args.stage == "hosted":
-        screen.hosted(root, models=[m for m in plan["generators"]
-                                    if m not in plan["local_configs"]],
-                      budget=plan["generation_budget_usd"],
-                      timeout_seconds=plan.get("api_timeout_seconds", 1800))
-    elif args.stage == "export":
-        export(root)
-    elif args.stage == "judge":
-        if not (root / "trial-verification.json").exists():
-            raise ValueError("Verified trials are required")
-        verify_trials(root, save=False)
-        hosted_judge.run(SimpleNamespace(public=root / "assessment/public", output=root / "judge",
-                                        env_file=Path(".env"), models=[plan["judge"]],
-                                        budget=plan["judge_budget_usd"], limit=1000,
-                                        timeout_seconds=plan.get("api_timeout_seconds", 1800)))
-    else:
-        assess.report(root / "assessment", [root / "judge" / plan["judge"] / "review.json"],
-                      root / "report")
-
-
-if __name__ == "__main__":
-    main()

@@ -18,7 +18,7 @@ Retain each distinct reachable target sequence as a separate example and select 
 
 Resolve each passage’s variables within its owning mission. Player identity comes from shared configuration; literal mission locations come from the game source. Do not apply the current mission’s substitutions to earlier missions or invent values for unresolved dynamic substitutions. Preserve unknown markers and record source coordinates, state and resolved values in provenance.
 
-`DatasetBuilder` owns preparation. Its example builder and context sampler share `DialogueInterpreter`; `game_variables.py` handles passage substitutions. Publish fixed examples for consumers through `SceneDataset`, rather than reinterpreting branches during training or evaluation. Unsupported operations, non-progressing loops and exceeded exploration or context limits fail preparation explicitly.
+The `gameplay/` package owns source interpretation and reproducible encounter sampling. `DatasetBuilder` consumes reconstructed encounters and owns split eligibility, context assembly and publication. Publish fixed examples for consumers through `SceneDataset`, rather than reinterpreting branches during training or evaluation. Unsupported operations, non-progressing loops and exceeded exploration or context limits fail preparation explicitly.
 
 ## Consequences
 

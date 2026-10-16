@@ -9,5 +9,9 @@
   "kv_bits": 8,
   "kv_group_size": 64,
   "quantized_kv_start": 0,
-  "kv_scope": "full_history"
+  "kv_scope": "full_history",
+  "max_input_tokens": 8192,
+  "tokenizer_options": {
+    "extra_special_tokens": {}
+  }
 }

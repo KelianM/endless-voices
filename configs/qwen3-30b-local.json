@@ -6,5 +6,6 @@
   "label": "qwen30b",
   "context_ceiling": 16384,
   "max_output_tokens": 1024,
-  "prefill_step_size": 64
+  "prefill_step_size": 64,
+  "max_input_tokens": 8192
 }

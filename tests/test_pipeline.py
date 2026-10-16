@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 from peft import PeftModel
+from prepared_fixtures import write_raw_context
 from tokenizers import Tokenizer
 from tokenizers.models import WordLevel
 from tokenizers.pre_tokenizers import Whitespace
@@ -17,6 +18,7 @@ from endless_voices.data import (
     ConversationCollator,
     tokenize_conversations,
 )
+from endless_voices.dataset.storage import SceneDataset
 
 
 @pytest.fixture
@@ -73,8 +75,9 @@ def prepared(tmp_path, messages):
     path = root / "train.jsonl"
     path.write_text(json.dumps(record) + "\n")
     (root / "manifest.json").write_text(json.dumps({
-        "format": "scene-dataset-v1", "split_unit": "mission", "splits": ["train"],
+        "format": "scene-dataset-v3", "split_unit": "mission_chain", "splits": ["train"],
         "artifacts": {path.name: hashlib.sha256(path.read_bytes()).hexdigest()}}))
+    write_raw_context(root)
     return root
 
 
@@ -84,10 +87,11 @@ def test_long_conversation_rejected(tmp_path: Path, tokenizer: PreTrainedTokeniz
         {"role": "user", "content": "hello hello hello"},
         {"role": "assistant", "content": "friend"}])
     with pytest.raises(ValueError, match="Shorten the conversation"):
-        tokenize_conversations(str(path), tokenizer, max_length=2)
+        tokenize_conversations(
+            [row["messages"] for row in SceneDataset.load(path, "train")], tokenizer, max_length=2)
 
 
-def test_train_and_chat_cli(tmp_path: Path, tokenizer: PreTrainedTokenizerFast) -> None:
+def test_training_and_chat_cli(tmp_path: Path, tokenizer: PreTrainedTokenizerFast, monkeypatch):
     base = tmp_path / "base"
     GPT2LMHeadModel(
         GPT2Config(
@@ -114,6 +118,8 @@ name_or_path = "{base}"
 [data]
 path = "{dataset}"
 max_length = 32
+[context]
+index = "unused"
 [lora]
 r = 2
 lora_alpha = 4
@@ -126,14 +132,24 @@ learning_rate = 0.001
 save_strategy = "no"
 use_cpu = true
 ''')
-    subprocess.run(
-        [sys.executable, "-m", "endless_voices.train", "--config", str(config)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    from test_retrieval import Encoder, block
+
+    from endless_voices.common import load_config
+    from endless_voices.retrieval import SceneDatabase
+    from endless_voices.train import run_training
+
+    index = tmp_path / "context.sqlite"
+    SceneDatabase.create(index, [block("unrelated", "hello")], Encoder()).close()
+    monkeypatch.setattr("endless_voices.train.open_database",
+                        lambda settings: SceneDatabase(index, Encoder()))
+    training_config = load_config(config)
+    training_config["context"]["index"] = str(index)
+    run_training(training_config)
     assert (output / "adapter_model.safetensors").exists()
     assert (output / "run_config.json").exists()
+    saved = json.loads((output / "training_contexts.jsonl").read_text())
+    assert saved["messages"] == SceneDataset.load(dataset, "train")[0]["messages"]
+    assert saved["retrieval_trace"][0]["tool"] == "static_context"
     model = PeftModel.from_pretrained(GPT2LMHeadModel.from_pretrained(base), output)
     assert any(
         "lora_B" in name and parameter.abs().sum() > 0
@@ -144,7 +160,7 @@ use_cpu = true
             [
                 sys.executable,
                 "-m",
-                "endless_voices.chat",
+                "endless_voices", "chat",
                 "--config",
                 str(config),
                 "--device",
@@ -170,7 +186,7 @@ def test_contract_cli_local_tokenizer(tmp_path: Path, tokenizer: PreTrainedToken
     command = [
         sys.executable,
         "-m",
-        "endless_voices.contracts",
+        "endless_voices", "validate",
         str(manifest),
         "--tokenizer",
         str(local),
@@ -189,7 +205,8 @@ def test_continuation_loss_excludes_lore_and_preserves_target_eos(tmp_path, toke
         {"role": "system", "content": "hello"},
         {"role": "user", "content": "hello"},
         {"role": "assistant", "content": "friend"}])
-    examples = tokenize_conversations(str(path), tokenizer, 32)
+    examples = tokenize_conversations(
+        [row["messages"] for row in SceneDataset.load(path, "train")], tokenizer, 32)
     batch = ConversationCollator(tokenizer)(examples)
     assert batch["labels"].tolist() == [[-100, -100, -100, -100, 3, 1]]
 
@@ -202,6 +219,7 @@ def test_mapping_tokenizer_output_keeps_ids_and_loss_boundary(tmp_path, tokenize
         {"role": "system", "content": "hello"},
         {"role": "user", "content": "hello"},
         {"role": "assistant", "content": "friend"}])
-    row = tokenize_conversations(str(path), tokenizer, 16)[0]
+    row = tokenize_conversations(
+        [row["messages"] for row in SceneDataset.load(path, "train")], tokenizer, 16)[0]
     assert row["input_ids"] == [2, 1, 2, 1, 3, 1]
     assert row["labels"] == [-100, -100, -100, -100, 3, 1]

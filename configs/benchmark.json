@@ -13,5 +13,18 @@
   "local_configs": {
     "gemma31b": "configs/gemma4-31b-local.json",
     "qwen30b": "configs/qwen3-30b-local.json"
+  },
+  "context": {
+    "index": "outputs/context.sqlite",
+    "tokenizer": "data/local/hub/models--mlx-community--gemma-4-31b-it-4bit/snapshots/696d436c404745a59f30e4939a658162b0a9e57f",
+    "max_input_tokens": 8192,
+    "depth": 4,
+    "hosted_max_input_tokens": {
+      "gpt-6-luna": 65536,
+      "claude-sonnet-5-5": 65536
+    },
+    "tokenizer_options": {
+      "extra_special_tokens": {}
+    }
   }
 }
