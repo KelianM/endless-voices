@@ -297,17 +297,61 @@ class ContextBuilder:
         finally:
             self.history_variables = None
 
+    def history_steps(self, ancestors):
+        """Order mission starts and completions around active prerequisites."""
+        active_parents = {name: set() for name in ancestors}
+        for name in ancestors:
+            for node in self.corpus.missions[name].node["children"]:
+                if node["tokens"] != ["to", "offer"]:
+                    continue
+                for term, parents in walk(node["children"]):
+                    parts = term["tokens"]
+                    if (len(parts) == 2 and parts[0] == "has"
+                            and parts[1].endswith(": active")
+                            and parts[1][:-8] in active_parents
+                            and not any(p["tokens"] == ["or"] for p in parents)):
+                        active_parents[name].add(parts[1][:-8])
+        steps, visiting, done = [], set(), set()
+
+        def visit(name, stage):
+            key = (name, stage)
+            if key in done:
+                return
+            if key in visiting:
+                raise ValueError(f"Cyclic mission history phases: {name}")
+            visiting.add(key)
+            if stage == "start":
+                for parent in self.graph[name]:
+                    visit(parent, "complete")
+                for parent in sorted(active_parents[name]):
+                    visit(parent, "start")
+            else:
+                visit(name, "start")
+                for child in ancestors:
+                    if name in active_parents[child]:
+                        visit(child, "complete")
+            visiting.remove(key)
+            done.add(key)
+            steps.append(key)
+
+        for name in ancestors:
+            visit(name, "complete")
+        return steps
+
     def _histories(self, mission, split, initial):
         initial = initial.copy()
         initial.events = self.corpus.events
         initial.planet_systems = self.corpus.planet_systems
         histories, omitted = [History(initial, [])], []
         ancestors = self.ancestors(mission.name)
-        for index, name in enumerate(ancestors):
-            self.history_variables = self.future_variables([*ancestors[index:], mission.name])
+        steps = self.history_steps(ancestors)
+        for index, (name, stage) in enumerate(steps):
+            remaining = list(dict.fromkeys(n for n, _ in steps[index:]))
+            self.history_variables = self.future_variables([*remaining, mission.name])
             histories = self.bounded(histories)
             if not self.eligible(name, split):
-                omitted.append(name)
+                if stage == "start":
+                    omitted.append(name)
                 continue
             previous = self.corpus.missions[name]
             requirements = [
@@ -316,31 +360,36 @@ class ContextBuilder:
                 if n["tokens"] == ["to", "offer"]
                 for c in n["children"]
             ]
-            candidates = []
-            for history in histories:
-                timelines = sorted(enumerate(history.state.advance()),
-                                   key=lambda item: digest([self.seed, item[0]]))
-                for _, state in timelines:
-                    self.enter(state, previous)
-                    state = state.assume(condition(requirements, state))
-                    if state is not None:
-                        candidates.append(History(state, history.blocks))
-                        break
-            histories = self.bounded(candidates)
+            if stage == "start":
+                candidates = []
+                for history in histories:
+                    timelines = sorted(enumerate(history.state.advance()),
+                                       key=lambda item: digest([self.seed, item[0]]))
+                    for _, state in timelines:
+                        self.enter(state, previous)
+                        state = state.assume(condition(requirements, state))
+                        if state is not None:
+                            candidates.append(History(state, history.blocks))
+                            break
+                histories = self.bounded(candidates)
+            else:
+                for history in histories:
+                    history.state.scope = name
             before_visit = None
-            for phase in ["offer", "accept", "enter", "visit", "complete"]:
+            phases = ["offer", "accept", "enter", "visit"] if stage == "start" else ["complete"]
+            for phase in phases:
                 if phase == "visit":
                     before_visit = histories
                     if not any(n["tokens"] == ["on", "visit"]
                                for n in previous.node["children"]):
                         continue
-                elif phase == "complete":
-                    histories = self.bounded([*before_visit, *histories])
                 histories = self.phase_histories(histories, previous, phase, sample=True)
                 events = [n for n in previous.node["children"] if n["tokens"][:2] == ["on", phase]]
                 for event in events:
                     histories = self.event_location(histories, event)
                     histories = self.event(event["children"], histories, previous, phase)
+                if phase == "visit":
+                    histories = self.bounded([*before_visit, *histories])
         self.history_variables = None
         return histories, omitted
 

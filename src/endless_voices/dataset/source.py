@@ -136,6 +136,13 @@ class GameCorpus:
     @property
     def mission_graph(self):
         """Return prerequisite mission links from authored offer conditions."""
+        event_parents = {}
+        for event, schedulers in self.event_schedulers.items():
+            if len(schedulers) != 1 or "event: " + event in self.condition_writers:
+                continue
+            kind, name, phase = next(iter(schedulers))
+            if kind == "mission" and phase == "complete":
+                event_parents[event] = name
         graph = {}
         for name, mission in self.missions.items():
             parents = set()
@@ -150,6 +157,10 @@ class GameCorpus:
                         parent = parts[1][:-6]
                         if parent in self.missions:
                             parents.add(parent)
+                    elif len(parts) == 2 and parts[0] == "has" and parts[1].startswith("event: "):
+                        parent = event_parents.get(parts[1][7:])
+                        if parent is not None and parent != name:
+                            parents.add(parent)
             graph[name] = sorted(parents)
         return graph
 
@@ -161,6 +172,7 @@ class GameCorpus:
         self.conversations = {}
         self.phrases = {}
         self.condition_writers = {}
+        self.event_schedulers = {}
         self.planet_systems = {}
         self.systems = {}
         self.planets = {}
@@ -180,8 +192,16 @@ class GameCorpus:
             for node in tree(raw.decode("utf-8")):
                 kind, *names = node["tokens"]
                 owner = (kind, names[0] if names else str(relative))
+                if kind == "event" and any(c["tokens"][:1] == ["date"]
+                                           for c in node["children"]):
+                    self.event_schedulers.setdefault(names[0], set()).add((*owner, None))
                 for operation, ancestors in walk([node]):
                     parts = operation["tokens"]
+                    if ancestors and parts[0] == "event" and 2 <= len(parts) <= 4:
+                        phase = next((p["tokens"][1] for p in ancestors
+                                      if p["tokens"][:1] == ["on"]
+                                      and len(p["tokens"]) >= 2), None)
+                        self.event_schedulers.setdefault(parts[1], set()).add((*owner, phase))
                     if parts[:1] == ["planet"]:
                         operation["source_path"] = str(relative)
                     variable = None

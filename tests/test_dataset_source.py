@@ -35,6 +35,32 @@ def test_named_conversation_keeps_definition_location_and_callsite(tmp_path):
         source.resolve_conversation(reference, mission)
 
 
+@pytest.mark.parametrize("alternative", [
+    'mission Other\n\ton complete\n\t\tevent wedding 10\n',
+    'mission Other\n\ton decline\n\t\tevent wedding 10\n',
+    'event calendar\n\tevent wedding 10\n',
+    'conversation shared\n\taction\n\t\tevent wedding 10\n',
+    'mission Other\n\ton complete\n\t\tset "event: wedding"\n',
+    'event wedding\n\tdate 1 1 3014\n',
+])
+def test_event_with_another_trigger_does_not_imply_completed_mission(tmp_path, alternative):
+    source = corpus(tmp_path, {"missions.txt": (
+        'mission Earlier\n\ton complete\n\t\tevent wedding 60\n'
+        'mission Later\n\tto offer\n\t\thas "event: wedding"\n' + alternative
+    )})
+    assert source.mission_graph["Later"] == []
+
+
+def test_optional_or_uncompleted_event_does_not_become_history(tmp_path):
+    source = corpus(tmp_path, {"missions.txt": (
+        'mission Earlier\n\ton complete\n\t\tevent wedding 60\n'
+        'mission Declined\n\ton decline\n\t\tevent rejected 1\n'
+        'mission Later\n\tto offer\n\t\tor\n\t\t\thas "event: wedding"\n'
+        '\t\t\thas other\n\t\thas "event: rejected"\n'
+    )})
+    assert source.mission_graph["Later"] == []
+
+
 def test_dialog_preserves_inline_children_and_named_phrase_sources(tmp_path):
     source = corpus(tmp_path, {
         "phrases.txt": 'phrase "payment"\n\tword\n\t\t`Payment received.`\n',

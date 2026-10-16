@@ -159,6 +159,70 @@ def test_failed_interpretation_does_not_publish_a_partial_dataset(tmp_path):
     assert not (tmp_path / "prepared").exists()
 
 
+def test_delayed_completion_event_keeps_predecessor_as_history(tmp_path):
+    source = corpus(tmp_path, '''mission Earlier
+	on offer
+		conversation
+			`You agree to transport Tom.`
+				accept
+	on complete
+		event wedding 60
+		conversation
+			`Tom reunites with Carl.`
+event wedding
+mission Later
+	to offer
+		has "event: wedding"
+	on offer
+		conversation
+			`Tom and Carl send their wedding photos.`
+				decline
+''')
+    assert source.mission_graph["Later"] == ["Earlier"]
+    with pytest.raises(ValueError, match="chain crosses splits"):
+        DatasetBuilder(source, config({"Earlier": spec(), "Later": spec("test")}))
+    builder = DatasetBuilder(source, config({"Earlier": spec(), "Later": spec()}))
+    output = tmp_path / "prepared"
+    builder.build(output)
+    dataset = SceneDataset.load(output, "train")
+    index = next(i for i, row in enumerate(dataset)
+                 if row["metadata"]["sources"][0]["source_group"] == "mission / Later")
+    pool = dataset.context_pool(index)
+    assert [(block["mission"], block["phase"]) for block in pool.blocks] == [
+        ("Earlier", "offer"), ("Earlier", "complete"),
+    ]
+    assert all(block["mission"] != "Earlier" for block in pool.references)
+
+
+def test_event_history_keeps_parent_active_during_required_side_mission(tmp_path):
+    text = STORY.replace('has "Earlier: done"', 'has "Earlier: active"').replace(
+        'mission Later', '\ton complete\n\t\tevent ready 15\n'
+        '\t\tdialog `The journey is complete.`\nmission Later')
+    text += '''event ready
+mission Finale
+	to offer
+		has "Later: done"
+		has "event: ready"
+	on offer
+		conversation
+			`You return after both journeys.`
+				decline
+'''
+    source = corpus(tmp_path, text)
+    builder = DatasetBuilder(source, config({name: spec() for name in (
+        "Earlier", "Later", "Finale")}))
+    output = tmp_path / "prepared"
+    builder.build(output)
+    dataset = SceneDataset.load(output, "train")
+    indices = [i for i, row in enumerate(dataset)
+               if row["metadata"]["sources"][0]["source_group"] == "mission / Finale"]
+    assert indices
+    for index in indices:
+        assert [(b["mission"], b["phase"]) for b in dataset.context_pool(index).blocks] == [
+            ("Earlier", "offer"), ("Later", "offer"), ("Earlier", "complete"),
+        ]
+
+
 def test_dataset_rejects_modified_target_files(tmp_path):
     source = corpus(tmp_path, STORY)
     DatasetBuilder(source, config({"Earlier": spec()})).build(tmp_path / "prepared")

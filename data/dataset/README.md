@@ -21,7 +21,9 @@ literal markers; no missing game facts are filled with generated text.
 Training context excludes held-out missions. Validation can use training context, and test
 can use training and validation context. References exclude the target mission and known
 sibling variants. History records one compatible branch, not every possible playthrough.
-The prerequisite graph follows positive completion requirements, not arbitrary OR conditions.
+The prerequisite graph follows positive completion requirements, including required events
+scheduled uniquely by a mission's completion. Events with other possible triggers and
+requirements inside OR conditions do not establish a completed predecessor.
 
 The interpreter resolves supported dialogue conditions, assignments and mission effects.
 Unknown starting conditions and travel durations remain constrained possibilities. Recorded
