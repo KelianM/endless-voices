@@ -134,18 +134,18 @@ class GameCorpus:
     """Load hash-verified source missions once for dataset preparation."""
 
     @property
-    def mission_graph(self):
-        """Return prerequisite mission links from authored offer conditions."""
-        event_parents = {}
+    def mission_dependencies(self):
+        """Return required conditions and alternative mission phases that establish them."""
+        events = {}
         for event, schedulers in self.event_schedulers.items():
-            if len(schedulers) != 1 or "event: " + event in self.condition_writers:
-                continue
-            kind, name, phase = next(iter(schedulers))
-            if kind == "mission" and phase == "complete":
-                event_parents[event] = name
-        graph = {}
+            if ("event: " + event not in self.condition_writers
+                    and all(kind == "mission" and phase in {"offer", "complete"}
+                            for kind, _, phase in schedulers)):
+                events[event] = sorted((name, phase) for _, name, phase in schedulers)
+        dependencies, present, absent = {}, {}, {}
         for name, mission in self.missions.items():
-            parents = set()
+            required = {}
+            present[name], absent[name] = set(), set()
             for child in mission.node["children"]:
                 if child["tokens"] != ["to", "offer"]:
                     continue
@@ -153,16 +153,48 @@ class GameCorpus:
                     if any(p["tokens"] == ["or"] for p in ancestors):
                         continue
                     parts = term["tokens"]
-                    if len(parts) == 2 and parts[0] == "has" and parts[1].endswith(": done"):
-                        parent = parts[1][:-6]
-                        if parent in self.missions:
-                            parents.add(parent)
-                    elif len(parts) == 2 and parts[0] == "has" and parts[1].startswith("event: "):
-                        parent = event_parents.get(parts[1][7:])
-                        if parent is not None and parent != name:
-                            parents.add(parent)
-            graph[name] = sorted(parents)
-        return graph
+                    if len(parts) == 2 and parts[0] == "not":
+                        absent[name].add(parts[1])
+                    if len(parts) != 2 or parts[0] != "has":
+                        continue
+                    flag = parts[1]
+                    present[name].add(flag)
+                    if flag.endswith(": done") and flag[:-6] in self.missions:
+                        required[flag] = [(flag[:-6], "complete")]
+                    elif flag.startswith("event: ") and flag[7:] in events:
+                        choices = events[flag[7:]]
+                        if all(parent != name for parent, _ in choices):
+                            required[flag] = choices
+            dependencies[name] = required
+        # A flag required absent earlier needs a witnessed transition before it can be present.
+        changed = True
+        while changed:
+            changed = False
+            for name, required in dependencies.items():
+                pending = [p for choices in required.values() for p, _ in choices]
+                ancestors = set()
+                while pending:
+                    parent = pending.pop()
+                    if parent in ancestors or parent == name:
+                        continue
+                    ancestors.add(parent)
+                    pending.extend(p for choices in dependencies[parent].values()
+                                   for p, _ in choices)
+                earlier_absent = set().union(*(absent[p] for p in ancestors))
+                for flag in sorted((present[name] & earlier_absent) - required.keys()):
+                    triggers = self.condition_triggers.get(flag, set())
+                    if triggers and all(kind == "mission" and parent != name
+                                        and phase in {"offer", "complete"}
+                                        for kind, parent, phase in triggers):
+                        required[flag] = sorted((parent, phase) for _, parent, phase in triggers)
+                        changed = True
+        return dependencies
+
+    @property
+    def mission_graph(self):
+        """Return all possible prerequisite links for split isolation and retrieval."""
+        return {name: sorted({parent for choices in required.values() for parent, _ in choices})
+                for name, required in self.mission_dependencies.items()}
 
     def __init__(self, root, inventory):
         self.root = Path(root)
@@ -172,6 +204,7 @@ class GameCorpus:
         self.conversations = {}
         self.phrases = {}
         self.condition_writers = {}
+        self.condition_triggers = {}
         self.event_schedulers = {}
         self.planet_systems = {}
         self.systems = {}
@@ -213,6 +246,11 @@ class GameCorpus:
                         variable = parts[0]
                     if variable is not None:
                         self.condition_writers.setdefault(variable, set()).add(owner)
+                        phase = next((p["tokens"][1] for p in ancestors
+                                      if p["tokens"][:1] == ["on"]
+                                      and len(p["tokens"]) >= 2), None)
+                        self.condition_triggers.setdefault(variable, set()).add(
+                            (*owner, phase if parts[0] == "set" else None))
                         conversation = next((n for n in reversed(ancestors)
                                              if n["tokens"][:1] == ["conversation"]), None)
                         if conversation is None or parts[0] not in {"set", "clear"}:

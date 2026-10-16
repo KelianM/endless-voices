@@ -21,9 +21,15 @@ literal markers; no missing game facts are filled with generated text.
 Training context excludes held-out missions. Validation can use training context, and test
 can use training and validation context. References exclude the target mission and known
 sibling variants. History records one compatible branch, not every possible playthrough.
-The prerequisite graph follows positive completion requirements, including required events
-scheduled uniquely by a mission's completion. Events with other possible triggers and
-requirements inside OR conditions do not establish a completed predecessor.
+The prerequisite graph follows positive completion requirements and required events
+scheduled by mission offers or completions. Multiple mission producers mean at least one producer is required. Histories explore
+individual producers and combinations in different orders; game conditions determine
+which combinations are compatible. Offer histories stop without inventing a
+completion, and only branches that schedule the required event can supply its history.
+All possible producers share a split; unused predecessor routes are excluded from references.
+A milestone required absent earlier and present later brings its supported mission setters
+into the history. Events with other kinds of triggers and requirements inside OR conditions
+remain unresolved.
 
 The interpreter resolves supported dialogue conditions, assignments and mission effects.
 Unknown starting conditions and travel durations remain constrained possibilities. Recorded

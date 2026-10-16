@@ -36,7 +36,6 @@ def test_named_conversation_keeps_definition_location_and_callsite(tmp_path):
 
 
 @pytest.mark.parametrize("alternative", [
-    'mission Other\n\ton complete\n\t\tevent wedding 10\n',
     'mission Other\n\ton decline\n\t\tevent wedding 10\n',
     'event calendar\n\tevent wedding 10\n',
     'conversation shared\n\taction\n\t\tevent wedding 10\n',

@@ -786,3 +786,259 @@ mission Later
                                   GameState.fixed({"expired": 0}))
     assert rows
     assert all(row[0]["messages"][-1]["content"] == "You made it in time." for row in rows)
+
+
+@pytest.mark.parametrize("stop", ["decline", "defer", "accept"])
+def test_offer_event_history_requires_the_scheduling_branch_without_completion(tmp_path, stop):
+    source = corpus(tmp_path, f'''mission Poll
+	on offer
+		conversation
+			choice
+				`Ignore the poll.`
+					decline
+				`Vote in the poll.`
+			action
+				event results 7
+			`Your vote was recorded.`
+				{stop}
+	on complete
+		dialog `This mission was completed.`
+event results
+mission Followup
+	to offer
+		has "event: results"
+		has "Poll: offered"
+		not "Poll: done"
+	on offer
+		conversation
+			`Here are the poll results.`
+				decline
+''')
+    builder = DatasetBuilder(source, config({"Followup": spec()}))
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    assert len(dataset) == 1
+    pool = dataset.context_pool(0)
+    assert [(b["mission"], b["phase"]) for b in pool.blocks] == [("Poll", "offer")]
+    assert "Your vote was recorded." in json.dumps(pool.blocks)
+    assert "Ignore the poll." not in json.dumps(pool.blocks)
+    assert "This mission was completed." not in json.dumps(pool.blocks)
+
+
+def test_alternative_event_producers_remain_separate_compatible_histories(tmp_path):
+    text = STORY[:STORY.index('mission Later')]
+    for name, requirement in [("EarthTrip", "has earth"), ("MarsTrip", "not earth")]:
+        text += f'''mission {name}
+	to offer
+		has "Earlier: done"
+		{requirement}
+	on offer
+		conversation
+			`You start {name}.`
+				accept
+	on complete
+		event research 14
+		dialog `You finish {name}.`
+'''
+    text += STORY[STORY.index('mission Later'):].replace(
+        'has "Earlier: done"', 'has "event: research"') + 'event research\n'
+    source = corpus(tmp_path, text)
+    assert source.mission_graph["Later"] == ["EarthTrip", "MarsTrip"]
+    with pytest.raises(ValueError, match="chain crosses splits"):
+        DatasetBuilder(source, config({"EarthTrip": spec("test"), "Later": spec()}))
+    builder = DatasetBuilder(source, config({"Later": spec()}))
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    assert len(dataset) == 2
+    for i, row in enumerate(dataset):
+        pool = dataset.context_pool(i)
+        earth = "Earth" in row["messages"][-1]["content"]
+        chosen, excluded = ("EarthTrip", "MarsTrip") if earth else ("MarsTrip", "EarthTrip")
+        names = {b["mission"] for b in pool.blocks}
+        assert names == {"Earlier", chosen}
+        assert excluded not in {b["mission"] for b in pool.references}
+        assert "EarthTrip (on complete) OR MarsTrip (on complete)" in pool.system_prefix
+
+
+def test_offer_event_history_can_include_travel_while_parent_remains_active(tmp_path):
+    source = corpus(tmp_path, '''mission Journey
+	on offer
+		event reminder 14
+		conversation
+			`Investigate the missing links.`
+				accept
+	on enter Somewhere
+		set investigated
+		dialog `The link is missing.`
+	on complete
+		dialog `You finished the journey.`
+event reminder
+mission Return
+	to offer
+		has "event: reminder"
+		has "Journey: active"
+		has investigated
+	on offer
+		conversation
+			`Return to the council.`
+				decline
+''')
+    builder = DatasetBuilder(source, config({"Return": spec()}))
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    assert len(dataset) == 1
+    assert [(b["mission"], b["phase"]) for b in dataset.context_pool(0).blocks] == [
+        ("Journey", "offer"), ("Journey", "enter"),
+    ]
+
+
+@pytest.mark.parametrize("mode", ["sequential", "overlapping", "dependent", "exclusive"])
+def test_shared_event_allows_multiple_producers_unless_conditions_forbid_them(tmp_path, mode):
+    text = ""
+    for name, other in [("Alpha", "Beta"), ("Beta", "Alpha")]:
+        requirement = ('not claimed' if mode == "exclusive" else
+                       'has "Alpha: done"' if mode == "dependent" and name == "Beta" else
+                       f'not "{other}: done"' if name == "Alpha" or mode == "overlapping"
+                       else 'not impossible')
+        text += f'''mission {name}
+	to offer
+		{requirement}
+	on offer
+'''
+        if mode == "exclusive":
+            text += '\t\tset claimed\n'
+        text += f'''		conversation
+			`You take the {name} job.`
+				accept
+	on complete
+		event ready 1
+		dialog `{name} is finished.`
+'''
+    text += '''event ready
+mission Later
+	to offer
+		has "event: ready"
+	on offer
+		conversation
+			branch both
+				has "Alpha: done"
+				has "Beta: done"
+			`Thanks for the first job.`
+				decline
+			label both
+			`Thanks for both jobs.`
+				decline
+'''
+    source = corpus(tmp_path, text)
+    settings = config({"Later": spec()})
+    settings["initial_state"] = {"Alpha: done": 0, "Beta: done": 0, "claimed": 0}
+    builder = DatasetBuilder(source, settings)
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    both = [i for i, row in enumerate(dataset) if "both jobs" in row["messages"][-1]["content"]]
+    assert bool(both) == (mode != "exclusive")
+    if both:
+        blocks = dataset.context_pool(both[0]).blocks
+        assert {(b["mission"], b["phase"]) for b in blocks} == {
+            ("Alpha", "offer"), ("Alpha", "complete"),
+            ("Beta", "offer"), ("Beta", "complete"),
+        }
+        assert len(blocks) == 4
+        if mode == "overlapping":
+            assert [b["phase"] for b in blocks] == ["offer", "offer", "complete", "complete"]
+
+
+def test_active_side_mission_can_complete_after_parent_event(tmp_path):
+    text = STORY.replace('has "Earlier: done"', 'has "Earlier: active"').replace(
+        'mission Later', '\ton complete\n\t\tevent ready 15\n'
+        '\t\tdialog `The main trip ends.`\nmission Later')
+    text += '''	to complete
+		has "event: ready"
+	on complete
+		dialog `The side trip ends after the wait.`
+event ready
+mission Finale
+	to offer
+		has "Later: done"
+		has "event: ready"
+	on offer
+		conversation
+			`Both trips are over.`
+				decline
+'''
+    source = corpus(tmp_path, text)
+    builder = DatasetBuilder(source, config({"Finale": spec()}))
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    assert len(dataset)
+    for index in range(len(dataset)):
+        assert [(b["mission"], b["phase"]) for b in dataset.context_pool(index).blocks] == [
+            ("Earlier", "offer"), ("Later", "offer"),
+            ("Earlier", "complete"), ("Later", "complete"),
+        ]
+
+
+def test_event_gate_includes_milestone_that_changes_an_earlier_absent_flag(tmp_path):
+    text = '''mission Start
+	to offer
+		not chapter_done
+	on offer
+		event island_open
+		conversation
+			`The island opens.`
+				accept
+mission Finish
+	to offer
+		has "Start: done"
+	on complete
+		set chapter_done
+		dialog `The chapter ends.`
+mission Timer
+	to offer
+		has "event: island_open"
+		has chapter_done
+	on offer
+		event ready 7
+		fail
+mission Later
+	to offer
+		has "event: ready"
+	on offer
+		conversation
+			`The next chapter begins.`
+				decline
+event island_open
+event ready
+'''
+    source = corpus(tmp_path, text)
+    builder = DatasetBuilder(source, config({"Later": spec()}))
+    builder.build(tmp_path / "prepared")
+    dataset = SceneDataset.load(tmp_path / "prepared", "train")
+    assert len(dataset) == 1
+    assert [(b["mission"], b["phase"]) for b in dataset.context_pool(0).blocks] == [
+        ("Start", "offer"), ("Finish", "complete"),
+    ]
+
+
+@pytest.mark.parametrize("can_clear", [False, True])
+def test_producer_is_pruned_only_when_its_flag_permanently_blocks_target(tmp_path, can_clear):
+    text = '''mission Ending
+	on complete
+		set ended
+		event ready
+mission Ordinary
+	on complete
+		event ready
+event ready
+mission Later
+	to offer
+		has "event: ready"
+		not ended
+'''
+    if can_clear:
+        text += 'event reset\n\tclear ended\n'
+    source = corpus(tmp_path, text)
+    builder = DatasetBuilder(source, config({"Later": spec()}))
+    plans = builder.sampler.history_plans("Later")
+    assert any("Ending" in stages for stages, _ in plans) == can_clear
+    assert any("Ordinary" in stages for stages, _ in plans)

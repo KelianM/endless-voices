@@ -4,6 +4,8 @@ import json
 import re
 from copy import deepcopy
 from dataclasses import asdict, dataclass
+from graphlib import CycleError
+from itertools import permutations
 from pathlib import Path
 from urllib.parse import quote
 
@@ -46,6 +48,7 @@ class ContextBuilder:
         self.reference_exclusions = {}
         self.history_variables = None
         self.graph = corpus.mission_graph
+        self.dependencies = corpus.mission_dependencies
 
     def ancestors(self, mission):
         ordered, active, done = [], set(), set()
@@ -124,7 +127,7 @@ class ContextBuilder:
         ]
         return conversations, dialogs, actions
 
-    def event(self, nodes, histories, mission, phase="offer"):
+    def event(self, nodes, histories, mission, phase="offer", *, offer_only=False):
         """Execute a mission event with actions after the initial conversation display."""
         conversations, dialogs, actions = self.event_parts(nodes, mission)
         updated = []
@@ -133,11 +136,32 @@ class ContextBuilder:
                 for route in self.interpreter.histories(
                         conversations[0], history.state, actions,
                         future_variables=self.history_variables):
-                    if not self.continues(route.stop, phase):
+                    if not self.continues(route.stop, "history" if offer_only else phase):
                         continue
                     block = self.block(
                         mission, (*route.prefix, *route.paragraphs), conversations[0], phase)
-                    updated.append(History(route.state, [*history.blocks, block]))
+                    outcomes = [History(route.state, [*history.blocks, block])]
+                    if offer_only:
+                        outcome = route.stop if route.stop in {"decline", "defer"} else "accept"
+                        outcomes = self.phase_histories(outcomes, mission, outcome)
+                        for event in mission.node["children"]:
+                            if event["tokens"] == ["on", outcome]:
+                                outcomes = self.event(event["children"], outcomes, mission, outcome)
+                        if outcome == "accept":
+                            accepted = deepcopy(outcomes)
+                            for next_phase in ("enter", "visit"):
+                                before = deepcopy(outcomes)
+                                outcomes = self.phase_histories(
+                                    outcomes, mission, next_phase, sample=True)
+                                for event in mission.node["children"]:
+                                    if event["tokens"][:2] == ["on", next_phase]:
+                                        outcomes = self.event_location(outcomes, event)
+                                        outcomes = self.event(
+                                            event["children"], outcomes, mission, next_phase)
+                                if next_phase == "visit":
+                                    outcomes = self.bounded([*before, *outcomes])
+                            outcomes = self.bounded([*accepted, *outcomes])
+                    updated.extend(outcomes)
             else:
                 blocks = list(history.blocks)
                 if dialogs:
@@ -235,6 +259,10 @@ class ContextBuilder:
         state.values["mission payment factor: " + mission.name] = (jumps + 1) * payload
 
     def phase_histories(self, histories, mission, phase, *, sample=False):
+        if phase == "offer":
+            for history in histories:
+                key = mission.name + ": offered"
+                history.state.values[key] = history.state.values.get(key, z3.IntVal(0)) + 1
         if phase == "accept":
             for history in histories:
                 history.state.values[mission.name + ": active"] = z3.IntVal(1)
@@ -297,8 +325,68 @@ class ContextBuilder:
         finally:
             self.history_variables = None
 
-    def history_steps(self, ancestors):
+    def history_plans(self, mission):
+        """Explore nonempty producer combinations and let game conditions filter histories."""
+        forbidden = set()
+        for node in self.corpus.missions[mission].node["children"]:
+            if node["tokens"] == ["to", "offer"]:
+                for term, parents in walk(node["children"]):
+                    t = term["tokens"]
+                    if (len(t) == 2 and t[0] == "not"
+                            and not any(p["tokens"] == ["or"] for p in parents)):
+                        writers = self.corpus.condition_triggers.get(t[1], set())
+                        if writers and all(phase is not None for _, _, phase in writers):
+                            forbidden.add(t[1])
+        pending = [({mission: "offer"}, {})]
+        plans = []
+        while pending:
+            stages, selected = pending.pop()
+            unresolved = next((name for name in stages if name not in selected), None)
+            if unresolved is None:
+                contradicted = any(
+                    action["tokens"] == ["set", flag]
+                    for name, stage in stages.items() if name != mission
+                    for node in self.corpus.missions[name].node["children"]
+                    if node["tokens"] in ([["on", "offer"], ["on", "accept"], ["on", "complete"]]
+                                          if stage == "complete" else [["on", "offer"]])
+                    for action in node["children"] for flag in forbidden)
+                if contradicted:
+                    continue
+                plans.append((stages, selected))
+                if len(plans) > self.max_routes:
+                    raise ValueError(
+                        "History route limit exceeded; no branches were silently discarded")
+                continue
+            options = [[]]
+            for choices in self.dependencies[unresolved].values():
+                expanded_options = []
+                for size in range(1, len(choices) + 1):
+                    for producers in permutations(choices, size):
+                        for parents in options:
+                            expanded_options.append([*parents, *producers])
+                            if len(expanded_options) > self.max_routes:
+                                raise ValueError(
+                                    "History route limit exceeded; "
+                                    "no branches were silently discarded")
+                options = expanded_options
+            for parents in options:
+                expanded = dict(stages)
+                for parent, phase in parents:
+                    if expanded.get(parent) != "complete":
+                        expanded[parent] = phase
+                pending.append((expanded, {**selected, unresolved: parents}))
+        return plans
+
+    def history_steps(self, ancestors, stages, selected, *, overlap=False):
         """Order mission starts and completions around active prerequisites."""
+        peers = {name: [] for name in ancestors}
+        if overlap:
+            for owner, parents in selected.items():
+                for choices in self.dependencies[owner].values():
+                    group = list(dict.fromkeys(p for p, phase in parents if (p, phase) in choices))
+                    for name in group:
+                        if name in peers:
+                            peers[name].extend(p for p in group if p != name and p in peers)
         active_parents = {name: set() for name in ancestors}
         for name in ancestors:
             for node in self.corpus.missions[name].node["children"]:
@@ -314,43 +402,88 @@ class ContextBuilder:
         steps, visiting, done = [], set(), set()
 
         def visit(name, stage):
+            if stage == "start" and stages[name] == "offer":
+                stage = "offer"
+            if stage == "offer" and stages[name] == "complete":
+                stage = "start"
             key = (name, stage)
             if key in done:
                 return
             if key in visiting:
-                raise ValueError(f"Cyclic mission history phases: {name}")
+                raise CycleError(f"Cyclic mission history phases: {name}")
             visiting.add(key)
-            if stage == "start":
-                for parent in self.graph[name]:
-                    visit(parent, "complete")
+            if stage in {"start", "offer"}:
+                for parent, phase in selected[name]:
+                    visit(parent, phase)
                 for parent in sorted(active_parents[name]):
                     visit(parent, "start")
             else:
                 visit(name, "start")
+                for peer in peers[name]:
+                    phase = "start" if stages[peer] == "complete" else "offer"
+                    if (peer, phase) not in visiting:
+                        visit(peer, phase)
                 for child in ancestors:
                     if name in active_parents[child]:
-                        visit(child, "complete")
+                        visit(child, "start")
+                for node in self.corpus.missions[name].node["children"]:
+                    if node["tokens"] != ["to", "complete"]:
+                        continue
+                    for term, parents in walk(node["children"]):
+                        parts = term["tokens"]
+                        if (len(parts) == 2 and parts[0] == "has"
+                                and parts[1].startswith("event: ")
+                                and not any(p["tokens"] == ["or"] for p in parents)):
+                            producers = self.corpus.event_schedulers.get(parts[1][7:], set())
+                            if len(producers) == 1:
+                                kind, parent, phase = next(iter(producers))
+                                if (kind == "mission" and parent in stages and parent != name
+                                        and phase in {"offer", "complete"}):
+                                    visit(parent, phase)
             visiting.remove(key)
             done.add(key)
             steps.append(key)
 
         for name in ancestors:
-            visit(name, "complete")
+            visit(name, stages[name])
         return steps
 
     def _histories(self, mission, split, initial):
-        initial = initial.copy()
-        initial.events = self.corpus.events
-        initial.planet_systems = self.corpus.planet_systems
+        histories, omitted = [], set()
+        for stages, selected in self.history_plans(mission.name):
+            state = initial.copy()
+            state.events = self.corpus.events
+            state.planet_systems = self.corpus.planet_systems
+            for name in selected:
+                for flag in self.dependencies[name]:
+                    if flag.startswith("event: "):
+                        state.values.setdefault(flag, z3.IntVal(0))
+            ancestors = [name for name in stages if name != mission.name]
+            schedules = [self.history_steps(ancestors, stages, selected)]
+            if any(len(choices) > 1 for name in selected
+                   for choices in self.dependencies[name].values()):
+                try:
+                    concurrent = self.history_steps(ancestors, stages, selected, overlap=True)
+                except CycleError:
+                    concurrent = None
+                if concurrent is not None and concurrent != schedules[0]:
+                    schedules.append(concurrent)
+            for steps in schedules:
+                routes, missing = self.execute_history(mission, split, state.copy(), steps)
+                histories.extend(routes)
+                omitted.update(missing)
+        self.history_variables = None
+        return self.bounded(histories), sorted(omitted)
+
+    def execute_history(self, mission, split, initial, steps):
+        """Interpret one choice of event producers through their required phases."""
         histories, omitted = [History(initial, [])], []
-        ancestors = self.ancestors(mission.name)
-        steps = self.history_steps(ancestors)
         for index, (name, stage) in enumerate(steps):
             remaining = list(dict.fromkeys(n for n, _ in steps[index:]))
             self.history_variables = self.future_variables([*remaining, mission.name])
             histories = self.bounded(histories)
             if not self.eligible(name, split):
-                if stage == "start":
+                if stage in {"start", "offer"}:
                     omitted.append(name)
                 continue
             previous = self.corpus.missions[name]
@@ -360,7 +493,7 @@ class ContextBuilder:
                 if n["tokens"] == ["to", "offer"]
                 for c in n["children"]
             ]
-            if stage == "start":
+            if stage in {"start", "offer"}:
                 candidates = []
                 for history in histories:
                     timelines = sorted(enumerate(history.state.advance()),
@@ -373,10 +506,22 @@ class ContextBuilder:
                             break
                 histories = self.bounded(candidates)
             else:
+                completion = [c for n in previous.node["children"]
+                              if n["tokens"] == ["to", "complete"] for c in n["children"]]
+                if completion:
+                    candidates = []
+                    for history in histories:
+                        for state in history.state.advance():
+                            state = state.assume(condition(completion, state))
+                            if state is not None:
+                                candidates.append(History(state, history.blocks))
+                                break
+                    histories = self.bounded(candidates)
                 for history in histories:
                     history.state.scope = name
             before_visit = None
-            phases = ["offer", "accept", "enter", "visit"] if stage == "start" else ["complete"]
+            phases = (["offer", "accept", "enter", "visit"] if stage == "start"
+                      else [stage])
             for phase in phases:
                 if phase == "visit":
                     before_visit = histories
@@ -387,7 +532,8 @@ class ContextBuilder:
                 events = [n for n in previous.node["children"] if n["tokens"][:2] == ["on", phase]]
                 for event in events:
                     histories = self.event_location(histories, event)
-                    histories = self.event(event["children"], histories, previous, phase)
+                    histories = self.event(event["children"], histories, previous, phase,
+                                           offer_only=stage == "offer")
                 if phase == "visit":
                     histories = self.bounded([*before_visit, *histories])
         self.history_variables = None
@@ -406,6 +552,7 @@ class ContextBuilder:
     def references(self, mission, split, history):
         """Return independent reference scenes from eligible related missions."""
         excluded = {mission.name, *(b["mission"] for b in history.blocks)}
+        excluded.update(self.ancestors(mission.name))
         excluded.update(self.reference_exclusions.get(mission.name, ()))
         blocks = []
         paths = self.reference_paths.get(mission.name, {mission.path})
@@ -657,11 +804,14 @@ class ExampleBuilder:
                 system = self.corpus.planet_systems.get(location)
                 if system:
                     cue += f" System: {system}."
-            links = [f"{parent} -> {name}"
-                     for name in [*self.sampler.ancestors(mission.name), mission.name]
-                     for parent in self.sampler.graph[name]]
-            overview = "Mission prerequisites (arrows mean precedes):\n" + (
-                "\n".join(links) or "No prerequisite missions.")
+            links = []
+            for name in [*self.sampler.ancestors(mission.name), mission.name]:
+                for choices in self.sampler.dependencies[name].values():
+                    producers = " OR ".join(f"{parent} (on {phase})" for parent, phase in choices)
+                    links.append(f"{producers} -> {name}")
+            overview = (
+                "Mission prerequisites (OR means at least one producer, possibly several):\n"
+                + ("\n".join(links) or "No prerequisite missions."))
             overview += "\nEarlier scenes in this interpreted history (oldest first):\n"
             overview += "\n".join(
                 f"{block['mission']} | on {block['phase']} | {scene_id(block)}"
