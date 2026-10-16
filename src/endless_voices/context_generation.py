@@ -150,7 +150,7 @@ def benchmark_sessions(root, settings):
 
 
 def verify_tool_context(pool, messages, selected_ids):
-    """Check native tool evidence against the encounter's eligible scenes and passages."""
+    """Verify native tool evidence and return ordinary messages containing that evidence."""
     initial = dynamic_messages(pool.messages(), len(pool.blocks))
     if messages[:len(initial)] != initial:
         raise ValueError("Native encounter differs from prepared context")
@@ -161,7 +161,7 @@ def verify_tool_context(pool, messages, selected_ids):
             allowed[sid] = (sid, kind, render(block))
             for passage in passage_chunks(block):
                 allowed[passage["id"]] = (sid, kind, passage["text"])
-    selected = set()
+    selected, retrieved = set(), set()
     for message in messages[len(initial):]:
         outputs = ([message["output"]] if message.get("type") == "function_call_output"
                    else [message["content"]] if message.get("role") == "tool"
@@ -175,5 +175,20 @@ def verify_tool_context(pool, messages, selected_ids):
                 if expected != actual:
                     raise ValueError("Tool result differs from eligible scene evidence")
                 selected.add(document["scene_id"])
+                retrieved.add(document["id"])
     if selected != set(selected_ids):
         raise ValueError("Retrieved scene selection differs from native tool results")
+
+    def evidence(blocks):
+        result = []
+        for block in blocks:
+            if scene_id(block) in retrieved:
+                result.append(block)
+                continue
+            passages = [passage for passage, chunk in zip(
+                block["passages"], passage_chunks(block), strict=True) if chunk["id"] in retrieved]
+            if passages:
+                result.append({**block, "passages": passages})
+        return result
+
+    return pool.messages(evidence(pool.blocks), evidence(pool.references))

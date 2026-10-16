@@ -69,7 +69,8 @@ def load_run(directory, manifest, records, split):
     for sid, prompt in prompts.items():
         trace = responses[sid]["retrieval"]
         messages = prompt["messages"]
-        verify_tool_context(pools[sid], messages, trace["selected_scene_ids"])
+        prompt["judging_context"] = verify_tool_context(
+            pools[sid], messages, trace["selected_scene_ids"])
         if prompt["messages"] != messages or prompt["messages_sha256"] != digest(encoded(messages)):
             raise ValueError("Prompt differs from authored context")
         if "input_ids" in prompt and (
@@ -146,10 +147,10 @@ def prepare(manifest, runs, output, split="validation", seed=None, controls=None
     contexts = {}
     for _, prompts, _ in loaded.values():
         for sid, prompt in prompts.items():
-            if sid in contexts and contexts[sid] != prompt["messages"]:
+            if sid in contexts and contexts[sid] != prompt["judging_context"]:
                 raise ValueError("Generation contexts differ; use benchmark export for shared "
                                  "static judging evidence")
-            contexts[sid] = prompt["messages"]
+            contexts[sid] = prompt["judging_context"]
     for sid, messages in contexts.items():
         records[sid] = {**records[sid], "messages": [*messages, records[sid]["messages"][-1]]}
     provenance = {
