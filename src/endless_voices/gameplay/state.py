@@ -33,6 +33,7 @@ class GameState:
     scope: str = "dialogue"
     failures: tuple = ()
     planet_systems: dict = field(default_factory=dict)
+    substitutions: dict = field(default_factory=dict)
 
     def copy(self):
         return GameState(
@@ -47,6 +48,7 @@ class GameState:
             self.scope,
             self.failures,
             self.planet_systems,
+            {name: dict(values) for name, values in self.substitutions.items()},
         )
 
     def draw(self, kind, lower, upper=None):
@@ -178,6 +180,7 @@ class GameState:
                 for name, due in self.pending
             ],
             "world_changes": list(self.world),
+            "substitutions": self.substitutions,
             "failed_missions_pending": list(self.failures),
             "initial_values": {
                 k: model.eval(v, model_completion=True).as_long()
@@ -416,4 +419,7 @@ def projected_state(state, variables=None, symbol_cache=None):
         "world": state.world,
         "failures": state.failures,
         "scope": state.scope,
+        "substitutions": {name: substitutions for name, substitutions
+                          in state.substitutions.items()
+                          if variables is None or name + ": active" in variables},
     }

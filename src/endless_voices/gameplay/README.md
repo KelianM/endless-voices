@@ -11,6 +11,7 @@ import dataset, retrieval, agent or model code.
 | `state.py` | Interpret symbolic integer conditions, actions and scheduled events |
 | `dialogue.py` | Traverse satisfiable dialogue branches and preserve player choices |
 | `histories.py` | Order mission phases, execute histories and select reproducible encounters |
+| `locations.py` | Match supported planet filters against the interpreted galaxy |
 | `variables.py` | Resolve player and mission substitutions in authored passages |
 
 `GameCorpus.mission_graph` includes every inferred producer link. A graph edge does not
@@ -41,3 +42,19 @@ Equivalent projected states share a representative history, independently of sol
 print order.
 Unsupported operations and exceeded route limits fail explicitly. These limits apply
 to both dataset preparation and direct gameplay use.
+
+Mission substitutions are captured at mission entry and retained in state and passage
+provenance. Named NPC ships use their given name and displayed base model. Supported
+planet filters select a candidate using the configured seed, mission name and location
+field; selection does not depend on corpus iteration order. Filters cover named planets,
+systems, governments, attributes, negation, neighboring systems and hyperlane distances.
+Planet and system field changes and link events apply before selection. Later world
+changes do not move an already instantiated mission's origin or destination.
+
+Selection uses ordinary spaceports without explicit reputation requirements. Unsupported
+filters, special travel options, in-flight origins and filters with no known candidate
+remain unresolved. The interpreter does not infer landing permission from a real save,
+instantiate fleets or expand generated ship-name phrases. Prepared prompts include the
+resolved mission values even when the scene opening contains no preceding passage.
+Rebuild prepared datasets and their retrieval indexes after changing substitution rules;
+old provenance does not contain the captured mission values needed for reconstruction.

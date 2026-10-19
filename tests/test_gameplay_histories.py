@@ -62,3 +62,16 @@ def test_equivalent_condition_order_keeps_the_same_history_witness():
                                   constraints=(condition,)), [])
                 for condition in (credits > reputation, reputation > credits)]
     assert len(gameplay.bounded(opposite)) == 2
+
+
+def test_completed_substitutions_do_not_prevent_history_deduplication():
+    from endless_voices.gameplay.state import projected_state
+
+    first = GameState(substitutions={'Completed': {'<origin>': 'Alpha'},
+                                     'Current': {'<origin>': 'Port'}})
+    second = GameState(substitutions={'Completed': {'<origin>': 'Beta'},
+                                      'Current': {'<origin>': 'Port'}})
+    relevant = {'Current: active'}
+    assert projected_state(first, relevant) == projected_state(second, relevant)
+    second.substitutions['Current']['<origin>'] = 'Elsewhere'
+    assert projected_state(first, relevant) != projected_state(second, relevant)

@@ -154,6 +154,7 @@ class GameCorpus:
         self.events = {}
         self.conversations = {}
         self.phrases = {}
+        self.ships = {}
         self.condition_writers = {}
         self.condition_triggers = {}
         self.event_schedulers = {}
@@ -246,6 +247,8 @@ class GameCorpus:
                             "conversation": node["line"], "passages": passages,
                             "reference": True, "state": {}, "source_kind": kind,
                         })
+                if kind == "ship" and names:
+                    self.ships[names[-1]] = node
                 if kind == "planet" and names:
                     self.planets[names[0]] = node
         self.scratch_conditions = {
