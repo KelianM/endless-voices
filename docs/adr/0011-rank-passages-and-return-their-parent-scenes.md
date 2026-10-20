@@ -20,11 +20,8 @@ the eligible history and writing references defined in
   increase its score.
 - **Return the whole scene once,** with the matching passage identified. The result limit
   counts distinct scenes. Passage-only retrieval remains available.
-- **Keep authored passages and their vectors in a static SQLite database.** Preserve every
-  placeholder, including values that currently resolve to only one name or location.
-- **Bind results to the current encounter's interpreted scenes.** The retrieval session
-  determines eligibility and returns each scene with its owning mission's substitutions.
-  Different sampled states may share vectors without sharing rendered context.
+- **Preserve placeholders in indexed passages.** Changing player names or mission values
+  does not require rebuilding embeddings.
 - **Keep the generated index local and ignored.** Rebuild it from the prepared dataset and
   cached encoder instead of storing successive index versions in Git LFS.
 
