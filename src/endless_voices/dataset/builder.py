@@ -352,7 +352,7 @@ class DatasetBuilder:
                 }
         self.examples = ExampleBuilder(corpus, self.sampler)
 
-    def build(self, output, splits=("train",)):
+    def build(self, output, splits=("train",), *, progress=None):
         """Publish a complete prepared bundle only after every requested mission succeeds."""
         from .storage import write_dataset
 
@@ -360,9 +360,11 @@ class DatasetBuilder:
         if output.exists():
             raise ValueError("Output exists; choose a new dataset directory")
         built, failures = [], []
-        for name, spec in sorted(self.config["missions"].items()):
-            if spec["split"] not in splits or spec.get("conversations") == []:
-                continue
+        missions = [(name, spec) for name, spec in sorted(self.config["missions"].items())
+                    if spec["split"] in splits and spec.get("conversations") != []]
+        for completed, (name, spec) in enumerate(missions):
+            if progress is not None:
+                progress(completed, len(missions), name)
             try:
                 mission = self.corpus.missions[name]
                 rows = self.examples.build(
@@ -380,6 +382,8 @@ class DatasetBuilder:
         if not built:
             raise ValueError("No missions selected")
         check_mission_splits([row[0] for row in built])
+        if progress is not None:
+            progress(len(missions), len(missions), "Writing dataset")
         write_dataset(output, built, self.config, self.corpus)
         return {
             "examples": len(built),

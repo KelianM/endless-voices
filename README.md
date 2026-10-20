@@ -29,13 +29,15 @@ Prepare reproducible encounters from cached game sources, without loading a mode
 or tokenizer:
 
 ```sh
-endless-voices prepare-dataset \
-  --source data/local/endless-sky-7140eb2a29ce \
-  --inventory data/sources/source-statistics.json \
-  --config data/dataset/config.json \
-  --splits train validation test \
+endless-voices prepare-dataset --splits train validation test \
   --output outputs/prepared-scenes
 ```
+
+Preparation reports the current mission, completed count and elapsed time to stderr,
+with an update every ten seconds during long missions. The final JSON result stays on
+stdout. Source and configuration paths default to the repository inputs; `--output`
+defaults to `data/dataset-resolved` and must not already exist. Preparation reconstructs
+game histories; it does not run a model or build the vector index.
 
 [Dataset inputs](data/README.md) explains source and mission selection. The
 [published dataset](data/dataset/README.md) records release coverage and limitations;
