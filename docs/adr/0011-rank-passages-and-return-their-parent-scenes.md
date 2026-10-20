@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-13
-- **Sources:** [PR 19](https://github.com/KelianM/endless-voices/pull/19), [issue 21](https://github.com/KelianM/endless-voices/issues/21), [retrieval comparison](../../experiments/retrieval-embeddings/README.md)
+- **Sources:** [PR 19](https://github.com/KelianM/endless-voices/pull/19), [issue 21](https://github.com/KelianM/endless-voices/issues/21), [PR 22](https://github.com/KelianM/endless-voices/pull/22), [retrieval comparison](../../experiments/retrieval-embeddings/README.md)
 
 ## Context
 
@@ -25,6 +25,8 @@ the eligible history and writing references defined in
 - **Bind results to the current encounter's interpreted scenes.** The retrieval session
   determines eligibility and returns each scene with its owning mission's substitutions.
   Different sampled states may share vectors without sharing rendered context.
+- **Keep the generated index local and ignored.** Rebuild it from the prepared dataset and
+  cached encoder instead of storing successive index versions in Git LFS.
 
 ## Consequences
 
@@ -43,3 +45,5 @@ the eligible history and writing references defined in
   changed player name or sampled origin required rebuilding otherwise unchanged vectors.
 - **Reuse requires the same authored passages.** A different branch or world-event
   description still needs indexing if the database does not contain that authored variant.
+- **Each machine must build its own index.** Local storage avoids accumulating full index
+  versions in LFS, at the cost of repeating context reconstruction and embedding.
