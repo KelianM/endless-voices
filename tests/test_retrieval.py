@@ -522,3 +522,36 @@ def test_index_rejects_rendered_context_without_authored_passages(tmp_path):
     with pytest.raises(ValueError, match="missing authored passages"):
         SceneDatabase.create(tmp_path / "missing.db", [rendered], encoder)
     assert not encoder.inputs
+
+
+def test_index_progress_tracks_completed_batches_and_preserves_passage_vectors(tmp_path):
+    source = pool()
+    encoder = Encoder()
+    encoder.batch_size = 1
+    progress = []
+    with SceneDatabase.create(tmp_path / "progress.db", source.blocks, encoder,
+                              progress=progress.append) as database:
+        source.references = []
+        session = RetrievalSession(database, source)
+        assert session.search_context("starship", limit=1)[0]["mission"] == "parent"
+    assert progress == [
+        "Embedding passages [0/2]", "Embedding passages [1/2]",
+        "Embedding passages [2/2]", "Writing SQLite index (2 passages)",
+    ]
+
+
+def test_index_cli_keeps_progress_out_of_json_output(monkeypatch, capsys):
+    import json
+
+    from endless_voices.cli import index_context as cli
+
+    def build(**kwargs):
+        kwargs["progress"]("Embedding passages [1/1]")
+        return {"scenes": 1, "output": str(kwargs["output"])}
+
+    monkeypatch.setattr(cli, "index_context", build)
+    cli.main(["--dataset", "fixture", "--output", "index.sqlite"])
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {"scenes": 1, "output": "index.sqlite"}
+    assert "Starting context index" in output.err
+    assert "Finished" in output.err

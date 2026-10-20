@@ -13,7 +13,7 @@ loss = "continuation"
 
 [context]
 model = "Qwen/Qwen3-Embedding-0.6B"
-index = "data/local/context.sqlite"
+index = "data/context.sqlite"
 max_input_tokens = 8192
 depth = 4
 

@@ -221,8 +221,9 @@ class SceneDatabase:
             raise
 
     @classmethod
-    def create(cls, path, blocks, embedder):
+    def create(cls, path, blocks, embedder, *, progress=None):
         """Persist complete passage vectors without replacing an existing index."""
+        progress = progress or (lambda message: None)
         path = Path(path)
         if path.exists() or path.is_symlink():
             raise FileExistsError(f"Scene index destination already exists: {path}")
@@ -233,13 +234,23 @@ class SceneDatabase:
         chunks = [chunk for sid in sorted(documents) for chunk in passage_chunks(documents[sid])]
         if not chunks:
             raise ValueError("Cannot index an empty passage corpus")
-        vectors = list(embedder.embed([chunk["text"] for chunk in chunks], kind="document"))
+        vectors = []
+        batch_size = getattr(embedder, "batch_size", 32)
+        for start in range(0, len(chunks), batch_size):
+            progress(f"Embedding passages [{start}/{len(chunks)}]")
+            texts = [chunk["text"] for chunk in chunks[start:start + batch_size]]
+            batch = list(embedder.embed(texts, kind="document"))
+            if len(batch) != len(texts):
+                raise ValueError("Embedder returned the wrong number of passage vectors")
+            vectors.extend(batch)
+        progress(f"Embedding passages [{len(chunks)}/{len(chunks)}]")
         if len(vectors) != len(chunks):
             raise ValueError("Embedder returned the wrong number of passage vectors")
         vectors = [_vector(vector) for vector in vectors]
         dimension = len(vectors[0])
         if any(len(vector) != dimension for vector in vectors):
             raise ValueError("Passage embedding dimensions differ")
+        progress(f"Writing SQLite index ({len(chunks)} passages)")
         with path.open("xb"):
             pass
         connection = sqlite3.connect(path)
