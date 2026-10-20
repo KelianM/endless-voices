@@ -56,5 +56,7 @@ filters, special travel options, in-flight origins and filters with no known can
 remain unresolved. The interpreter does not infer landing permission from a real save,
 instantiate fleets or expand generated ship-name phrases. Prepared prompts include the
 resolved mission values even when the scene opening contains no preceding passage.
-Rebuild prepared datasets and their retrieval indexes after changing substitution rules;
-old provenance does not contain the captured mission values needed for reconstruction.
+Rebuild prepared datasets after changing substitution rules; provenance must contain the
+captured mission values needed for reconstruction. Context blocks also retain authored
+passages for indexing. Substitution changes do not invalidate authored passage vectors;
+retrieval returns the current encounter's rendered blocks.

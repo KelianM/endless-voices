@@ -3,5 +3,6 @@ name_or_path = "Qwen/Qwen3-4B-Instruct-2507"
 revision = "cdbee75f17c01a7cc42f958dc650907174af0554"
 
 [context]
-index = "outputs/context.sqlite"
+model = "Qwen/Qwen3-Embedding-0.6B"
+index = "data/local/context.sqlite"
 max_input_tokens = 8192

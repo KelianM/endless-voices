@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-13
-- **Sources:** [PR 19](https://github.com/KelianM/endless-voices/pull/19), [retrieval comparison](../../experiments/retrieval-embeddings/README.md)
+- **Sources:** [PR 19](https://github.com/KelianM/endless-voices/pull/19), [issue 21](https://github.com/KelianM/endless-voices/issues/21), [PR 22](https://github.com/KelianM/endless-voices/pull/22), [retrieval comparison](../../experiments/retrieval-embeddings/README.md)
 
 ## Context
 
@@ -20,8 +20,10 @@ the eligible history and writing references defined in
   increase its score.
 - **Return the whole scene once,** with the matching passage identified. The result limit
   counts distinct scenes. Passage-only retrieval remains available.
-- **Keep passage vectors and interpreted scenes in a static SQLite database.** The retrieval
-  session determines which scenes the current encounter permits.
+- **Preserve placeholders in indexed passages.** Changing player names or mission values
+  does not require rebuilding embeddings.
+- **Keep the generated index local and ignored.** Rebuild it from the prepared dataset and
+  cached encoder instead of storing successive index versions in Git LFS.
 
 ## Consequences
 
@@ -35,3 +37,10 @@ the eligible history and writing references defined in
 - **Search cost grows with the eligible passage count.** Every eligible vector is scored.
 - **The initial scene-prefix embeddings omitted later passages.** Complete passage indexing
   replaced that approach so text near a scene's end can also influence retrieval.
+- **Resolved names and locations do not influence passage embeddings.** Queries mentioning
+  those values may rank differently. Embedding substituted text was rejected because a
+  changed player name or sampled origin required rebuilding otherwise unchanged vectors.
+- **Reuse requires the same authored passages.** A different branch or world-event
+  description still needs indexing if the database does not contain that authored variant.
+- **Each machine must build its own index.** Local storage avoids accumulating full index
+  versions in LFS, at the cost of repeating context reconstruction and embedding.

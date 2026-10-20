@@ -63,10 +63,16 @@ Validation checks the saved encounter and target; runtime selection checks retri
 Build a passage index from a prepared dataset:
 
 ```sh
+mkdir -p data/local
 endless-voices index-context \
   --dataset outputs/prepared-scenes \
-  --output outputs/context.sqlite
+  --output data/local/context.sqlite
 ```
+
+Progress is printed to stderr during context reconstruction, model loading, embedding and
+SQLite writing, with a heartbeat every ten seconds during long steps. The generated index
+at `data/local/context.sqlite` stays ignored and is rebuilt locally on each machine.
+Create the output directory first. Use a new output path if an index already exists.
 
 The default encoder is `Qwen/Qwen3-Embedding-0.6B`, which must already be cached in
 `data/local/hub`. Use `--model` for another cached Qwen3 embedding model or local model
@@ -75,6 +81,20 @@ token limit fail without truncation. See `index-context --help` for device and e
 
 Set `context.index` in the generation, training or benchmark configuration to this database.
 Open the database with the same model and encoding settings used to build it.
+Query encoding selects CUDA, then MPS, then CPU according to availability. Set
+`context.device` to `cpu` to reserve GPU memory for dialogue generation. Device selection
+does not change the encoding dtype or require an index rebuild.
+
+The index stores authored passages with every placeholder intact, including fixed mission
+values. Player names, sampled origins and other substitutions are applied only to the
+eligible context returned by a retrieval session. Searches mentioning resolved names or
+locations may therefore rank differently from searches using the authored wording.
+Changing substitutions alone does not require new embeddings. New authored branches or
+world-event descriptions need indexing if the database does not already contain them;
+changed source text or encoding settings also require rebuilding the index.
+
+Indexes built before this separation must be rebuilt once, at a new output path. Existing
+prepared datasets remain usable; no dataset regeneration is required for this change.
 
 Generation uses one retrieval loop for local and hosted models. Models call native tools
 for history, semantic search and scene reads, then continue with the results in their

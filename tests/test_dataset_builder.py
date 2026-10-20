@@ -1107,6 +1107,7 @@ mission Later
                 origin = block['substitutions']['<origin>']
                 origins.add(origin)
                 assert all('<' not in p['text'] for p in block['passages'])
+                assert any('<origin>' in p['text'] for p in block['source_passages'])
         if pool.mission == 'Hijack':
             origin = pool.variables['<origin>']
             origins.add(origin)

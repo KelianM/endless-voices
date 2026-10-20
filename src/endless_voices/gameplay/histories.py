@@ -219,6 +219,7 @@ class HistoryReconstructor:
             "phase": phase,
             "substitutions": values,
             "path": (node or {}).get("source_path", mission.path),
+            "source_passages": [asdict(p) for p in paragraphs],
             "passages": [{**asdict(p), "text": render(p.text, values)[0]} for p in paragraphs],
         }
 

@@ -467,3 +467,91 @@ def test_index_created_during_embedding_is_not_overwritten(tmp_path):
     with pytest.raises(FileExistsError):
         SceneDatabase.create(path, pool().blocks, RacingEncoder())
     assert path.read_bytes() == b"Another writer's index"
+
+
+def test_static_vectors_serve_distinct_encounters_without_leaking_sampled_values(tmp_path):
+    from endless_voices.retrieval import authored_scene
+
+    template = "Captain <first> visits <origin> aboard <npc>."
+
+    def encounter(name, origin):
+        source = pool()
+        source.blocks = [block("parent", f"Captain {name} visits {origin} aboard Finch.",
+                               substitutions={"<first>": name, "<origin>": origin,
+                                              "<npc>": "Finch"})]
+        source.blocks[0]["passages"][0]["role"] = "option"
+        source.blocks[0]["source_passages"] = [
+            {"line": 1, "text": template, "role": "option"}]
+        source.references = []
+        return source
+
+    first, second = encounter("Alex", "Earth"), encounter("Sam", "Mars")
+    encoder = Encoder()
+    with SceneDatabase.create(tmp_path / "static.db", first.blocks + second.blocks,
+                              encoder) as database:
+        assert encoder.inputs == ["parent\nPlayer choice: " + template]
+        stored = database.connection.execute("SELECT block FROM scenes").fetchall()
+        assert len(stored) == 1
+        assert all(value not in stored[0][0] for value in ("Alex", "Sam", "Earth", "Mars",
+                                                          "Finch", "substitutions"))
+        for source in (first, second):
+            session = RetrievalSession(database, source)
+            hit = session.search_context("Captain", expand_scenes=False)[0]
+            expected = "parent\nPlayer choice: " + source.blocks[0]["passages"][0]["text"]
+            assert hit["excerpt"] == expected
+            assert session.read_context([hit["id"]])[0]["text"] == expected
+            assert session.get_history(1)[0]["text"] == expected
+            assert expected in session.messages_for([hit["scene_id"]])[0]["content"]
+        combined = deepcopy(first)
+        combined.blocks.extend(second.blocks)
+        session = RetrievalSession(database, combined)
+        assert len(session.get_history(1)) == 2
+        assert {doc["text"] for doc in session.get_history(1)} == {
+            "parent\nPlayer choice: " + source.blocks[0]["passages"][0]["text"]
+            for source in (first, second)}
+        changed = deepcopy(first)
+        changed.blocks[0]["source_passages"][0]["text"] += " New authored sentence."
+        with pytest.raises(ValueError, match="absent"):
+            RetrievalSession(database, changed)
+        assert authored_scene(first.blocks[0]) == authored_scene(second.blocks[0])
+
+
+def test_index_rejects_rendered_context_without_authored_passages(tmp_path):
+    rendered = block("parent", "Captain Alex arrives.", substitutions={"<first>": "Alex"})
+    encoder = Encoder()
+    with pytest.raises(ValueError, match="missing authored passages"):
+        SceneDatabase.create(tmp_path / "missing.db", [rendered], encoder)
+    assert not encoder.inputs
+
+
+def test_index_progress_tracks_completed_batches_and_preserves_passage_vectors(tmp_path):
+    source = pool()
+    encoder = Encoder()
+    encoder.batch_size = 1
+    progress = []
+    with SceneDatabase.create(tmp_path / "progress.db", source.blocks, encoder,
+                              progress=progress.append) as database:
+        source.references = []
+        session = RetrievalSession(database, source)
+        assert session.search_context("starship", limit=1)[0]["mission"] == "parent"
+    assert progress == [
+        "Embedding passages [0/2]", "Embedding passages [1/2]",
+        "Embedding passages [2/2]", "Writing SQLite index (2 passages)",
+    ]
+
+
+def test_index_cli_keeps_progress_out_of_json_output(monkeypatch, capsys):
+    import json
+
+    from endless_voices.cli import index_context as cli
+
+    def build(**kwargs):
+        kwargs["progress"]("Embedding passages [1/1]")
+        return {"scenes": 1, "output": str(kwargs["output"])}
+
+    monkeypatch.setattr(cli, "index_context", build)
+    cli.main(["--dataset", "fixture", "--output", "index.sqlite"])
+    output = capsys.readouterr()
+    assert json.loads(output.out) == {"scenes": 1, "output": "index.sqlite"}
+    assert "Starting context index" in output.err
+    assert "Finished" in output.err
