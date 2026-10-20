@@ -17,6 +17,14 @@ from endless_voices.contracts import SPLITS, read_records, validate_record
 from endless_voices.splits import mission_key
 
 
+def pool_fingerprint(pool):
+    """Hash interpreted context; authored copies are verified through source file hashes."""
+    evidence = asdict(pool)
+    for block in evidence["blocks"] + evidence["references"]:
+        block.pop("source_passages", None)
+    return digest(evidence)
+
+
 class SceneDataset(Sequence):
     """Provide prepared encounters, targets and eligible context pools."""
 
@@ -131,7 +139,7 @@ class SceneDataset(Sequence):
             self._context["builder"] = DatasetBuilder(self._context["corpus"],
                                                       self._context["config"])
         pool = self._context["builder"].sampler.restore_pool(record, evidence)
-        if digest(asdict(pool)) != evidence["context"]["pool_sha256"]:
+        if pool_fingerprint(pool) != evidence["context"]["pool_sha256"]:
             raise ValueError("Reconstructed context differs from its preparation evidence")
         return deepcopy(pool)
 
@@ -173,7 +181,7 @@ def write_dataset(output, built, config, corpus):
             )
         save(root / "provenance.json", {
             record["metadata"]["id"]: {
-                **provenance, "context": {"pool_sha256": digest(asdict(pool))}}
+                **provenance, "context": {"pool_sha256": pool_fingerprint(pool)}}
             for record, pool, provenance in built})
         save(root / "config.json", config)
         licensing = root / "licensing"

@@ -4,6 +4,7 @@ from endless_voices.retrieval import (
     DEFAULT_EMBEDDING_MODEL,
     SceneDatabase,
     TransformersEmbedder,
+    authored_scene,
     scene_id,
 )
 
@@ -19,7 +20,8 @@ def index_context(dataset, output, model=DEFAULT_EMBEDDING_MODEL, *, device="aut
         for index in range(len(dataset)):
             pool = dataset.context_pool(index)
             for block in (*pool.blocks, *pool.references):
-                scenes[scene_id(block)] = block
+                source = authored_scene(block)
+                scenes[scene_id(source)] = source
     embedder = TransformersEmbedder.from_pretrained(
         model, device=device, dtype=dtype, batch_size=batch_size,
         max_length=max_length, cache_dir=cache_dir)

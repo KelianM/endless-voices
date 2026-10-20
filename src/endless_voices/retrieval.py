@@ -149,7 +149,19 @@ class TransformersEmbedder:
 
 def scene_id(block):
     """Identify an exact interpreted scene, including its scoped state and wording."""
-    return "scene-" + digest(block)
+    return "scene-" + digest({key: value for key, value in block.items()
+                              if key != "source_passages"})
+
+
+def authored_scene(block):
+    """Return source wording and provenance without encounter state."""
+    if "substitutions" in block and "source_passages" not in block:
+        raise ValueError("Interpreted context is missing authored passages")
+    result = {key: block[key] for key in (
+        "mission", "heading", "path", "phase", "conversation", "source_kind"
+    ) if key in block}
+    result["passages"] = deepcopy(block.get("source_passages", block["passages"]))
+    return result
 
 
 def context_messages(pool, ids):
@@ -199,7 +211,7 @@ class SceneDatabase:
         self.connection = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
         try:
             metadata = dict(self.connection.execute("SELECT key, value FROM metadata"))
-            if metadata.get("format") != "passage-vectors-v2":
+            if metadata.get("format") != "passage-vectors-v3":
                 raise ValueError("Unsupported scene index format; rebuild the passage index")
             if metadata.get("embedder") != embedder.identity:
                 raise ValueError("Embedding model differs from the scene index")
@@ -216,7 +228,8 @@ class SceneDatabase:
             raise FileExistsError(f"Scene index destination already exists: {path}")
         if not isinstance(embedder.identity, str) or not embedder.identity:
             raise ValueError("Embedding model identity must be a nonempty string")
-        documents = {scene_id(block): deepcopy(block) for block in blocks}
+        documents = {scene_id(source): source for block in blocks
+                     for source in [authored_scene(block)]}
         chunks = [chunk for sid in sorted(documents) for chunk in passage_chunks(documents[sid])]
         if not chunks:
             raise ValueError("Cannot index an empty passage corpus")
@@ -238,7 +251,7 @@ class SceneDatabase:
                                    "chunk TEXT, vector TEXT)")
                 connection.execute("CREATE INDEX passage_scenes ON passages (scene_id)")
                 connection.executemany("INSERT INTO metadata VALUES (?, ?)", [
-                    ("format", "passage-vectors-v2"), ("embedder", embedder.identity),
+                    ("format", "passage-vectors-v3"), ("embedder", embedder.identity),
                     ("dimension", str(dimension)),
                 ])
                 connection.executemany("INSERT INTO scenes VALUES (?, ?)", [
@@ -300,11 +313,15 @@ class RetrievalSession:
                              ("reference", self._pool.references)):
             for block in blocks:
                 sid = scene_id(block)
-                stored, chunks = database._get(sid)
-                if stored != block:
+                source = authored_scene(block)
+                stored, chunks = database._get(scene_id(source))
+                if stored != source:
                     raise ValueError("Scene index does not match the eligible context")
                 self._allowed[sid] = (kind, block)
-                self._chunks.update(chunks)
+                for source_chunk, runtime_chunk in zip(
+                        passage_chunks(source), passage_chunks(block), strict=True):
+                    self._chunks[runtime_chunk["id"]] = (
+                        runtime_chunk, chunks[source_chunk["id"]][1])
         self._distances = distances(self._pool.graph, self._pool.mission)
 
     def initial_messages(self):

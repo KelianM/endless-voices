@@ -76,6 +76,17 @@ token limit fail without truncation. See `index-context --help` for device and e
 Set `context.index` in the generation, training or benchmark configuration to this database.
 Open the database with the same model and encoding settings used to build it.
 
+The index stores authored passages with every placeholder intact, including fixed mission
+values. Player names, sampled origins and other substitutions are applied only to the
+eligible context returned by a retrieval session. Searches mentioning resolved names or
+locations may therefore rank differently from searches using the authored wording.
+Changing substitutions alone does not require new embeddings. New authored branches or
+world-event descriptions need indexing if the database does not already contain them;
+changed source text or encoding settings also require rebuilding the index.
+
+Indexes built before this separation must be rebuilt once, at a new output path. Existing
+prepared datasets remain usable; no dataset regeneration is required for this change.
+
 Generation uses one retrieval loop for local and hosted models. Models call native tools
 for history, semantic search and scene reads, then continue with the results in their
 conversation. The same instructions and eligible evidence apply to every model. There is

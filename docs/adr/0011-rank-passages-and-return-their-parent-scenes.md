@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-13
-- **Sources:** [PR 19](https://github.com/KelianM/endless-voices/pull/19), [retrieval comparison](../../experiments/retrieval-embeddings/README.md)
+- **Sources:** [PR 19](https://github.com/KelianM/endless-voices/pull/19), [issue 21](https://github.com/KelianM/endless-voices/issues/21), [retrieval comparison](../../experiments/retrieval-embeddings/README.md)
 
 ## Context
 
@@ -20,8 +20,11 @@ the eligible history and writing references defined in
   increase its score.
 - **Return the whole scene once,** with the matching passage identified. The result limit
   counts distinct scenes. Passage-only retrieval remains available.
-- **Keep passage vectors and interpreted scenes in a static SQLite database.** The retrieval
-  session determines which scenes the current encounter permits.
+- **Keep authored passages and their vectors in a static SQLite database.** Preserve every
+  placeholder, including values that currently resolve to only one name or location.
+- **Bind results to the current encounter's interpreted scenes.** The retrieval session
+  determines eligibility and returns each scene with its owning mission's substitutions.
+  Different sampled states may share vectors without sharing rendered context.
 
 ## Consequences
 
@@ -35,3 +38,8 @@ the eligible history and writing references defined in
 - **Search cost grows with the eligible passage count.** Every eligible vector is scored.
 - **The initial scene-prefix embeddings omitted later passages.** Complete passage indexing
   replaced that approach so text near a scene's end can also influence retrieval.
+- **Resolved names and locations do not influence passage embeddings.** Queries mentioning
+  those values may rank differently. Embedding substituted text was rejected because a
+  changed player name or sampled origin required rebuilding otherwise unchanged vectors.
+- **Reuse requires the same authored passages.** A different branch or world-event
+  description still needs indexing if the database does not contain that authored variant.
