@@ -75,6 +75,9 @@ token limit fail without truncation. See `index-context --help` for device and e
 
 Set `context.index` in the generation, training or benchmark configuration to this database.
 Open the database with the same model and encoding settings used to build it.
+Query encoding selects CUDA, then MPS, then CPU according to availability. Set
+`context.device` to `cpu` to reserve GPU memory for dialogue generation. Device selection
+does not change the encoding dtype or require an index rebuild.
 
 The index stores authored passages with every placeholder intact, including fixed mission
 values. Player names, sampled origins and other substitutions are applied only to the

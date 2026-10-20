@@ -14,10 +14,10 @@ from endless_voices.retrieval import (
 
 
 def open_database(settings):
-    """Open a scene index with its cached query encoder on CPU."""
+    """Open a scene index with its cached query encoder on the configured device."""
     encoder = TransformersEmbedder.from_pretrained(
         settings.get("model", DEFAULT_EMBEDDING_MODEL),
-        device="cpu",
+        device=settings.get("device", "auto"),
         dtype=settings.get("dtype", "float16"),
         max_length=settings.get("embedding_max_length", 32768),
         cache_dir=settings.get("cache_dir", "data/local/hub"),
