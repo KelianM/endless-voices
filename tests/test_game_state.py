@@ -117,3 +117,16 @@ def test_map_markers_preserve_mission_scope_without_changing_visited_conditions(
     assert updated.snapshot()["current_values"] == {"visited system: Port": 1}
     assert [(n["tokens"][0], n["mission"]) for n in updated.world] == [
         ("unmark", "Current"), ("mark", "Other")]
+
+
+def test_expression_cache_keeps_independent_z3_contexts_separate():
+    import z3
+
+    from endless_voices.gameplay.state import expression_key
+
+    first, second = z3.Context(), z3.Context()
+    left = z3.Int('alpha', ctx=first)
+    right = z3.Int('beta', ctx=second)
+    assert expression_key(left) != expression_key(right)
+    assert expression_key(z3.Int('alpha', ctx=first)) == expression_key(left)
+    assert expression_key(left + 1) == expression_key(1 + left)

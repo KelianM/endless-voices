@@ -1,7 +1,7 @@
 """Track integer game conditions and satisfiable route requirements."""
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 import z3
 from z3.z3util import get_vars
@@ -361,9 +361,16 @@ def expression(tokens, state):
     return z3.simplify(result)
 
 
-@lru_cache(maxsize=4096)
+_expression_keys = OrderedDict()
+
+
 def expression_key(expression):
     """Fingerprint a simplified expression with stable commutative operand order."""
+    identity = (expression.ctx_ref().value, expression.get_id())
+    cached = _expression_keys.get(identity)
+    if cached is not None:
+        _expression_keys.move_to_end(identity)
+        return cached[1]
     keys = {}
 
     def visit(node):
@@ -381,7 +388,12 @@ def expression_key(expression):
                 keys[identity] = fingerprint([str(node.decl()), operands])
         return keys[identity]
 
-    return visit(z3.simplify(expression))
+    result = visit(z3.simplify(expression))
+    # Retain the expression so Z3 cannot reuse its identity while cached.
+    _expression_keys[identity] = (expression, result)
+    if len(_expression_keys) > 4096:
+        _expression_keys.popitem(last=False)
+    return result
 
 
 def projected_state(state, variables=None, symbol_cache=None):
