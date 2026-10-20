@@ -15,6 +15,7 @@
     "qwen30b": "configs/qwen3-30b-local.json"
   },
   "context": {
+    "model": "Qwen/Qwen3-Embedding-0.6B",
     "index": "outputs/context.sqlite",
     "tokenizer": "data/local/hub/models--mlx-community--gemma-4-31b-it-4bit/snapshots/696d436c404745a59f30e4939a658162b0a9e57f",
     "max_input_tokens": 8192,
