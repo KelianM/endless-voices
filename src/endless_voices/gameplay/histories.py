@@ -133,7 +133,8 @@ class HistoryReconstructor:
                     if not self.continues(route.stop, "history" if offer_only else phase):
                         continue
                     block = self.block(
-                        mission, (*route.prefix, *route.paragraphs), conversations[0], phase)
+                        mission, (*route.prefix, *route.paragraphs), conversations[0],
+                        phase, history.state)
                     outcomes = [History(route.state, [*history.blocks, block])]
                     if offer_only:
                         outcome = route.stop if route.stop in {"decline", "defer"} else "accept"
@@ -166,7 +167,8 @@ class HistoryReconstructor:
                         grouped.setdefault(passage["path"], []).append(
                             Passage(passage["line"], passage["text"]))
                     for path, paragraphs in grouped.items():
-                        blocks.append(self.block(mission, paragraphs, {"source_path": path}, phase))
+                        blocks.append(self.block(
+                            mission, paragraphs, {"source_path": path}, phase, history.state))
                 updated.append(History(apply(actions, history.state), blocks))
         return self.settle_failures(self.bounded(updated))
 
@@ -201,18 +203,27 @@ class HistoryReconstructor:
             phase != "offer" or stop not in {"decline", "defer"}
         )
 
-    def block(self, mission, paragraphs, node, phase):
-        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+    def values(self, mission, state=None):
+        """Return the substitutions captured when this mission was instantiated."""
+        if state is not None and mission.name in state.substitutions:
+            return state.substitutions[mission.name]
+        return mission_values(mission.node, self.corpus.planet_systems, self.player,
+                              corpus=self.corpus, seed=self.seed,
+                              world=state.world if state is not None else ())
+
+    def block(self, mission, paragraphs, node, phase, state=None):
+        values = self.values(mission, state)
         return {
             "mission": mission.name,
             "heading": mission.name,
             "phase": phase,
+            "substitutions": values,
             "path": (node or {}).get("source_path", mission.path),
             "passages": [{**asdict(p), "text": render(p.text, values)[0]} for p in paragraphs],
         }
 
-    def travel_days(self, mission):
-        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+    def travel_days(self, mission, state):
+        values = self.values(mission, state)
         return int(
             "<origin>" in values
             and "<planet>" in values
@@ -221,6 +232,7 @@ class HistoryReconstructor:
 
     def enter(self, state, mission):
         state.scope = mission.name
+        state.substitutions[mission.name] = self.values(mission, state)
         repeat = next((n["tokens"][1:] for n in mission.node["children"]
                        if n["tokens"][:1] == ["repeat"]), ["1"])
         for name, writers in self.corpus.condition_writers.items():
@@ -253,7 +265,9 @@ class HistoryReconstructor:
             for history in histories:
                 history.state.values[mission.name + ": active"] = z3.IntVal(1)
         if phase == "enter":
-            histories = self.advance(histories, self.travel_days(mission), sample=sample)
+            histories = [advanced for history in histories
+                         for advanced in self.advance(
+                             [history], self.travel_days(mission, history.state), sample=sample)]
         if phase in {"visit", "complete"}:
             requirements = [c for n in mission.node["children"]
                             if n["tokens"] == ["to", "complete"] for c in n["children"]]
@@ -584,7 +598,8 @@ class HistoryReconstructor:
                         if (retain_histories and route.terminal
                                 and self.continues(route.stop, phase)):
                             block = self.block(
-                                mission, (*route.prefix, *route.paragraphs), node, phase)
+                                mission, (*route.prefix, *route.paragraphs), node,
+                                phase, history.state)
                             next_histories.append(History(route.state, [*history.blocks, block]))
                         if not route.paragraphs or not route.text.strip():
                             continue

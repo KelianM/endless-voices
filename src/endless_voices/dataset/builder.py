@@ -14,7 +14,7 @@ from endless_voices.gameplay.dialogue import DialogueInterpreter, Passage
 from endless_voices.gameplay.histories import History, HistoryReconstructor
 from endless_voices.gameplay.source import tokens
 from endless_voices.gameplay.state import GameState
-from endless_voices.gameplay.variables import mission_values, render
+from endless_voices.gameplay.variables import render
 from endless_voices.instructions import SCENE_INSTRUCTIONS, scene_task
 from endless_voices.retrieval import scene_id
 from endless_voices.splits import check_chain_splits, check_mission_splits
@@ -94,7 +94,7 @@ class ContextBuilder:
                                 continue
                             block = self.gameplay.block(
                                 other, (*route.prefix, *route.paragraphs), node,
-                                event["tokens"][1])
+                                event["tokens"][1], state)
                             block.update(reference=True, conversation=node["line"])
                             branches[key] = block
                         scenes.extend(branches.values())
@@ -138,11 +138,13 @@ class ContextBuilder:
                 else:
                     raise ValueError("History passage does not identify literal source text")
                 paragraphs.append(Passage(line, text, role))
+            history_state = GameState(substitutions={entry["mission"]: entry["substitutions"]})
             blocks.append(self.gameplay.block(
                 self.corpus.missions[entry["mission"]], paragraphs,
-                {"source_path": entry["path"]}, entry["phase"]))
-        state = GameState(world=tuple(evidence["encounter_state"]["world_changes"]))
-        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+                {"source_path": entry["path"]}, entry["phase"], history_state))
+        state = GameState(world=tuple(evidence["encounter_state"]["world_changes"]),
+                          substitutions=evidence["encounter_state"].get("substitutions", {}))
+        values = self.gameplay.values(mission, state)
         pool = ContextPool(meta["id"], meta["conversation_id"], mission.name,
                            record["messages"][0]["content"], record["messages"][1:-1],
                            blocks, self.graph, values,
@@ -153,7 +155,7 @@ class ContextBuilder:
 
     def add_planets(self, pool, mission, world, lore_names=()):
         """Add named and region-relevant planets visible in this encounter's world."""
-        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+        values = pool.variables
         names = set(lore_names)
         names.update(values[k] for k in ("<planet>", "<origin>") if k in values)
         paths = self.reference_paths.get(mission.name, {mission.path})
@@ -169,7 +171,7 @@ class ContextBuilder:
         self, sample_id, conversation_id, mission, history, prefix, lore, split, task
     ):
         """Build the interpreted eligibility boundary shared by selection and retrieval."""
-        values = mission_values(mission.node, self.corpus.planet_systems, self.player)
+        values = self.gameplay.values(mission, history.state)
         encounter = "\n\n".join(render(p.text, values)[0] for p in prefix)
         system = (
             SCENE_INSTRUCTIONS[task]
@@ -201,18 +203,19 @@ class ExampleBuilder:
             mission, initial, excluded=excluded,
             selected_conversations=specification.get("conversations"))
         lore_names = set(specification.get("lore_planets", []))
-        values = mission_values(mission.node, self.corpus.planet_systems, self.sampler.player)
-        lore_names.update(values[k] for k in ("<planet>", "<origin>") if k in values)
         examples = []
         for encounter in encounters:
             key, node, route, history, phase = (
                 encounter.key, encounter.node, encounter.route, encounter.history, encounter.phase)
+            values = self.sampler.gameplay.values(mission, history.state)
+            encounter_lore = lore_names | {values[k] for k in ("<planet>", "<origin>")
+                                           if k in values}
             sid = "scene-" + key[:24]
             cid = "conversation-" + digest(
                 [node.get("source_path", mission.path), node["line"]])[:24]
             planets = self.corpus.planet_references(history.state.world)
             lore = "\n\n".join(render_block(block) for block in planets
-                                 if block["name"] in lore_names)
+                                 if block["name"] in encounter_lore)
             task = scene_task(has_prefix=bool(route.prefix))
             pool = self.sampler.pool(
                 sid, cid, mission, history, route.prefix, lore, split, task
@@ -229,6 +232,9 @@ class ExampleBuilder:
                 system = self.corpus.planet_systems.get(location)
                 if system:
                     cue += f" System: {system}."
+            if values:
+                cue += "\nMission values:\n" + "\n".join(
+                    f"{marker[1:-1]}: {value}" for marker, value in sorted(values.items()))
             links = []
             for name in [*self.sampler.gameplay.ancestors(mission.name), mission.name]:
                 for choices in self.sampler.gameplay.dependencies[name].values():
@@ -288,7 +294,7 @@ class ExampleBuilder:
                 "state": route.state.snapshot(),
                 "encounter_state": history.state.snapshot(),
                 "history": [{"mission": block["mission"], "phase": block["phase"],
-                             "path": block["path"],
+                             "path": block["path"], "substitutions": block["substitutions"],
                              "passages": [[p["line"], p["role"]] for p in block["passages"]]}
                             for block in history.blocks],
                 "source_path": node.get("source_path", mission.path),
@@ -346,7 +352,7 @@ class DatasetBuilder:
                 }
         self.examples = ExampleBuilder(corpus, self.sampler)
 
-    def build(self, output, splits=("train",)):
+    def build(self, output, splits=("train",), *, progress=None):
         """Publish a complete prepared bundle only after every requested mission succeeds."""
         from .storage import write_dataset
 
@@ -354,9 +360,11 @@ class DatasetBuilder:
         if output.exists():
             raise ValueError("Output exists; choose a new dataset directory")
         built, failures = [], []
-        for name, spec in sorted(self.config["missions"].items()):
-            if spec["split"] not in splits or spec.get("conversations") == []:
-                continue
+        missions = [(name, spec) for name, spec in sorted(self.config["missions"].items())
+                    if spec["split"] in splits and spec.get("conversations") != []]
+        for completed, (name, spec) in enumerate(missions):
+            if progress is not None:
+                progress(completed, len(missions), name)
             try:
                 mission = self.corpus.missions[name]
                 rows = self.examples.build(
@@ -374,6 +382,8 @@ class DatasetBuilder:
         if not built:
             raise ValueError("No missions selected")
         check_mission_splits([row[0] for row in built])
+        if progress is not None:
+            progress(len(missions), len(missions), "Writing dataset")
         write_dataset(output, built, self.config, self.corpus)
         return {
             "examples": len(built),

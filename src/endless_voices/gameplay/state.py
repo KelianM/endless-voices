@@ -1,7 +1,7 @@
 """Track integer game conditions and satisfiable route requirements."""
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
-from functools import lru_cache
 
 import z3
 from z3.z3util import get_vars
@@ -33,6 +33,7 @@ class GameState:
     scope: str = "dialogue"
     failures: tuple = ()
     planet_systems: dict = field(default_factory=dict)
+    substitutions: dict = field(default_factory=dict)
 
     def copy(self):
         return GameState(
@@ -47,6 +48,7 @@ class GameState:
             self.scope,
             self.failures,
             self.planet_systems,
+            {name: dict(values) for name, values in self.substitutions.items()},
         )
 
     def draw(self, kind, lower, upper=None):
@@ -178,6 +180,7 @@ class GameState:
                 for name, due in self.pending
             ],
             "world_changes": list(self.world),
+            "substitutions": self.substitutions,
             "failed_missions_pending": list(self.failures),
             "initial_values": {
                 k: model.eval(v, model_completion=True).as_long()
@@ -358,9 +361,16 @@ def expression(tokens, state):
     return z3.simplify(result)
 
 
-@lru_cache(maxsize=4096)
+_expression_keys = OrderedDict()
+
+
 def expression_key(expression):
     """Fingerprint a simplified expression with stable commutative operand order."""
+    identity = (expression.ctx_ref().value, expression.get_id())
+    cached = _expression_keys.get(identity)
+    if cached is not None:
+        _expression_keys.move_to_end(identity)
+        return cached[1]
     keys = {}
 
     def visit(node):
@@ -378,7 +388,12 @@ def expression_key(expression):
                 keys[identity] = fingerprint([str(node.decl()), operands])
         return keys[identity]
 
-    return visit(z3.simplify(expression))
+    result = visit(z3.simplify(expression))
+    # Retain the expression so Z3 cannot reuse its identity while cached.
+    _expression_keys[identity] = (expression, result)
+    if len(_expression_keys) > 4096:
+        _expression_keys.popitem(last=False)
+    return result
 
 
 def projected_state(state, variables=None, symbol_cache=None):
@@ -416,4 +431,7 @@ def projected_state(state, variables=None, symbol_cache=None):
         "world": state.world,
         "failures": state.failures,
         "scope": state.scope,
+        "substitutions": {name: substitutions for name, substitutions
+                          in state.substitutions.items()
+                          if variables is None or name + ": active" in variables},
     }

@@ -1057,3 +1057,64 @@ def test_named_conversation_cannot_cross_assigned_mission_splits(tmp_path):
         "First": spec("validation"), "Second": spec("validation")}))
     assert builder.sampler.conversation_owners == {"shared": "validation"}
     assert source.named_conversation_users() == {"shared": {"First", "Second", "Unselected"}}
+
+
+def test_sampled_mission_values_survive_history_and_prompt_reconstruction(tmp_path):
+    from endless_voices.view_samples import viewer_data
+
+    source = corpus(tmp_path, '''system Start
+	government Syndicate
+	object Alpha
+	object Beta
+planet Alpha
+	spaceport `Alpha port.`
+planet Beta
+	spaceport `Beta port.`
+ship Argosy
+ship Argosy "Argosy (Blaster)"
+mission Hijack
+	source
+		government Syndicate
+	npc
+		ship "Argosy (Blaster)" "Moonshake Express"
+	on offer
+		conversation
+			`The <npc>, an <npc model>, is on <origin>.`
+			choice
+				`Help on <origin>.`
+			`Return to <planet>.`
+	on complete
+		dialog `Saved the <npc> on <origin>.`
+mission Later
+	to offer
+		has "Hijack: done"
+	on offer
+		conversation
+			`Welcome back.`
+''')
+    builder = DatasetBuilder(source, config({'Hijack': spec(), 'Later': spec()}))
+    output = tmp_path / 'prepared'
+    builder.build(output)
+    dataset = SceneDataset.load(output, 'train')
+    viewer, _ = viewer_data(output / 'manifest.json')
+    assert [s['messages'] for s in viewer['samples']] == [r['messages'] for r in dataset]
+    origins = set()
+    for i, row in enumerate(dataset):
+        pool = dataset.context_pool(i)
+        assert pool.messages() == dataset.prompt(i)
+        for block in pool.blocks:
+            if block['mission'] == 'Hijack':
+                origin = block['substitutions']['<origin>']
+                origins.add(origin)
+                assert all('<' not in p['text'] for p in block['passages'])
+        if pool.mission == 'Hijack':
+            origin = pool.variables['<origin>']
+            origins.add(origin)
+            assert f'origin: {origin}' in pool.system_prefix
+            assert 'npc: Moonshake Express' in pool.system_prefix
+            assert 'npc model: Argosy' in pool.system_prefix
+            assert all('<' not in m['content'] for m in row['messages'])
+            choices = viewer['samples'][i]['player_choices']
+            if choices:
+                assert choices['selected'] == f'Help on {origin}.'
+    assert len(origins) == 1
