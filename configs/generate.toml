@@ -4,5 +4,5 @@ revision = "cdbee75f17c01a7cc42f958dc650907174af0554"
 
 [context]
 model = "Qwen/Qwen3-Embedding-0.6B"
-index = "data/context.sqlite"
+index = "data/local/context.sqlite"
 max_input_tokens = 8192

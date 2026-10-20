@@ -63,15 +63,16 @@ Validation checks the saved encounter and target; runtime selection checks retri
 Build a passage index from a prepared dataset:
 
 ```sh
+mkdir -p data/local
 endless-voices index-context \
   --dataset outputs/prepared-scenes \
-  --output data/context.sqlite
+  --output data/local/context.sqlite
 ```
 
 Progress is printed to stderr during context reconstruction, model loading, embedding and
-SQLite writing, with a heartbeat every ten seconds during long steps. The published index
-at `data/context.sqlite` is tracked by Git LFS. Use a new output path for a rebuild if an
-index already exists.
+SQLite writing, with a heartbeat every ten seconds during long steps. The generated index
+at `data/local/context.sqlite` stays ignored and is rebuilt locally on each machine.
+Create the output directory first. Use a new output path if an index already exists.
 
 The default encoder is `Qwen/Qwen3-Embedding-0.6B`, which must already be cached in
 `data/local/hub`. Use `--model` for another cached Qwen3 embedding model or local model
